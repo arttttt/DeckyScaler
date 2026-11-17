@@ -225,6 +225,15 @@ def test_a_library_is_listed_with_what_it_serves_takes_and_which_games_have_it()
 
     assert ul.library_json(library, 5_700_000, ["Hades II"]) == {
         "id": "anr-v-b19", "label": "Apex Neural Rendering FG V.B19", "origin": ul.DOWNLOADED,
-        "slots": [ul.FRAME_GENERATION], "size": 5_700_000, "games": ["Hades II"],
+        "slots": [ul.FRAME_GENERATION], "turns_on": [ul.FRAME_GENERATION], "size": 5_700_000, "games": ["Hades II"],
     }
     assert ul.space_needed(3_418_118) == 4 * 3_418_118
+
+
+def test_a_provider_and_an_upscaler_dll_switch_on_by_themselves_and_a_frame_generation_dll_doesnt():
+    sdk = ul.added(ul.recognize(XESS_SDK), "sdk.zip", None, set(), "t")
+    fg_only = ul.added(ul.recognize(frozenset({"libxess_fg.dll"})), "fg", None, set(), "t")
+
+    assert sdk.slots == (ul.UPSCALER, ul.FRAME_GENERATION) and sdk.turns_on == (ul.UPSCALER,)
+    assert fg_only.turns_on == ()
+    assert ul.added(ul.recognize(ANR_MEMBERS), "anr.zip", None, set(), "t").turns_on == (ul.FRAME_GENERATION,)

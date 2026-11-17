@@ -232,6 +232,15 @@ class Library:
     def slots(self) -> tuple[str, ...]:
         return _slots(self.providers, self.dlls)
 
+    @property
+    def turns_on(self) -> tuple[str, ...]:
+        """The slots picking it switches on by itself: a provider is selected by name, a DLL picked as the upscaler
+        selects its upscaler. A frame generation DLL is only pointed at: OptiScaler's FG settings turn it on."""
+        selecting = {_KINDS[k].slot for provider in self.providers for k in provider.kinds}
+        if any(_DLLS[dll.name].upscaler for dll in self.dlls):
+            selecting.add(UPSCALER)
+        return tuple(slot for slot in self.slots if slot in selecting)
+
 
 def library_json(library: Library, size: int, games: list[str]) -> dict:
     """A library as the plugin's pages list it: `size` its bytes on the device, `games` those whose patch placed it."""
@@ -240,6 +249,7 @@ def library_json(library: Library, size: int, games: list[str]) -> dict:
         "label": library.label,
         "origin": library.origin,
         "slots": list(library.slots),
+        "turns_on": list(library.turns_on),
         "size": size,
         "games": games,
     }
