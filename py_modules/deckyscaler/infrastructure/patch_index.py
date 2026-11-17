@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from deckyscaler.infrastructure.files import read_json, write_json
+from deckyscaler.infrastructure.files import read_json, replace_json
 
 
 class PatchIndex:
@@ -28,7 +28,4 @@ class PatchIndex:
             self._write(index)
 
     def _write(self, index: dict[str, str]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        staged = self.path.with_name(self.path.name + ".new")
-        write_json(staged, index)
-        staged.replace(self.path)
+        replace_json(self.path, index)

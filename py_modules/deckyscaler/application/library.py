@@ -10,15 +10,11 @@ from pathlib import Path
 from deckyscaler.domain import library
 from deckyscaler.infrastructure import archive
 from deckyscaler.infrastructure.files import sha256
-from deckyscaler.infrastructure.github_releases import ReleasesUnavailable
+from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
 from deckyscaler.infrastructure.library_store import LibraryStore
 
 log = logging.getLogger(__name__)
 
-ListReleases = Callable[[str], list]
-Download = Callable[[str, Path, Callable[[int, int | None], None]], None]
-Report = Callable[[str, int, int | None], None]
-"""Tells the frontend how a download goes: version id, bytes received, total bytes if known."""
 
 
 def _error(message: str) -> dict:
@@ -107,7 +103,7 @@ class Library:
         if version is None:
             return _error(f"{version_id} is no longer published. Check again.")
         if version.unsupported:
-            return _error(f"{version_id} can't be installed: {version.unsupported}.")
+            return _error(f"{version_id} can't be downloaded now. Check again.")
         if self.store.free_bytes() < library.space_needed(version.size):
             needed = library.space_needed(version.size) // 1_000_000
             return _error(f"Not enough free space: installing {version_id} needs about {needed} MB.")

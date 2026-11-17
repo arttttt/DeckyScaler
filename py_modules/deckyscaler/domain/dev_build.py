@@ -158,24 +158,16 @@ def _release(entry: object, current: BuildInfo, plugin_name: str) -> DevRelease 
         return None
     name = asset_name(plugin_name, info)
     asset = next((a for a in entry.get("assets") or [] if isinstance(a, dict) and a.get("name") == name), None)
-    if asset is None or asset.get("state") != "uploaded":
-        return None
-    digest = release_assets.sha256(asset)
-    url = str(asset.get("browser_download_url", ""))
-    if digest is None or url != download_url(info, name):
+    # Nothing but an uploaded, checksummed asset of the build's own repository is downloaded.
+    if asset is None or release_assets.problem(asset, info.repository, info.channel) is not None:
         return None
     return DevRelease(
         info=info,
         title=str(entry.get("name") or info.channel),
         published_at=str(entry.get("published_at") or ""),
-        url=url,
-        sha256=digest,
+        url=str(asset["browser_download_url"]),
+        sha256=str(release_assets.sha256(asset)),
     )
-
-
-def download_url(info: BuildInfo, asset: str) -> str:
-    """Where GitHub serves a release asset of the build's own repository; nothing else is downloaded."""
-    return f"https://github.com/{info.repository}/releases/download/{info.channel}/{asset}"
 
 
 def _channel_order(channel: str) -> tuple[int, int]:
@@ -239,18 +231,14 @@ def stable_release(entry: object, repository: str) -> StableRelease | None:
     if not release_version.is_release(tag):
         return None
     asset = next((a for a in entry.get("assets") or [] if isinstance(a, dict) and a.get("name") == RELEASE_ASSET), None)
-    if asset is None or asset.get("state") != "uploaded":
-        return None
-    digest = release_assets.sha256(asset)
-    url = str(asset.get("browser_download_url", ""))
-    if digest is None or url != f"https://github.com/{repository}/releases/download/{tag}/{RELEASE_ASSET}":
+    if asset is None or release_assets.problem(asset, repository, tag) is not None:
         return None
     return StableRelease(
         version=tag,
         title=str(entry.get("name") or f"{RELEASE_TITLE_PREFIX}{tag}"),
         published_at=str(entry.get("published_at") or ""),
-        url=url,
-        sha256=digest,
+        url=str(asset["browser_download_url"]),
+        sha256=str(release_assets.sha256(asset)),
     )
 
 

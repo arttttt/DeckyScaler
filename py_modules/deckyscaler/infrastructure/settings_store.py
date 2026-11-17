@@ -6,7 +6,7 @@ from pathlib import Path
 
 from deckyscaler.domain import settings_layers
 from deckyscaler.domain.settings_layers import Layer
-from deckyscaler.infrastructure.files import read_json, write_json
+from deckyscaler.infrastructure.files import read_json, replace_json
 
 
 class SettingsStore:
@@ -37,7 +37,4 @@ class SettingsStore:
 
     @staticmethod
     def _write(path: Path, layer: Layer) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        staged = path.with_name(path.name + ".new")
-        write_json(staged, settings_layers.layer_json(layer))
-        staged.replace(path)
+        replace_json(path, settings_layers.layer_json(layer))

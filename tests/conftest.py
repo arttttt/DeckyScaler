@@ -308,6 +308,24 @@ with zipfile.ZipFile(archive) as zf:
 # ── GitHub ───────────────────────────────────────────────────────────────────
 
 
+class FakeDownload:
+    """Stands in for github_releases.download: records each URL, writes `content` (or raises `error`) and reports
+    the download halfway and done."""
+
+    def __init__(self, content: bytes = b"", error: Exception | None = None):
+        self.content, self.error, self.urls = content, error, []
+
+    def __call__(self, url: str, destination: Path, on_progress) -> None:
+        self.urls.append(url)
+        if self.error:
+            raise self.error
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(self.content)
+        on_progress(len(self.content) // 2, len(self.content))
+        on_progress(len(self.content), len(self.content))
+
+
+
 @pytest.fixture
 def github_api(monkeypatch):
     """A local stand-in for api.github.com: every GET answers `.status` and `.body` (a JSON list by default)."""

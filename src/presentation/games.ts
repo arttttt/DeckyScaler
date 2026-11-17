@@ -1,5 +1,5 @@
 import type { InstalledLibrary, PatchedGame } from "../api";
-import { versionLabel } from "./library";
+import { versionLabel } from "./releases";
 
 export type GameRowView = {
   key: string;

@@ -1,8 +1,8 @@
 import { ButtonItem, Field } from "@decky/ui";
-import type { LibraryRowView } from "../presentation/library";
+import type { ReleaseRowView } from "../presentation/releases";
 
 /** Version rows in a dialog: a row with an action is a button, the rest are plain text the gamepad skips. */
-export function VersionRows({ rows, onAction }: { rows: LibraryRowView[]; onAction: (id: string, label: string) => void }) {
+export function VersionRows({ rows, onAction }: { rows: ReleaseRowView[]; onAction: (id: string, label: string) => void }) {
   return (
     <>
       {rows.map((row) =>

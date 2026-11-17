@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import main
-from conftest import run, write
+from conftest import FakeDownload, run, write
 from deckyscaler.application.plugin_updates import UNKNOWN_BUILD, PluginUpdates
 from deckyscaler.domain import dev_build
 from deckyscaler.infrastructure import github_releases
@@ -152,22 +152,6 @@ ZIP = b"PK fake development build"
 ZIP_SHA256 = hashlib.sha256(ZIP).hexdigest()
 
 
-class FakeDownload:
-    """Stands in for github_releases.download: records each URL and writes the given bytes."""
-
-    def __init__(self, content: bytes = ZIP, error: Exception | None = None):
-        self.content, self.error, self.urls = content, error, []
-
-    def __call__(self, url: str, destination: Path, on_progress) -> None:
-        self.urls.append(url)
-        if self.error:
-            raise self.error
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(self.content)
-        half = len(self.content) // 2
-        on_progress(half, len(self.content))
-        on_progress(len(self.content), len(self.content))
-
 
 def service(plugin_dir: Path, download: FakeDownload | None = None, reports: list | None = None) -> PluginUpdates:
     def report(channel, received, total):
@@ -179,7 +163,7 @@ def service(plugin_dir: Path, download: FakeDownload | None = None, reports: lis
         plugin_dir.parent / "settings" / "updates.json",
         github_releases.list_releases,
         github_releases.latest_release,
-        download or FakeDownload(),
+        download or FakeDownload(ZIP),
         plugin_dir.parent / "runtime",
         report,
     )
@@ -247,7 +231,7 @@ def test_a_development_build_lists_its_repositorys_builds(plugin_dir, github):
 
 def test_installing_downloads_the_build_published_now_and_hands_decky_the_file(plugin_dir, github):
     stamp(plugin_dir)
-    download, reports = FakeDownload(), []
+    download, reports = FakeDownload(ZIP), []
     updates = service(plugin_dir, download, reports)
     updates.available_builds()
     # A push to the pull request replaced its build after the list was shown.
@@ -284,7 +268,7 @@ def test_installing_downloads_the_build_published_now_and_hands_decky_the_file(p
 
 def test_a_download_that_fails_or_does_not_match_its_checksum_installs_nothing(plugin_dir, github):
     stamp(plugin_dir)
-    failed = service(plugin_dir, FakeDownload(error=github_releases.ReleasesUnavailable("Could not download x"))).install_request("pr-12")
+    failed = service(plugin_dir, FakeDownload(ZIP, error=github_releases.ReleasesUnavailable("Could not download x"))).install_request("pr-12")
     corrupt = service(plugin_dir, FakeDownload(content=b"not the published build")).install_request("pr-12")
 
     assert failed == {"status": "error", "message": "Could not download x"}
@@ -408,7 +392,7 @@ def test_the_plugin_reports_download_progress_as_decky_events(plugin, tmp_path, 
     published = listing()
     next(entry for entry in published if entry["tag_name"] == "pr-12")["assets"][0]["digest"] = f"sha256:{ZIP_SHA256}"
     github.body = json.dumps(published).encode()
-    monkeypatch.setattr(github_releases, "download", FakeDownload())
+    monkeypatch.setattr(github_releases, "download", FakeDownload(ZIP))
     events = []
 
     async def emit(event, *args):
@@ -543,7 +527,7 @@ def test_switching_a_development_build_to_the_release_downloads_it_and_asks_deck
     stamp(plugin_dir)
     (plugin_dir / "package.json").write_text(json.dumps({"version": "2026.10.26-dev.9f2c1a6"}))
     github.body = json.dumps(release_entry()).encode()
-    download, reports = FakeDownload(), []
+    download, reports = FakeDownload(ZIP), []
 
     result = service(plugin_dir, download, reports).stable_install_request()
 

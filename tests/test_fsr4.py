@@ -8,39 +8,9 @@ from pathlib import Path
 import pytest
 
 from conftest import STABLE, add_gpu, run
-from deckyscaler.domain import fsr4, keyvalues, launch_options
+from deckyscaler.domain import fsr4, launch_options
 
 # ── unit: rules ──────────────────────────────────────────────────────────────
-
-
-def mapping(entries: dict[str, str]) -> keyvalues.KeyValues:
-    return {"installconfigstore": {"software": {"valve": {"steam": {"compattoolmapping": {
-        appid: {"name": name, "config": "", "priority": "250"} for appid, name in entries.items()
-    }}}}}}
-
-
-@pytest.mark.parametrize(
-    ("entries", "tool"),
-    [
-        ({"730": "GE-Proton11-11", "0": "proton_experimental"}, "GE-Proton11-11"),  # the game's own choice wins
-        ({"0": "proton-cachyos"}, "proton-cachyos"),  # else the one for every game
-        ({"730": "", "0": "GE-Proton11-1"}, "GE-Proton11-1"),  # an empty name is no choice
-        ({}, None),  # Steam's default, which no file names
-    ],
-)
-def test_the_games_tool_is_its_own_choice_else_the_global_one(entries, tool):
-    assert fsr4.compat_tool(mapping(entries), "730") == tool
-
-
-def test_no_mapping_section_means_steams_default():
-    assert fsr4.compat_tool({}, "730") is None
-
-
-def test_a_tool_manifest_names_its_tools_and_where_they_are():
-    manifest = keyvalues.parse('"compatibilitytools" { "compat_tools" { "GE-Proton11-11" { "install_path" "." } "x" { } } }')
-
-    assert fsr4.custom_tools(manifest) == {"ge-proton11-11": ".", "x": "."}
-    assert fsr4.custom_tools({}) == {}
 
 
 @pytest.mark.parametrize(

@@ -12,6 +12,7 @@ import decky
 from deckyscaler.application.plugin_updates import PluginUpdates, Report
 from deckyscaler.application.library import Library
 from deckyscaler.application.patcher import Patcher
+from deckyscaler.application.proton_builds import ProtonBuilds, builds_json
 from deckyscaler.application.settings import Settings
 from deckyscaler.domain import bundle, launch_options
 from deckyscaler.infrastructure import archive, core_install, github_releases
@@ -156,6 +157,47 @@ class Plugin:
     async def library_remove(self, version_id: str) -> dict:
         # Deleting an unpacked version (hundreds of MB) takes a moment on handheld storage.
         return await asyncio.to_thread(self._library().remove, version_id)
+
+    # ── Proton builds ─────────────────────────────────────────────────────────
+
+    # Reading GitHub, unpacking a build (a gigabyte and more) and sizing builds take seconds: off Decky's event
+    # loop. An install's download progress goes to the frontend as "proton_download" events.
+
+    def _proton(self, report=_ignore) -> ProtonBuilds:
+        return ProtonBuilds(
+            self._home_path(),
+            github_releases.list_releases,
+            github_releases.download,
+            report,
+            Path(decky.DECKY_PLUGIN_SETTINGS_DIR) / "proton.json",
+        )
+
+    async def proton_build_options(self) -> list:
+        return builds_json()
+
+    async def proton_installed(self, with_sizes: bool = False) -> dict:
+        return await asyncio.to_thread(self._proton().installed, with_sizes)
+
+    async def proton_versions(self, build_id: str) -> dict:
+        return await asyncio.to_thread(self._proton().versions, build_id)
+
+    async def proton_install(self, build_id: str, tool: str) -> dict:
+        return await asyncio.to_thread(self._proton(_decky_events("proton_download")).install, build_id, tool)
+
+    async def proton_removal(self, tool: str) -> dict:
+        return await asyncio.to_thread(self._proton().removal, tool)
+
+    async def proton_remove(self, tool: str) -> dict:
+        return await asyncio.to_thread(self._proton().remove, tool)
+
+    async def proton_moved(self, target: str, appids: list[str]) -> dict:
+        return await asyncio.to_thread(self._proton().moved, target, appids)
+
+    async def proton_keep(self, target: str) -> dict:
+        return await asyncio.to_thread(self._proton().keep, target)
+
+    async def proton_games(self, tool: str) -> dict:
+        return await asyncio.to_thread(self._proton().games, tool)
 
     # ── Plugin updates ────────────────────────────────────────────────────────
 

@@ -10,6 +10,7 @@ import { GamesPage } from "./GamesPage";
 import { LibrarySection } from "./LibrarySection";
 import { OptiScalerWiki } from "./OptiScalerWiki";
 import { PatchPickers } from "./PatchPickers";
+import { ProtonPage } from "./ProtonPage";
 import { UpdatesSection } from "./UpdatesSection";
 import { offered } from "../presentation/developerSection";
 import { PLUGIN_TITLE } from "../presentation/plugin";
@@ -61,6 +62,7 @@ export function PluginPage() {
       pages={[
         { title: "OptiScaler", identifier: "optiscaler", content: <OptiScalerPage /> },
         { title: "Games", identifier: "games", content: <GamesPage /> },
+        { title: "Proton", identifier: "proton", content: <ProtonPage /> },
         { title: "Advanced", identifier: "advanced", content: <AdvancedPage /> },
         { title: "Updates", identifier: "updates", content: <UpdatesSection /> },
         { title: "Developer", identifier: "developer", content: <DeveloperSection />, visible: offered(check.build) },

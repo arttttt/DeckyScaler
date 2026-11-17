@@ -103,12 +103,10 @@ def version_id(channel: str, version: str, date: str) -> str:
     return f"{channel}-{date}" if channel == NIGHTLY else f"{channel}-{version}"
 
 
-NO_ARCHIVE = "no archive this plugin can read"
-SEVERAL_ARCHIVES = "more than one archive"
-NO_CHECKSUM = "no checksum to verify the download"
-UPLOADING = "still uploading"
-UNKNOWN_FAMILY = "a version this plugin does not support yet"
-ELSEWHERE = "a download outside the OptiScaler release"
+UNKNOWN_FAMILY = "unknown-family"
+"""A version of no layout family the plugin knows: one it doesn't support yet. Other reasons: release_assets."""
+UPLOADING, NO_CHECKSUM, ELSEWHERE = release_assets.UPLOADING, release_assets.NO_CHECKSUM, release_assets.ELSEWHERE
+NO_ARCHIVE, SEVERAL_ARCHIVES = release_assets.NO_ARCHIVE, release_assets.SEVERAL_ARCHIVES
 
 
 
@@ -132,19 +130,8 @@ class Available:
 def available(channel_id: str, listing: object) -> list[Available]:
     """The versions a channel publishes, newest first, each either downloadable or saying why not."""
     channel = CHANNELS[channel_id]
-    releases = [
-        release
-        for release in (listing if isinstance(listing, list) else [])
-        if isinstance(release, dict) and not release.get("draft") and bool(release.get("prerelease")) == channel.prerelease
-    ]
-    versions = [_version(channel, release) for release in releases]
-    versions.sort(key=lambda v: v.published_at, reverse=True)
-    # A version re-released upstream (a fixed re-upload as a new release) is offered once: the newest.
-    newest: list[Available] = []
-    for version in versions:
-        if all(version.id != kept.id for kept in newest):
-            newest.append(version)
-    return newest if channel.shown is None else newest[: channel.shown]
+    versions = [_version(channel, release) for release in release_assets.releases(listing, channel.prerelease)]
+    return release_assets.newest(versions, lambda v: v.published_at, lambda v: v.id, channel.shown)
 
 
 def _version(channel: Channel, release: dict) -> Available:
@@ -160,17 +147,7 @@ def _version(channel: Channel, release: dict) -> Available:
     digest = release_assets.sha256(asset)
     family = family_of(version)
     url = str(asset.get("browser_download_url", ""))
-    expected_url = f"https://github.com/{channel.repository}/releases/download/{tag}/{asset.get('name')}"
-    if asset.get("state") != "uploaded":
-        reason: str | None = UPLOADING
-    elif digest is None:
-        reason = NO_CHECKSUM
-    elif url != expected_url:
-        reason = ELSEWHERE
-    elif family is None:
-        reason = UNKNOWN_FAMILY
-    else:
-        reason = None
+    reason = release_assets.problem(asset, channel.repository, tag) or (UNKNOWN_FAMILY if family is None else None)
     return Available(
         id=version_id(channel.id, version, date),
         channel=channel.id,
