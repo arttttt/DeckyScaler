@@ -121,11 +121,11 @@ def test_a_provider_named_as_one_of_optiscalers_own_values_is_refused():
 
 
 def test_a_library_serves_the_slots_of_its_providers_and_dlls_and_is_called_by_name_and_version():
-    library = ul.Library("x", "XeSS SDK", "3.0.2", ul.YOUR_FILE, None, (), ul.recognize(XESS_SDK).dlls, (), "")
+    library = ul.Library("x", "XeSS SDK", "3.0.2", ul.YOUR_FILE, None, (), ul.recognize(XESS_SDK).dlls, (), (), "")
 
     assert library.slots == (ul.UPSCALER, ul.FRAME_GENERATION)
     assert library.label == "XeSS SDK 3.0.2"
-    assert ul.Library("y", "ANR", None, ul.YOUR_FILE, None, (), (), (), "").label == "ANR"
+    assert ul.Library("y", "ANR", None, ul.YOUR_FILE, None, (), (), (), (), "").label == "ANR"
 
 
 def test_what_the_user_picked_is_named_after_its_one_provider_or_dll_else_after_the_pick():
@@ -152,7 +152,13 @@ def test_an_entry_reads_back_as_the_library_it_was_written_from():
 
 @pytest.mark.parametrize(
     "data",
-    [None, [], {"id": "x"}, {**ul.entry_json(ul.added(ul.recognize(frozenset({"libxess.dll"})), "a", None, set(), "t")), "dlls": []}],
+    [
+        None,
+        [],
+        {"id": "x"},
+        {**ul.entry_json(ul.added(ul.recognize(frozenset({"libxess.dll"})), "a", None, set(), "t")), "dlls": []},
+        {**ul.entry_json(ul.added(ul.recognize(frozenset({"libxess.dll"})), "a", None, set(), "t")), "files": "libxess.dll"},
+    ],
 )
 def test_an_entry_that_isnt_a_library_is_none(data):
     assert ul.parse_entry(data) is None
@@ -197,7 +203,7 @@ def test_the_dialog_lists_the_newest_releases_then_downloaded_ones_no_longer_amo
     releases = ul.releases(ul.ANR, ANR_LISTING)
     contents = ul.recognize(ANR_MEMBERS)
     b19 = ul.downloaded(releases[0], contents, "t")
-    old = ul.Library("anr-v-b01", ANR_PROVIDER, "V.B01", ul.DOWNLOADED, ul.ANR, contents.providers, (), (), "t")
+    old = ul.Library("anr-v-b01", ANR_PROVIDER, "V.B01", ul.DOWNLOADED, ul.ANR, contents.providers, (), contents.files, (), "t")
     mine = ul.added(contents, "x.zip", None, set(), "t")
 
     rows = ul.rows(ul.ANR, releases, [b19, old, mine], {"anr-v-b19": 5_000_000})

@@ -205,6 +205,8 @@ class Library:
     """The source it was downloaded from; None for the user's own file."""
     providers: tuple[Provider, ...]
     dlls: tuple[Dll, ...]
+    files: tuple[str, ...]
+    """Every file it keeps, relative to its files' directory: its providers' folders and its DLLs."""
     settings: tuple[tuple[Key, str], ...]
     """Other keys its source sets along with it (ANR's own installer's)."""
     added_at: str
@@ -240,7 +242,9 @@ def added(
     library_id = _slug(f"{name} {library_version or ''}")
     if library_id in taken:
         return ALREADY_ADDED
-    return Library(library_id, name, library_version, YOUR_FILE, None, contents.providers, contents.dlls, (), added_at)
+    return Library(
+        library_id, name, library_version, YOUR_FILE, None, contents.providers, contents.dlls, contents.files, (), added_at
+    )
 
 
 def entry_json(library: Library) -> dict:
@@ -252,9 +256,17 @@ def entry_json(library: Library) -> dict:
         "source": library.source,
         "providers": [{"name": p.name, "kinds": list(p.kinds), "folder": p.folder} for p in library.providers],
         "dlls": [{"name": d.name, "path": d.path} for d in library.dlls],
+        "files": list(library.files),
         "settings": [{"section": section, "key": key, "value": value} for (section, key), value in library.settings],
         "added_at": library.added_at,
     }
+
+
+def _items(data: dict, key: str) -> list:
+    value = data[key]
+    if not isinstance(value, list):
+        raise TypeError(f"{key} isn't a list")
+    return value
 
 
 def parse_entry(data: object) -> Library | None:
@@ -264,14 +276,15 @@ def parse_entry(data: object) -> Library | None:
     try:
         providers = tuple(
             Provider(str(p["name"]), tuple(str(k) for k in p["kinds"] if str(k) in _KINDS), str(p["folder"]))
-            for p in data["providers"]
+            for p in _items(data, "providers")
         )
-        dlls = tuple(Dll(str(d["name"]), str(d["path"])) for d in data["dlls"] if str(d["name"]) in _DLLS)
-        settings = tuple(((str(s["section"]), str(s["key"])), str(s["value"])) for s in data["settings"])
+        dlls = tuple(Dll(str(d["name"]), str(d["path"])) for d in _items(data, "dlls") if str(d["name"]) in _DLLS)
+        files = tuple(str(f) for f in _items(data, "files"))
+        settings = tuple(((str(s["section"]), str(s["key"])), str(s["value"])) for s in _items(data, "settings"))
         library = Library(
             str(data["id"]), str(data["name"]), None if data["version"] is None else str(data["version"]),
-            str(data["origin"]), None if data["source"] is None else str(data["source"]), providers, dlls, settings,
-            str(data["added_at"]),
+            str(data["origin"]), None if data["source"] is None else str(data["source"]), providers, dlls, files,
+            settings, str(data["added_at"]),
         )
     except (KeyError, TypeError):
         return None
@@ -360,7 +373,7 @@ def downloaded(release: Release, contents: Contents, added_at: str) -> Library:
     source = SOURCES[release.source]
     return Library(
         release.id, source.label, release.version, DOWNLOADED, source.id, contents.providers, contents.dlls,
-        source.settings, added_at,
+        contents.files, source.settings, added_at,
     )
 
 

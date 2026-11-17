@@ -69,6 +69,9 @@ class Family:
     main_dir: str
     """Where OptiScaler looks for its own files, such as AMD's FSR 4 driver DLL, relative to the game's
     directory: its OptiScaler/ subfolder when there is one, else the directory itself (dllmain.cpp, MainDllPath)."""
+    libraries: bool
+    """Whether it takes the user's libraries (domain/user_libraries): custom providers, and [Libraries] paths
+    relative to the game's directory, came with OptiScaler 10."""
 
 
 FAMILIES = {
@@ -76,11 +79,13 @@ FAMILIES = {
         "0.9",
         frozenset({"OptiScaler.dll", "OptiScaler.ini", "amd_fidelityfx_upscaler_dx12.dll"}),
         "",
+        libraries=False,
     ),
     "10": Family(
         "10",
         frozenset({"OptiScaler.dll", "OptiScaler.ini", "OptiScaler/amd_fidelityfx_upscaler_dx12.dll"}),
         "OptiScaler",
+        libraries=True,
     ),
 }
 
