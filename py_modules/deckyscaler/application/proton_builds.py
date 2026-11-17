@@ -15,7 +15,7 @@ from deckyscaler.domain import proton_builds, steam
 from deckyscaler.infrastructure import archive, proton
 from deckyscaler.infrastructure import steam as steam_library
 from deckyscaler.infrastructure.compat_tools_store import CompatToolsStore
-from deckyscaler.infrastructure.files import sha256
+from deckyscaler.infrastructure.files import read_json, sha256, write_json
 from deckyscaler.infrastructure.github_releases import ReleasesUnavailable
 
 log = logging.getLogger(__name__)
@@ -53,12 +53,15 @@ class ProtonBuilds:
         list_releases: ListReleases,
         download: Download,
         report: Report,
+        moves_file: Path,
         system_tools: Path | None = None,
     ):
         self.home = home
         self.list_releases = list_releases
         self.download = download
         self.report = report
+        self.moves_file = moves_file
+        """Moves an update leaves to offer once Steam restarted (the plugin restarts with it), per build."""
         self.system_tools = system_tools if system_tools is not None else proton.SYSTEM_TOOLS
 
     def _active(self, clients: list[tuple[Path, float]] | None = None) -> steam.ActiveRoot:
@@ -71,17 +74,40 @@ class ProtonBuilds:
         named = steam.name_apps(appids, steam_library.app_names(self.home), steam_library.shortcut_names(root))
         return [_app_json(app) for app in named]
 
+    def _pending(self) -> dict[str, proton_builds.PendingMove]:
+        return proton_builds.parse_pending(read_json(self.moves_file))
+
+    def _save_pending(self, moves: dict[str, proton_builds.PendingMove]) -> None:
+        self.moves_file.parent.mkdir(parents=True, exist_ok=True)
+        write_json(self.moves_file, proton_builds.pending_to_json(moves))
+
+    def _offers(self, root: Path, tools: list[proton_builds.Tool], forced) -> list[dict]:
+        """The moves to offer now: games still on an older build of a build whose newer one Steam lists."""
+        offers = []
+        for build, pending in self._pending().items():
+            appids = proton_builds.still_to_move(pending, tools, forced)
+            if appids:
+                offers.append({
+                    "build": build,
+                    "target": pending.target,
+                    "sources": sorted({forced.games[appid] for appid in appids}),
+                    "games": self._games(root, appids),
+                })
+        return offers
+
     def installed(self) -> dict:
         """Every build Steam would find, with what it takes on disk and the games whose user chose it, and whether
         Steam must restart to see the builds as they are now."""
         clients = steam_library.running_clients()
         active = self._active(clients)
         if active.root is None:
-            return {"status": "success", "problem": active.problem, "tools": [], "installed_bytes": 0, "restart_needed": False}
+            return {"status": "success", "problem": active.problem, "tools": [], "installed_bytes": 0, "restart_needed": False,
+                    "moves": []}
         store = self._store(active.root)
         forced = proton.forced_mappings(active.root)
+        tools = store.installed()
         rows = []
-        for tool in store.installed():
+        for tool in tools:
             appids, global_default = proton_builds.chosen_for(tool, forced)
             build = tool.build
             rows.append({
@@ -95,7 +121,10 @@ class ProtonBuilds:
             })
         own = sum(row["size"] for row in rows if not row["system"])
         restart = steam.restart_needed(active.root, clients, store.changed_at())
-        return {"status": "success", "problem": None, "tools": rows, "installed_bytes": own, "restart_needed": restart}
+        # Steam takes a game's move only to a build it lists, which a restart due means it doesn't yet.
+        moves = [] if restart else self._offers(active.root, tools, forced)
+        return {"status": "success", "problem": None, "tools": rows, "installed_bytes": own, "restart_needed": restart,
+                "moves": moves}
 
     def _published(self, build_id: str) -> list[proton_builds.Release]:
         return proton_builds.available(build_id, self.list_releases(proton_builds.BUILDS[build_id].repository))
@@ -125,15 +154,17 @@ class ProtonBuilds:
         if active.root is None:
             return _problem(str(active.problem))
         try:
-            release = next((r for r in self._published(build_id) if r.tool == tool_name), None)
+            releases = self._published(build_id)
         except ReleasesUnavailable as exc:
             return _error(str(exc))
+        release = next((r for r in releases if r.tool == tool_name), None)
         if release is None:
             return _error(f"{tool_name} is no longer published. Check again.")
         if release.unsupported:
             return _error(f"{tool_name} can't be installed: {release.unsupported}.")
         store = self._store(active.root)
-        if any(tool.known_as(tool_name) for tool in store.installed()):
+        tools = store.installed()
+        if any(tool.known_as(tool_name) for tool in tools):
             return _error(f"{tool_name} is already installed.")
         if store.free_bytes() < proton_builds.space_needed(release.size):
             needed = proton_builds.space_needed(release.size) // 1_000_000
@@ -159,7 +190,48 @@ class ProtonBuilds:
         finally:
             store.clear_partial()
         log.info(f"Installed {tool_name} into {store.tools_dir}")
+        self._remember_move(build_id, proton_builds.pending_move(release, releases, tools, proton.forced_mappings(active.root)))
         return {"status": "success", "id": tool_name, "message": f"{tool_name} is installed. Restart Steam to use it."}
+
+    def _remember_move(self, build_id: str, pending: proton_builds.PendingMove | None) -> None:
+        """Keep the move an update leaves for after Steam's restart; the build is installed either way."""
+        if pending is None:
+            return
+        try:
+            moves = self._pending()
+            merged = proton_builds.merge(moves.get(build_id), pending)
+            if merged is not None:
+                moves[build_id] = merged
+            self._save_pending(moves)
+        except OSError as exc:
+            log.warning(f"Keeping the games to move to {pending.target} failed: {exc}")
+
+    def moved(self, target: str, appids: list[str]) -> dict:
+        """These games were moved to `target`: they are offered no more."""
+        moves = self._pending()
+        for build, pending in list(moves.items()):
+            if pending.target == target:
+                left = proton_builds.moved(pending, appids)
+                if left is None:
+                    del moves[build]
+                else:
+                    moves[build] = left
+        self._save_pending(moves)
+        return {"status": "success"}
+
+    def keep(self, target: str) -> dict:
+        """The user keeps the games where they are: the move to `target` is offered no more."""
+        self._save_pending({build: m for build, m in self._pending().items() if m.target != target})
+        return {"status": "success"}
+
+    def games(self, tool_name: str) -> dict:
+        """The games whose user chose a tool now, as Steam's config says (read again whenever Steam rewrote it)."""
+        active = self._active()
+        if active.root is None:
+            return _problem(str(active.problem))
+        forced = proton.forced_mappings(active.root)
+        appids = sorted(appid for appid, name in forced.games.items() if name.lower() == tool_name.lower())
+        return {"status": "success", "games": self._games(active.root, appids)}
 
     def _own_tool(self, root: Path, folder: str) -> proton_builds.Tool | str:
         tool = next((t for t in self._store(root).installed() if t.folder == folder), None)

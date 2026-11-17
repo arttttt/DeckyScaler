@@ -40,6 +40,7 @@ def world(home, tmp_path, steam_library, github_api, monkeypatch):
     class World:
         root = steam_library.root.resolve()
         tools = root / "compatibilitytools.d"
+        moves_file = tmp_path / "settings" / "proton.json"
         reports: list = []
 
         def publish(self, archive_bytes: bytes) -> None:
@@ -51,7 +52,7 @@ def world(home, tmp_path, steam_library, github_api, monkeypatch):
 
         def proton(self, download=None) -> ProtonBuilds:
             return ProtonBuilds(home, github_releases.list_releases, download or FakeDownload(self.archive),
-                                lambda *args: self.reports.append(args))
+                                lambda *args: self.reports.append(args), self.moves_file)
 
         def tree(self) -> list[str]:
             return sorted(p.relative_to(self.tools).as_posix() for p in self.tools.glob("*")) if self.tools.exists() else []
@@ -149,7 +150,7 @@ def test_without_a_steam_to_install_into_nothing_is_written_and_the_frontend_is_
 
     assert proton.install(pb.GE_PROTON, NEWEST) == {"status": "error", "problem": steam.NO_STEAM}
     assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "installed_bytes": 0,
-                                  "restart_needed": False}
+                                  "restart_needed": False, "moves": []}
     assert proton.versions(pb.GE_PROTON)["problem"] == steam.NO_STEAM
     assert world.tree() == []
 
@@ -249,3 +250,90 @@ def test_steam_running_since_before_an_install_or_a_removal_needs_a_restart(worl
 
     monkeypatch.setattr(processes, "started_processes", lambda: [])
     assert proton.installed()["restart_needed"] is False  # Steam isn't running
+
+
+# ── moving games after an update ─────────────────────────────────────────────
+
+OLDER = "GE-Proton11-11-x86_64"
+
+
+@pytest.fixture
+def updating(world, steam_library):
+    """GE-Proton11-11 installed, chosen for Counter-Strike 2 and a shortcut; then 11-12 installed over GitHub."""
+    build_tree(world.tools, OLDER)
+    steam_library.set_compat_tools({"730": OLDER, SHORTCUT_APPID: OLDER, "1245620": "proton_experimental"})
+    assert world.proton().install(pb.GE_PROTON, NEWEST)["status"] == "success"
+    return world
+
+
+def test_an_update_offers_to_move_the_older_builds_games_once_steam_lists_the_new_one(updating, monkeypatch):
+    offers = updating.proton().installed()["moves"]
+
+    assert offers == [{
+        "build": pb.GE_PROTON,
+        "target": NEWEST,
+        "sources": [OLDER],
+        "games": [{"appid": SHORTCUT_APPID, "name": "Heroic", "kind": "shortcut"},
+                  {"appid": "730", "name": "Counter-Strike 2", "kind": "steam"}],
+    }]
+
+    client = f"{updating.root}/ubuntu12_32/steam"
+    monkeypatch.setattr(processes, "started_processes", lambda: [(1.0, client)])  # Steam from before the install
+    assert updating.proton().installed()["moves"] == []  # it doesn't list the new build yet: restart first
+
+
+def test_the_offer_survives_the_plugin_and_shrinks_as_games_move(updating, steam_library):
+    other = {"target": "proton-cachyos-11.0-20261015-slr-x86_64", "sources": ["proton-cachyos-x"], "appids": ["730"]}
+    updating.moves_file.write_text(json.dumps(json.loads(updating.moves_file.read_text()) | {pb.PROTON_CACHYOS: other}))
+    proton = updating.proton()
+
+    assert proton.moved(NEWEST, ["730"]) == {"status": "success"}
+    assert [g["appid"] for g in updating.proton().installed()["moves"][0]["games"]] == [SHORTCUT_APPID]
+    assert json.loads(updating.moves_file.read_text())[pb.PROTON_CACHYOS] == other  # another build's move stays
+
+    steam_library.set_compat_tools({"730": NEWEST, SHORTCUT_APPID: NEWEST})  # moved by hand meanwhile
+    assert updating.proton().installed()["moves"] == []
+    assert updating.proton().games(NEWEST)["games"] == [
+        {"appid": SHORTCUT_APPID, "name": "Heroic", "kind": "shortcut"},
+        {"appid": "730", "name": "Counter-Strike 2", "kind": "steam"},
+    ]
+
+
+def test_keeping_the_games_where_they_are_drops_the_offer(updating):
+    assert updating.proton().keep(NEWEST) == {"status": "success"}
+
+    assert updating.proton().installed()["moves"] == []
+    assert json.loads(updating.moves_file.read_text()) == {}
+
+
+def test_removing_the_new_build_drops_the_offer(updating):
+    updating.proton().remove(NEWEST)
+
+    assert updating.proton().installed()["moves"] == []
+
+
+def test_an_install_nothing_moves_to_records_nothing(world, steam_library):
+    build_tree(world.tools, OLDER)
+    steam_library.set_compat_tools({"730": "proton_experimental"})
+
+    world.proton().install(pb.GE_PROTON, NEWEST)
+
+    assert not world.moves_file.exists()
+
+
+def test_a_corrupt_moves_file_means_nothing_to_move(updating):
+    updating.moves_file.write_text("{not json")
+
+    assert updating.proton().installed()["moves"] == []
+
+
+def test_the_games_on_a_tool_follow_steams_config_as_it_rewrites_it(world, steam_library):
+    assert world.proton().games(NEWEST)["games"] == [
+        {"appid": "1245620", "name": None, "kind": "unknown"},
+        {"appid": SHORTCUT_APPID, "name": "Heroic", "kind": "shortcut"},
+        {"appid": "730", "name": "Counter-Strike 2", "kind": "steam"},
+    ]
+    time.sleep(0.01)
+    steam_library.set_compat_tools({"730": NEWEST})
+
+    assert [g["appid"] for g in world.proton().games(NEWEST)["games"]] == ["730"]

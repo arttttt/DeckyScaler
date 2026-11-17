@@ -179,3 +179,80 @@ TOOL = "GE-Proton11-12-x86_64"
 )
 def test_an_unpacked_build_is_whole_or_says_what_it_lacks(top, manifest, toolmanifest, declared, problem):
     assert pb.check_extracted(top, TOOL, manifest, toolmanifest, declared) == problem
+
+
+# ── moving games to a newer build ────────────────────────────────────────────
+
+
+def ge_releases() -> list[pb.Release]:
+    return pb.available(pb.GE_PROTON, ge())
+
+
+def test_the_older_builds_of_an_update_are_those_released_before_it_or_no_longer_listed():
+    releases = ge_releases()
+    new = releases[1]  # GE-Proton11-11
+    tools = [tool("GE-Proton11-12-x86_64"), tool("GE-Proton11-10-x86_64"), tool("GE-Proton10-34"),
+             tool("GE-Proton11-11-x86_64"), tool("proton-cachyos-11.0-20261015-slr-x86_64")]
+
+    older = pb.older_of_build(new, releases, tools)
+
+    assert [t.folder for t in older] == ["GE-Proton11-10-x86_64", "GE-Proton10-34"]
+
+
+def forced(games: dict[str, str]) -> ForcedMappings:
+    return ForcedMappings(games, None)
+
+
+def test_an_update_leaves_the_games_on_older_builds_of_the_same_build_to_move():
+    releases = ge_releases()
+    renamed = pb.Tool("my-ge", frozenset({"ge-proton11-10-x86_64"}))
+    tools = [tool("GE-Proton11-11-x86_64"), renamed, tool("GE-Proton10-34"), tool("proton-cachyos-11.0-20261015-slr-x86_64")]
+    chosen = forced({"730": "GE-Proton11-11-x86_64", "440": "GE-Proton11-10-x86_64", "570": "GE-Proton10-34",
+                     "620": "proton-cachyos-11.0-20261015-slr-x86_64"})
+
+    pending = pb.pending_move(releases[0], releases, tools, chosen)
+
+    assert pending == pb.PendingMove(
+        "GE-Proton11-12-x86_64",
+        frozenset({"ge-proton11-11-x86_64", "my-ge", "ge-proton11-10-x86_64", "ge-proton10-34"}),
+        ("440", "570", "730"),
+    )
+    assert pb.pending_move(releases[0], releases, tools, forced({"620": "proton-cachyos-11.0-20261015-slr-x86_64"})) is None
+    # going back to an older release: the newer build's games stay where they are
+    assert pb.pending_move(releases[5], releases, [tool("GE-Proton11-11-x86_64")], chosen) is None
+
+
+def test_a_second_update_before_the_move_moves_the_games_to_the_latest_from_any_older_build():
+    first = pb.PendingMove("GE-Proton11-12-x86_64", frozenset({"ge-proton11-11-x86_64"}), ("730",))
+    second = pb.PendingMove("GE-Proton11-13-x86_64", frozenset({"ge-proton11-12-x86_64"}), ("440",))
+
+    assert pb.merge(first, second) == pb.PendingMove(
+        "GE-Proton11-13-x86_64", frozenset({"ge-proton11-11-x86_64", "ge-proton11-12-x86_64"}), ("440", "730")
+    )
+    assert pb.merge(None, second) == second and pb.merge(first, None) == first and pb.merge(None, None) is None
+
+
+def test_only_games_still_on_an_older_build_are_offered_while_the_newer_one_is_installed():
+    pending = pb.PendingMove("GE-Proton11-12-x86_64", frozenset({"ge-proton11-11-x86_64"}), ("440", "570", "730"))
+    tools = [tool("GE-Proton11-12-x86_64"), tool("GE-Proton11-11-x86_64")]
+    now = forced({"730": "GE-Proton11-11-x86_64", "440": "GE-Proton11-12-x86_64"})  # 440 moved by hand, 570 cleared
+
+    assert pb.still_to_move(pending, tools, now) == ["730"]
+    assert pb.still_to_move(pending, [tool("GE-Proton11-11-x86_64")], now) == []  # the newer build was removed
+
+
+def test_moved_games_are_offered_no_more():
+    pending = pb.PendingMove("GE-Proton11-12-x86_64", frozenset({"ge-proton11-11-x86_64"}), ("440", "730"))
+
+    assert pb.moved(pending, ["730"]) == pb.PendingMove(pending.target, pending.sources, ("440",))
+    assert pb.moved(pending, ["730", "440"]) is None
+
+
+def test_pending_moves_survive_a_file_and_junk_in_it_doesnt():
+    moves = {pb.GE_PROTON: pb.PendingMove("GE-Proton11-12-x86_64", frozenset({"ge-proton11-11-x86_64"}), ("730",))}
+
+    assert pb.parse_pending(json.loads(json.dumps(pb.pending_to_json(moves)))) == moves
+    junk = {"valve-proton": {"target": "x", "sources": [], "appids": ["1"]}, pb.PROTON_CACHYOS: {"target": "x", "sources": ["a"], "appids": []},
+            pb.PROTON_CACHYOS_V3: "x", pb.GE_PROTON: {"target": "GE", "sources": ["A"], "appids": [730]}}
+    assert pb.parse_pending(junk) == {pb.GE_PROTON: pb.PendingMove("GE", frozenset({"a"}), ("730",))}
+    assert pb.parse_pending([]) == {}

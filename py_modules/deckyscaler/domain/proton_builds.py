@@ -217,3 +217,78 @@ def check_extracted(top_entries: list[str], tool: str, has_manifest: bool, has_t
     if tool.lower() not in declared:
         return f"does not declare a tool named {tool}"
     return None
+
+
+# ── Moving games to a newer build ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class PendingMove:
+    """Games to offer a newer build to once Steam lists it: an update installs the newer build next to the old
+    ones, and Steam sees it only after a restart, which the plugin doesn't outlive."""
+
+    target: str
+    """The newer build's tool name."""
+    sources: frozenset[str]
+    """Every name the older builds of the same build are known by, lowercased."""
+    appids: tuple[str, ...]
+
+
+def older_of_build(new: Release, releases: list[Release], tools: list[Tool]) -> list[Tool]:
+    """The installed tools of `new`'s build that are older than it: released before it, or no longer among the
+    newest releases at all."""
+    def published(tool: Tool) -> str | None:
+        return next((r.published_at for r in releases if tool.known_as(r.tool)), None)
+
+    return [
+        tool
+        for tool in tools
+        if tool.build == BUILDS[new.build] and ((at := published(tool)) is None or at < new.published_at)
+    ]
+
+
+def pending_move(new: Release, releases: list[Release], tools: list[Tool], forced: ForcedMappings) -> PendingMove | None:
+    """What installing `new` leaves to offer: the games whose user chose an older build of the same build."""
+    sources = [tool for tool in older_of_build(new, releases, tools) if chosen_for(tool, forced)[0]]
+    appids = sorted({appid for tool in sources for appid in chosen_for(tool, forced)[0]})
+    if not appids:
+        return None
+    names = frozenset(name for tool in sources for name in (tool.folder.lower(), *tool.names))
+    return PendingMove(new.tool, names, tuple(appids))
+
+
+def merge(earlier: PendingMove | None, later: PendingMove | None) -> PendingMove | None:
+    """A second update before the games moved: they move to the latest build, from any of the older ones."""
+    if earlier is None or later is None:
+        return later or earlier
+    return PendingMove(later.target, earlier.sources | later.sources, tuple(sorted({*earlier.appids, *later.appids})))
+
+
+def still_to_move(pending: PendingMove, tools: list[Tool], forced: ForcedMappings) -> list[str]:
+    """The games to offer the move now: still on an older build (not moved by hand meanwhile), while the newer
+    build is still installed."""
+    if not any(tool.known_as(pending.target) for tool in tools):
+        return []
+    return [appid for appid in pending.appids if forced.games.get(appid, "").lower() in pending.sources]
+
+
+def moved(pending: PendingMove, appids: list[str]) -> PendingMove | None:
+    """What is left once these games moved; None when nothing is."""
+    left = tuple(appid for appid in pending.appids if appid not in appids)
+    return PendingMove(pending.target, pending.sources, left) if left else None
+
+
+def pending_to_json(moves: dict[str, PendingMove]) -> dict:
+    return {build: {"target": m.target, "sources": sorted(m.sources), "appids": list(m.appids)} for build, m in moves.items()}
+
+
+def parse_pending(data: object) -> dict[str, PendingMove]:
+    """The pending moves a file holds, per build; anything that isn't one is left out."""
+    moves: dict[str, PendingMove] = {}
+    for build, entry in (data.items() if isinstance(data, dict) else []):
+        if build not in BUILDS or not isinstance(entry, dict):
+            continue
+        target, sources, appids = entry.get("target"), entry.get("sources"), entry.get("appids")
+        if isinstance(target, str) and isinstance(sources, list) and isinstance(appids, list) and appids:
+            moves[build] = PendingMove(target, frozenset(str(s).lower() for s in sources), tuple(str(a) for a in appids))
+    return moves

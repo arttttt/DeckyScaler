@@ -164,7 +164,13 @@ class Plugin:
     # loop. An install's download progress goes to the frontend as "proton_download" events.
 
     def _proton(self, report=_ignore) -> ProtonBuilds:
-        return ProtonBuilds(self._home_path(), github_releases.list_releases, github_releases.download, report)
+        return ProtonBuilds(
+            self._home_path(),
+            github_releases.list_releases,
+            github_releases.download,
+            report,
+            Path(decky.DECKY_PLUGIN_SETTINGS_DIR) / "proton.json",
+        )
 
     async def proton_build_options(self) -> list:
         return builds_json()
@@ -183,6 +189,15 @@ class Plugin:
 
     async def proton_remove(self, tool: str) -> dict:
         return await asyncio.to_thread(self._proton().remove, tool)
+
+    async def proton_moved(self, target: str, appids: list[str]) -> dict:
+        return await asyncio.to_thread(self._proton().moved, target, appids)
+
+    async def proton_keep(self, target: str) -> dict:
+        return await asyncio.to_thread(self._proton().keep, target)
+
+    async def proton_games(self, tool: str) -> dict:
+        return await asyncio.to_thread(self._proton().games, tool)
 
     # ── Plugin updates ────────────────────────────────────────────────────────
 
