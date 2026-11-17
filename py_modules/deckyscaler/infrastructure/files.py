@@ -40,6 +40,15 @@ def write_json(path: Path, payload: dict) -> None:
         json.dump(payload, f, indent=2)
 
 
+def replace_json(path: Path, payload: dict) -> None:
+    """Write a JSON file the plugin keeps (settings, indexes) in one step: written beside it, then moved over it,
+    so an interrupted write leaves the old content rather than half a file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_name(path.name + ".new")
+    write_json(staged, payload)
+    staged.replace(path)
+
+
 def read_text(path: Path) -> str:
     """A text file as it is, its line endings kept."""
     with open(path, encoding="utf-8", errors="replace", newline="") as f:

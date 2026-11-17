@@ -1,3 +1,4 @@
+import json
 import os
 
 from deckyscaler.infrastructure import files
@@ -47,3 +48,13 @@ def test_rewriting_a_text_file_keeps_its_line_endings(tmp_path):
     files.rewrite_text(path, lambda text: text.replace("auto", "false"))
 
     assert path.read_bytes() == b"[Menu]\r\nUseHQFont=false\r\n"
+
+
+def test_a_kept_json_file_is_replaced_whole_and_its_directory_made(tmp_path):
+    path = tmp_path / "settings" / "proton.json"
+
+    files.replace_json(path, {"a": 1})
+    files.replace_json(path, {"b": 2})
+
+    assert json.loads(path.read_text()) == {"b": 2}
+    assert sorted(p.name for p in path.parent.iterdir()) == ["proton.json"]  # nothing staged is left
