@@ -59,8 +59,16 @@ export type ProtonPageView = {
   hint: string;
 };
 
-const moveOffer = (move: ProtonMove, state: MoveState): MoveOfferView => {
-  const names = move.games.map(gameName).sort((a, b) => a.localeCompare(b)).join(", ");
+/** The games to show: those with a name. One nothing names (not installed, and unknown to Steam's library) is left
+ *  out; its appid alone says nothing. */
+export const shownGames = (games: ProtonGame[]): ProtonGame[] => games.filter((game) => game.name);
+
+const sortedNames = (games: ProtonGame[]): string[] => games.map((game) => game.name ?? "").sort((a, b) => a.localeCompare(b));
+
+const moveOffer = (offer: ProtonMove, state: MoveState): MoveOfferView => {
+  // Only the games the offer can name are moved and spoken of.
+  const move = { ...offer, games: shownGames(offer.games) };
+  const names = sortedNames(move.games).join(", ");
   const from = move.sources.join(", ");
   const busy = state?.busy === true;
   return {
@@ -86,7 +94,7 @@ export const protonPageView = (installed: InstalledProton | null, move: MoveStat
       ? `${count(own.length, "build", "builds")} installed. Newest: ${own[0].id}.`
       : "No Proton build is installed yet.",
     restart: installed.restart_needed,
-    moves: installed.moves.map((offer) => moveOffer(offer, move)),
+    moves: installed.moves.map((offer) => moveOffer(offer, move)).filter((offer) => offer.move.games.length > 0),
     dialogsEnabled: true,
   };
 };
@@ -103,7 +111,7 @@ export const unconfirmed = (appids: string[], onTarget: ProtonGame[]): string[] 
 /** How a move went: all the games are on the new build, or which ones Steam didn't confirm. */
 export const moveOutcome = (move: ProtonMove, pending: string[]): string => {
   if (pending.length === 0) return `Moved ${count(move.games.length, "game", "games")} to ${move.target}.`;
-  const names = move.games.filter((game) => pending.includes(game.appid)).map(gameName).join(", ");
+  const names = move.games.filter((game) => pending.includes(game.appid)).map((game) => game.name).join(", ");
   return `Steam hasn't confirmed the move of ${names}. Moving again is harmless.`;
 };
 
@@ -184,7 +192,8 @@ export type ProtonMenuItem = { action: "remove"; label: string; destructive: boo
 export const PROTON_MENU: ProtonMenuItem[] = [{ action: "remove", label: "Remove", destructive: true }];
 
 const usedBy = (tool: InstalledProtonTool): string => {
-  const games = tool.games.length ? `used by ${count(tool.games.length, "game", "games")}` : "no games";
+  const shown = shownGames(tool.games).length;
+  const games = shown ? `used by ${count(shown, "game", "games")}` : "no games";
   return tool.global_default ? `${games} · the default for all games` : games;
 };
 
@@ -214,9 +223,6 @@ export const protonManageView = (state: ProtonManageState): ProtonManageView => 
 /** What the dialog says when a removal succeeded and the backend gave no words of its own. */
 export const removeDone = (tool: string): string => `${tool} is removed.`;
 
-/** A game as the removal warning names it; one nothing names any more says so instead of a bare number. */
-export const gameName = (game: ProtonGame): string => game.name ?? `app ${game.appid} · not installed`;
-
 /** The removal question: a warning naming the games whose user chose the build, or why it can't be asked. */
 export type ProtonRemoveConfirmation = { title: string; lines: string[]; okLabel: string; removes: boolean; alert: boolean };
 
@@ -231,15 +237,20 @@ const cantRemove = (tool: string, reason: string): ProtonRemoveConfirmation => (
 export const protonRemoveConfirmation = (tool: string, removal: ProtonRemoval | null): ProtonRemoveConfirmation => {
   if (removal === null) return cantRemove(tool, "The plugin backend did not answer.");
   if (removal.status === "error") return cantRemove(tool, protonOutcome(removal, ""));
-  if (removal.games.length === 0 && !removal.global_default) {
+  const shown = shownGames(removal.games);
+  if (shown.length === 0 && !removal.global_default) {
     return { title: `Remove ${tool}?`, lines: ["No game uses it."], okLabel: "Remove", removes: true, alert: false };
   }
-  const names = removal.games.map(gameName).sort((a, b) => a.localeCompare(b));
-  const games = names.length
-    ? ["These games are set to use it:", ...names, "Steam will run them with its default Proton until you pick another one in their Properties."]
+  const installed = sortedNames(shown.filter((game) => game.kind !== "unknown"));
+  const elsewhere = sortedNames(shown.filter((game) => game.kind === "unknown"));
+  const games = installed.length
+    ? ["These games are set to use it:", ...installed, "Steam will run them with its default Proton until you pick another one in their Properties."]
+    : [];
+  const notInstalled = elsewhere.length
+    ? [`Steam also keeps it as the choice for games that aren't installed: ${elsewhere.join(", ")}.`]
     : [];
   const everyGame = removal.global_default
     ? ["It is the Proton Steam uses for every game you didn't pick one for; Steam goes back to its own until you pick another."]
     : [];
-  return { title: `Remove ${tool}?`, lines: [...games, ...everyGame], okLabel: "Remove anyway", removes: true, alert: false };
+  return { title: `Remove ${tool}?`, lines: [...games, ...notInstalled, ...everyGame], okLabel: "Remove anyway", removes: true, alert: false };
 };

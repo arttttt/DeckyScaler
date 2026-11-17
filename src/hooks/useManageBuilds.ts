@@ -8,6 +8,7 @@ import {
   protonRemoveConfirmation,
   removeDone,
 } from "../presentation/proton";
+import { installedWithSteamNames, withSteamNames } from "../api/steamClient";
 import { safeAsyncOperation } from "../utils";
 
 /** State and calls behind the dialog that manages installed Proton builds; `onChanged` runs after a removal. */
@@ -17,7 +18,7 @@ export const useManageBuilds = (onChanged: () => void) => {
 
   const load = useCallback(() => {
     void safeAsyncOperation(() => protonInstalled(true), "ManageBuilds -> protonInstalled").then((installed) => {
-      if (installed) setState((s) => ({ ...s, installed }));
+      if (installed) setState((s) => ({ ...s, installed: installedWithSteamNames(installed) }));
     });
   }, []);
 
@@ -34,7 +35,8 @@ export const useManageBuilds = (onChanged: () => void) => {
   /** Remove picked for a build: first the warning naming the games whose user chose it. */
   const onRemove = async (id: string) => {
     const removal = await safeAsyncOperation(() => protonRemoval(id), "ManageBuilds -> protonRemoval");
-    setPending({ id, confirmation: protonRemoveConfirmation(id, removal ?? null) });
+    const named = removal?.status === "success" ? { ...removal, games: withSteamNames(removal.games) } : removal;
+    setPending({ id, confirmation: protonRemoveConfirmation(id, named ?? null) });
   };
 
   const onConfirm = () => {

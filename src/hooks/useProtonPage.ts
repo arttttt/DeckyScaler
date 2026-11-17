@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { InstalledProton, ProtonMove, protonGames, protonInstalled, protonKeep, protonMoved } from "../api";
-import { restartSteam, specifyCompatTool } from "../api/steamClient";
+import { installedWithSteamNames, restartSteam, specifyCompatTool } from "../api/steamClient";
 import { MOVE_CONFIRM_MS, MOVE_POLL_MS, MoveState, moveOutcome, protonPageView, unconfirmed } from "../presentation/proton";
 import { safeAsyncOperation } from "../utils";
 
@@ -13,7 +13,7 @@ export const useProtonPage = () => {
 
   const reload = useCallback(() => {
     void safeAsyncOperation(() => protonInstalled(), "ProtonPage -> protonInstalled").then((answer) => {
-      if (answer) setInstalled(answer);
+      if (answer) setInstalled(installedWithSteamNames(answer));
     });
   }, []);
 

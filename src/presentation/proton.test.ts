@@ -8,7 +8,7 @@ import {
   PROTON_MENU,
   ProtonDownloadState,
   UNPACKING,
-  gameName,
+  shownGames,
   installDone,
   problemText,
   protonDownloadView,
@@ -141,13 +141,13 @@ describe("the manage dialog", () => {
     const view = protonManageView({ installed: installed(), busy: null, message: null });
 
     expect(view.rows).toEqual([
-      { id: GE.id, label: GE.id, description: "GE-Proton · 1.6 GB · used by 3 games", action: { label: "Manage", enabled: true } },
+      { id: GE.id, label: GE.id, description: "GE-Proton · 1.6 GB · used by 2 games", action: { label: "Manage", enabled: true } },
       { id: OTHER.id, label: OTHER.id, description: "Not installed by DeckyScaler · 1.4 GB · no games", action: { label: "Manage", enabled: true } },
       { id: SYSTEM.id, label: SYSTEM.id, description: "Installed system-wide · can't be removed here", action: null },
     ]);
     expect(view.usage).toBe("Installed builds take 3.0 GB.");
     const unsized = protonManageView({ installed: installed({ tools: [{ ...GE, size: null }], installed_bytes: null }), busy: null, message: null });
-    expect(unsized.rows[0].description).toBe("GE-Proton · used by 3 games");
+    expect(unsized.rows[0].description).toBe("GE-Proton · used by 2 games"); // the one nothing names isn't counted
     expect(unsized.usage).toBeNull();
     expect(PROTON_MENU).toEqual([{ action: "remove", label: "Remove", destructive: true }]);
   });
@@ -177,14 +177,13 @@ describe("the manage dialog", () => {
 });
 
 describe("removing a build", () => {
-  it("warns with the games whose user chose it, sorted, unnamed ones said as such, and still removes", () => {
+  it("warns with the games whose user chose it, sorted, leaving out what nothing names, and still removes", () => {
     const confirmation = protonRemoveConfirmation(GE.id, { status: "success", games: GE.games, global_default: false });
 
     expect(confirmation).toEqual({
       title: "Remove GE-Proton11-12-x86_64?",
       lines: [
         "These games are set to use it:",
-        "app 1245620 · not installed",
         "Counter-Strike 2",
         "Heroic",
         "Steam will run them with its default Proton until you pick another one in their Properties.",
@@ -214,9 +213,25 @@ describe("removing a build", () => {
     ]);
   });
 
-  it("names a game nothing names any more by its appid", () => {
-    expect(gameName({ appid: "1245620", name: null, kind: "unknown" })).toBe("app 1245620 · not installed");
-    expect(gameName({ appid: "730", name: "Counter-Strike 2", kind: "steam" })).toBe("Counter-Strike 2");
+  it("names the games that aren't installed apart, when Steam's library names them", () => {
+    const uninstalled = [{ appid: "1245620", name: "Elden Ring", kind: "unknown" as const }, { appid: "9", name: null, kind: "unknown" as const }];
+
+    expect(protonRemoveConfirmation(GE.id, { status: "success", games: [GE.games[0], ...uninstalled], global_default: false }).lines).toEqual([
+      "These games are set to use it:",
+      "Counter-Strike 2",
+      "Steam will run them with its default Proton until you pick another one in their Properties.",
+      "Steam also keeps it as the choice for games that aren't installed: Elden Ring.",
+    ]);
+    expect(protonRemoveConfirmation(GE.id, { status: "success", games: uninstalled, global_default: false }).lines).toEqual([
+      "Steam also keeps it as the choice for games that aren't installed: Elden Ring.",
+    ]);
+  });
+
+  it("asks plainly when only games nothing names chose it", () => {
+    expect(protonRemoveConfirmation(GE.id, { status: "success", games: [GE.games[1]], global_default: false }).lines).toEqual([
+      "No game uses it.",
+    ]);
+    expect(shownGames(GE.games).map((game) => game.appid)).toEqual(["730", "4294967291"]);
   });
 });
 
@@ -241,8 +256,8 @@ describe("moving an update's games", () => {
     const [offer] = protonPageView(installed({ moves: [MOVE] })).moves;
 
     expect(offer).toEqual({
-      move: MOVE,
-      text: "3 games still use GE-Proton11-12-x86_64: app 1245620 · not installed, Counter-Strike 2, Heroic.",
+      move: { ...MOVE, games: [GE.games[0], GE.games[2]] }, // what nothing names is neither moved nor spoken of
+      text: "2 games still use GE-Proton11-12-x86_64: Counter-Strike 2, Heroic.",
       moveLabel: "Move them to GE-Proton11-13-x86_64",
       keepLabel: "Keep them on GE-Proton11-12-x86_64",
       enabled: true,
@@ -264,25 +279,27 @@ describe("moving an update's games", () => {
 
   it("holds every offer while a move runs, then says how it went", () => {
     const moving = protonPageView(installed({ moves: [MOVE] }), { target: MOVE.target, busy: true, message: null });
-    expect(moving.moves[0]).toMatchObject({ text: "Moving 3 games to GE-Proton11-13-x86_64…", enabled: false });
+    expect(moving.moves[0]).toMatchObject({ text: "Moving 2 games to GE-Proton11-13-x86_64…", enabled: false });
     expect(moving.moveMessage).toBeNull();
 
-    const done = protonPageView(installed(), { target: MOVE.target, busy: false, message: moveOutcome(MOVE, []) });
-    expect(done.moveMessage).toBe("Moved 3 games to GE-Proton11-13-x86_64.");
+    const shown = protonPageView(installed({ moves: [MOVE] })).moves[0].move;
+    const done = protonPageView(installed(), { target: MOVE.target, busy: false, message: moveOutcome(shown, []) });
+    expect(done.moveMessage).toBe("Moved 2 games to GE-Proton11-13-x86_64.");
   });
 
   it("names the games Steam didn't confirm on the new build", () => {
     const onTarget = [GE.games[0]];
 
-    const pending = unconfirmed(["730", "4294967291", "1245620"], onTarget);
+    const pending = unconfirmed(["730", "4294967291"], onTarget);
 
-    expect(pending).toEqual(["4294967291", "1245620"]);
-    expect(moveOutcome(MOVE, pending)).toBe(
-      "Steam hasn't confirmed the move of Heroic, app 1245620 · not installed. Moving again is harmless.",
+    expect(pending).toEqual(["4294967291"]);
+    expect(moveOutcome({ ...MOVE, games: [GE.games[0], GE.games[2]] }, pending)).toBe(
+      "Steam hasn't confirmed the move of Heroic. Moving again is harmless.",
     );
   });
 
-  it("offers nothing when there is no Steam to work with", () => {
+  it("offers nothing when there is no Steam to work with, or no game it could name", () => {
     expect(protonPageView(installed({ problem: "no-steam", moves: [MOVE] })).moves).toEqual([]);
+    expect(protonPageView(installed({ moves: [{ ...MOVE, games: [GE.games[1]] }] })).moves).toEqual([]);
   });
 });

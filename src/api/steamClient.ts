@@ -1,4 +1,5 @@
 import type { LifetimeNotification } from "@decky/ui";
+import type { InstalledProton, ProtonGame } from "./index";
 
 /** Steam's own client API, for the launch options of a game. */
 
@@ -70,3 +71,23 @@ export const specifyCompatTool = (appId: number, toolName: string): void => {
     SteamClient.Apps.SpecifyCompatTool(appId, toolName);
   }
 };
+
+/** What Steam's library calls an app, installed or not; null when Steam doesn't know it. */
+const steamAppName = (appid: string): string | null => {
+  try {
+    return window.appStore?.GetAppOverviewByAppID?.(Number(appid))?.display_name || null;
+  } catch {
+    return null;
+  }
+};
+
+/** Games the backend couldn't name (no longer installed here), named as Steam's library calls them. */
+export const withSteamNames = (games: ProtonGame[]): ProtonGame[] =>
+  games.map((game) => (game.name ? game : { ...game, name: steamAppName(game.appid) }));
+
+/** The installed builds, with every game Steam's library can name named. */
+export const installedWithSteamNames = (installed: InstalledProton): InstalledProton => ({
+  ...installed,
+  tools: installed.tools.map((tool) => ({ ...tool, games: withSteamNames(tool.games) })),
+  moves: installed.moves.map((move) => ({ ...move, games: withSteamNames(move.games) })),
+});
