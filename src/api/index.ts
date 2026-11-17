@@ -90,17 +90,20 @@ export type InstalledVersion = {
 /** The downloaded versions, newest first, and what they take on disk. */
 export type InstalledLibrary = { versions: InstalledVersion[]; installed_bytes: number };
 
-export type LibraryVersion = {
+/** A published release as a download dialog lists it: an OptiScaler version or a Proton build. */
+export type ReleaseVersion = {
   id: string;
   version: string;
+  /** YYYYMMDD; empty when unknown (an installed build no longer listed). */
   date: string;
-  family: string | null;
   state: "installed" | "available" | "unsupported";
-  /** Why an unsupported version can't be installed. */
+  /** Why an unsupported release can't be downloaded. */
   reason: string | null;
-  /** Bytes on disk for an installed version, the download size otherwise. */
+  /** Bytes on disk when installed, the download's size otherwise. */
   size: number;
 };
+
+export type LibraryVersion = ReleaseVersion & { family: string | null };
 
 export type LibraryListing =
   | { status: "success"; versions: LibraryVersion[]; listing_error: string | null; installed_bytes: number }
@@ -117,6 +120,60 @@ export const libraryRemove = callable<[version_id: string], LibraryResult>("libr
 /** What removing a version would come to: why it can't be removed (or null) and the games patched with it. */
 export type LibraryRemoval = { status: "success"; refused: string | null };
 export const libraryRemoval = callable<[version_id: string], LibraryRemoval>("library_removal");
+
+// ── Proton builds ────────────────────────────────────────────────────────────
+
+/** A build the download dialog offers (GE-Proton, Proton-CachyOS and its x86_64_v3 variant). */
+export type ProtonBuildOption = { id: string; label: string; note: string | null };
+
+/** Why there is no Steam install to work with: none has run here, or several have and none is running. */
+export type ProtonProblem = "no-steam" | "several-steams";
+
+/** A game whose user chose a build; `name` is null when nothing on the device names it any more. */
+export type ProtonGame = { appid: string; name: string | null; kind: "steam" | "shortcut" | "unknown" };
+
+/** A compatibility tool Steam would find, whoever installed it. */
+export type InstalledProtonTool = {
+  id: string;
+  /** The build it is (GE-Proton, Proton-CachyOS…), or null for any other tool. */
+  build: string | null;
+  build_label: string | null;
+  /** Installed for every user of the device: listed, never removed here. */
+  system: boolean;
+  size: number;
+  games: ProtonGame[];
+  /** The tool Steam uses for every game the user didn't pick one for. */
+  global_default: boolean;
+};
+
+export type InstalledProton = {
+  status: "success";
+  problem: ProtonProblem | null;
+  tools: InstalledProtonTool[];
+  installed_bytes: number;
+  /** Builds came or went since Steam started: it lists them only after a restart. */
+  restart_needed: boolean;
+};
+
+export type ProtonListing =
+  | { status: "success"; problem: ProtonProblem | null; versions: ReleaseVersion[]; listing_error: string | null }
+  | { status: "error"; message: string };
+
+type ProtonResult =
+  | { status: "success"; message?: string }
+  | { status: "error"; message?: string; problem?: ProtonProblem };
+
+export type ProtonRemoval =
+  | { status: "success"; games: ProtonGame[]; global_default: boolean }
+  | { status: "error"; message?: string; problem?: ProtonProblem };
+
+export const protonBuildOptions = callable<[], ProtonBuildOption[]>("proton_build_options");
+export const protonInstalled = callable<[], InstalledProton>("proton_installed");
+export const protonVersions = callable<[build: string], ProtonListing>("proton_versions");
+/** Download progress arrives as "proton_download" events: tool name, bytes received, total bytes or null. */
+export const protonInstall = callable<[build: string, tool: string], ProtonResult>("proton_install");
+export const protonRemoval = callable<[tool: string], ProtonRemoval>("proton_removal");
+export const protonRemove = callable<[tool: string], ProtonResult>("proton_remove");
 
 // ── Development builds ───────────────────────────────────────────────────────
 

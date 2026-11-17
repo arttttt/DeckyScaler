@@ -56,3 +56,10 @@ export const onGameStopped = (callback: (appid: number) => void): (() => void) =
     return () => {};
   }
 };
+
+/** Restarts Steam, which then lists the Proton builds as they are now; a no-op where Steam's client API doesn't offer it. */
+export const restartSteam = (): void => {
+  if (typeof SteamClient !== "undefined" && SteamClient?.User?.StartRestart) {
+    SteamClient.User.StartRestart(false);
+  }
+};

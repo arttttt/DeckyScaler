@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ReleaseVersion, actionOutcome, byteSize, downloadProgress, downloadRows, listingMessage, versionLabel } from "./releases";
+import type { ReleaseVersion } from "../api";
+import { actionOutcome, byteSize, downloadProgress, downloadRows, listingMessage, versionLabel } from "./releases";
 
 describe("sizes", () => {
   it("reads in megabytes, and in gigabytes from a thousand megabytes", () => {

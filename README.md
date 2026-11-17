@@ -19,6 +19,7 @@ This plugin uses OptiScaler to replace DLSS calls with FSR3/FSR3.1, giving you:
 - **Smart Installation**: Handles all required dependencies and library files
 - **Game Patching**: Easy copy-paste launch commands for enabling/disabling the mod per game
 - **Games**: **DeckyScaler → Games** lists every game the plugin patched, with its OptiScaler version, proxy DLL and anything wrong with the patch; a Steam game opens its page, a directory patched by path is unpatched right there.
+- **Proton builds**: **DeckyScaler → Proton** installs GE-Proton and Proton-CachyOS into Steam and removes them (see [Proton builds](#proton-builds)).
 - **Updates**: **DeckyScaler → Updates** checks this repository's releases (on opening, and by a button) and installs a newer one through Decky; the Quick Access panel says when one is out. **Developer mode** there adds development builds, at your own risk.
 - **OptiScaler Wiki**: Direct access to OptiScaler documentation and settings via a webpage launch button right inside the plugin.
 
@@ -88,7 +89,14 @@ Dx12Upscaler=fsr31 ~/deckyscaler/patch %command%
 
 The plugin does not pick an FSR 4 model: OptiScaler does. OptiScaler 10.x chooses it from the GPU (INT8 Lite on Steam Deck and Ryzen Z1/Z2 handhelds, INT8 on RDNA3 desktop GPUs, FP8 on RDNA4). OptiScaler 0.9.x supports RDNA4 and RDNA3 desktop GPUs officially; `FSR_Fsr4ForceEnableInt8=true` (see above) forces INT8 elsewhere. Enable `FSR_Fsr4EnableWatermark=true` to see which path is active (`FSR4`, `FSR4-i8`, or `FSR3`).
 
-On Linux FSR 4 also needs AMD's driver DLL (`amdxcffx64.dll`), which neither OptiScaler nor Valve's Proton ship. GE-Proton and Proton-CachyOS download it into the game's prefix when the game is launched with `PROTON_FSR4_UPGRADE=1`. On an AMD GPU the plugin adds that variable to the launch options it writes when the game's Proton reads it, and the game's status says whether FSR 4 is already in the prefix, will be downloaded on the next launch, or needs another Proton. Without the DLL, OptiScaler's upscaler list ends at FSR 3.1.5.
+On Linux FSR 4 also needs AMD's driver DLL (`amdxcffx64.dll`), which neither OptiScaler nor Valve's Proton ship. GE-Proton and Proton-CachyOS (both installable from [**DeckyScaler → Proton**](#proton-builds)) download it into the game's prefix when the game is launched with `PROTON_FSR4_UPGRADE=1`. On an AMD GPU the plugin adds that variable to the launch options it writes when the game's Proton reads it, and the game's status says whether FSR 4 is already in the prefix, will be downloaded on the next launch, or needs another Proton. Without the DLL, OptiScaler's upscaler list ends at FSR 3.1.5.
+
+### Proton builds
+**DeckyScaler → Proton** installs custom Proton builds into Steam. *Download builds…* lists the ten newest releases of GE-Proton, Proton-CachyOS and Proton-CachyOS's x86_64_v3 variant (built for newer CPUs; for experimenting), checks each download against the checksum GitHub publishes, and unpacks it into the `compatibilitytools.d` of the Steam install that is running (or the only one that has run). *Manage installed…* lists every build Steam would find, including ones other tools installed, with the games set to use it, and removes one after a warning naming those games; builds installed for every user of the device are only listed.
+
+- Steam lists builds when it starts: after an install or a removal, the page says a restart is due and has a button for it.
+- A game's Proton is chosen in Steam: the game's Properties → Compatibility.
+- To update a build, download the newer release: it is installed next to the old one, which stays for going back until you remove it.
 
 ## Technical Details
 

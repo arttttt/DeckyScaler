@@ -3,18 +3,7 @@
  * release is named, how big things are, how a download goes, and a row of the list.
  */
 
-/** A published release as a download dialog lists it. */
-export type ReleaseVersion = {
-  id: string;
-  version: string;
-  /** YYYYMMDD; empty when unknown (an installed build no longer listed). */
-  date: string;
-  state: "installed" | "available" | "unsupported";
-  /** Why an unsupported release can't be downloaded. */
-  reason: string | null;
-  /** Bytes on disk when installed, the download's size otherwise. */
-  size: number;
-};
+import type { ReleaseVersion } from "../api";
 
 /** Bytes of the release being downloaded received so far, and the total when GitHub said it. */
 export type ReleaseDownload = { received: number; total: number | null };
