@@ -103,10 +103,10 @@ def version_id(channel: str, version: str, date: str) -> str:
     return f"{channel}-{date}" if channel == NIGHTLY else f"{channel}-{version}"
 
 
-NO_ARCHIVE = "no archive this plugin can read"
-SEVERAL_ARCHIVES = "more than one archive"
-UNKNOWN_FAMILY = "a version this plugin does not support yet"
+UNKNOWN_FAMILY = "unknown-family"
+"""A version of no layout family the plugin knows: one it doesn't support yet. Other reasons: release_assets."""
 UPLOADING, NO_CHECKSUM, ELSEWHERE = release_assets.UPLOADING, release_assets.NO_CHECKSUM, release_assets.ELSEWHERE
+NO_ARCHIVE, SEVERAL_ARCHIVES = release_assets.NO_ARCHIVE, release_assets.SEVERAL_ARCHIVES
 
 
 

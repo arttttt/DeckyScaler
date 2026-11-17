@@ -73,3 +73,17 @@ def test_releases_come_newest_first_once_each_and_up_to_a_limit():
     ]
     assert release_assets.newest(items, published_at, identity, 2) == [("y", "2026-01-05"), ("x", "2026-01-04")]
     assert release_assets.newest([], published_at, identity, 10) == []
+
+
+def test_the_frontend_words_every_reason_the_backend_gives():
+    import re
+
+    from conftest import REPO_ROOT
+    from deckyscaler.domain import library
+
+    reasons = {release_assets.UPLOADING, release_assets.NO_CHECKSUM, release_assets.ELSEWHERE, release_assets.NO_ARCHIVE,
+               release_assets.SEVERAL_ARCHIVES, library.UNKNOWN_FAMILY}
+    wording = (REPO_ROOT / "src" / "presentation" / "releases.ts").read_text()
+    table = wording[wording.index("const REASONS") : wording.index("};", wording.index("const REASONS"))]
+
+    assert set(re.findall(r'^\s*"?([a-z-]+)"?:', table, re.MULTILINE)) == reasons

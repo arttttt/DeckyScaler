@@ -9,9 +9,14 @@ from typing import TypeVar
 
 _SHA256_DIGEST = re.compile(r"^sha256:([0-9a-f]{64})$")
 
-UPLOADING = "still uploading"
-NO_CHECKSUM = "no checksum to verify the download"
-ELSEWHERE = "a download outside the release"
+# Why a release can't be downloaded, as kinds the frontend words (presentation/releases.ts).
+UPLOADING = "uploading"
+NO_CHECKSUM = "no-checksum"
+ELSEWHERE = "elsewhere"
+NO_ARCHIVE = "no-archive"
+"""No asset of the release is an archive the plugin reads."""
+SEVERAL_ARCHIVES = "several-archives"
+"""More than one asset could be the archive: which one is meant can't be told."""
 
 
 def sha256(asset: dict) -> str | None:

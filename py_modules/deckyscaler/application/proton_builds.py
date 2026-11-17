@@ -165,7 +165,7 @@ class ProtonBuilds:
         if release is None:
             return _error(f"{tool_name} is no longer published. Check again.")
         if release.unsupported:
-            return _error(f"{tool_name} can't be installed: {release.unsupported}.")
+            return _error(f"{tool_name} can't be downloaded now. Check again.")
         store = self._store(active.root)
         tools = store.installed()
         if any(tool.known_as(tool_name) for tool in tools):

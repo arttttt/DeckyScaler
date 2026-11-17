@@ -67,14 +67,14 @@ describe("the Proton page", () => {
   });
 });
 
-const release = (id: string, version: string, state: ReleaseVersion["state"], reason: string | null = null): ReleaseVersion => ({
+const release = (id: string, version: string, state: ReleaseVersion["state"], reason: ReleaseVersion["reason"] = null): ReleaseVersion => ({
   id, version, date: "20261103", state, reason, size: 566_859_228,
 });
 const LISTING: ProtonListing = {
   status: "success",
   problem: null,
   versions: [
-    release("GE-Proton11-13-x86_64", "GE-Proton11-13", "unsupported", "still uploading"),
+    release("GE-Proton11-13-x86_64", "GE-Proton11-13", "unsupported", "uploading"),
     release("GE-Proton11-12-x86_64", "GE-Proton11-12", "installed"),
     release("GE-Proton11-11-x86_64", "GE-Proton11-11", "available"),
   ],

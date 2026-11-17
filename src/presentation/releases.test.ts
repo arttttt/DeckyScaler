@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReleaseVersion } from "../api";
-import { actionOutcome, byteSize, downloadProgress, downloadRows, listingMessage, versionLabel } from "./releases";
+import { reasonText, actionOutcome, byteSize, downloadProgress, downloadRows, listingMessage, versionLabel } from "./releases";
 
 describe("sizes", () => {
   it("reads in megabytes, and in gigabytes from a thousand megabytes", () => {
@@ -29,12 +29,12 @@ describe("a download's progress", () => {
   });
 });
 
-const version = (id: string, state: ReleaseVersion["state"], reason: string | null = null): ReleaseVersion => ({
+const version = (id: string, state: ReleaseVersion["state"], reason: ReleaseVersion["reason"] = null): ReleaseVersion => ({
   id, version: id, date: "20261103", state, reason, size: 567_000_000,
 });
 
 describe("a download dialog's rows", () => {
-  const versions = [version("a", "installed"), version("b", "available"), version("c", "unsupported", "still uploading")];
+  const versions = [version("a", "installed"), version("b", "available"), version("c", "unsupported", "uploading")];
 
   it("offers what can be downloaded and says what the rest are", () => {
     expect(downloadRows(versions, null, null)).toEqual([
@@ -68,5 +68,18 @@ describe("how an action went", () => {
     expect(actionOutcome({ status: "error", message: "No room" }, "Done.")).toBe("No room");
     expect(actionOutcome({ status: "success" }, "Done.")).toBe("Done.");
     expect(actionOutcome(null, "Done.")).toBe("The plugin backend did not answer.");
+  });
+});
+
+describe("why a release can't be downloaded", () => {
+  it("is worded from the backend's kind, and a kind this frontend doesn't know shows as it came", () => {
+    expect(reasonText("uploading")).toBe("still uploading");
+    expect(reasonText("no-checksum")).toBe("no checksum to verify the download");
+    expect(reasonText("elsewhere")).toBe("a download outside the release");
+    expect(reasonText("no-archive")).toBe("no archive this plugin can read");
+    expect(reasonText("several-archives")).toBe("more than one archive");
+    expect(reasonText("unknown-family")).toBe("a version this plugin does not support yet");
+    expect(reasonText("from-the-future" as never)).toBe("from-the-future");
+    expect(reasonText(null)).toBe("unknown reason");
   });
 });

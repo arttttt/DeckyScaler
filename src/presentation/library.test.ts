@@ -22,7 +22,7 @@ const available: LibraryVersion = {
 };
 const unsupported: LibraryVersion = {
   id: "nightly-20261001", version: "9.9.0", date: "20261001", family: null,
-  state: "unsupported", reason: "a version this plugin does not support yet", size: 70_000_000,
+  state: "unsupported", reason: "unknown-family", size: 70_000_000,
 };
 
 const removal = (refused: string | null): LibraryRemoval => ({ status: "success", refused });

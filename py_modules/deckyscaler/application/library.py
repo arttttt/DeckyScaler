@@ -103,7 +103,7 @@ class Library:
         if version is None:
             return _error(f"{version_id} is no longer published. Check again.")
         if version.unsupported:
-            return _error(f"{version_id} can't be installed: {version.unsupported}.")
+            return _error(f"{version_id} can't be downloaded now. Check again.")
         if self.store.free_bytes() < library.space_needed(version.size):
             needed = library.space_needed(version.size) // 1_000_000
             return _error(f"Not enough free space: installing {version_id} needs about {needed} MB.")

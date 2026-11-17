@@ -3,7 +3,7 @@
  * release is named, how big things are, how a download goes, and a row of the list.
  */
 
-import type { ReleaseVersion } from "../api";
+import type { ReleaseReason, ReleaseVersion } from "../api";
 
 /** Bytes of the release being downloaded received so far, and the total when GitHub said it. */
 export type ReleaseDownload = { received: number; total: number | null };
@@ -39,9 +39,21 @@ export const downloadProgress = (download: ReleaseDownload | null, unpacking = "
   return `Downloading: ${percent}% of ${byteSize(download.total)}`;
 };
 
+const REASONS: Record<ReleaseReason, string> = {
+  uploading: "still uploading",
+  "no-checksum": "no checksum to verify the download",
+  elsewhere: "a download outside the release",
+  "no-archive": "no archive this plugin can read",
+  "several-archives": "more than one archive",
+  "unknown-family": "a version this plugin does not support yet",
+};
+
+/** Why a release can't be downloaded, in words; a reason this frontend doesn't know yet as it came. */
+export const reasonText = (reason: ReleaseReason | null): string => (reason ? REASONS[reason] ?? reason : "unknown reason");
+
 const describePublished = (version: ReleaseVersion): string => {
   if (version.state === "installed") return "Downloaded";
-  if (version.state === "unsupported") return `Can't be downloaded: ${version.reason ?? "unknown reason"}`;
+  if (version.state === "unsupported") return `Can't be downloaded: ${reasonText(version.reason)}`;
   return `${byteSize(version.size)} download`;
 };
 

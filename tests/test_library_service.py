@@ -274,7 +274,7 @@ def test_a_version_listed_as_unsupported_is_never_downloaded(world, github_api):
 
     result = world.library(download).install(library.NIGHTLY, NEWEST)
 
-    assert result["message"] == f"{NEWEST} can't be installed: {library.NO_CHECKSUM}."
+    assert result["message"] == f"{NEWEST} can't be downloaded now. Check again."  # the dialog said why
     assert download.urls == []
 
 

@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from deckyscaler.domain import proton_builds as pb
+from deckyscaler.domain import release_assets
 from deckyscaler.domain.compat_tools import ForcedMappings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -66,9 +67,9 @@ def test_a_release_without_a_downloadable_archive_says_why_and_the_older_ones_st
     releases = pb.available(pb.GE_PROTON, listing)
 
     assert [(r.tool, r.unsupported) for r in releases[:4]] == [
-        ("GE-Proton11-12-x86_64", "still uploading"),
-        ("GE-Proton11-11", pb.NO_ASSET),
-        ("GE-Proton11-10", pb.SEVERAL_ASSETS),
+        ("GE-Proton11-12-x86_64", release_assets.UPLOADING),
+        ("GE-Proton11-11", release_assets.NO_ARCHIVE),
+        ("GE-Proton11-10", release_assets.SEVERAL_ARCHIVES),
         ("GE-Proton11-9-x86_64", None),
     ]
 
@@ -136,7 +137,7 @@ def test_releases_say_whether_they_are_installed_and_installed_builds_stay_liste
     rows = pb.versions(pb.GE_PROTON, releases, installed)
 
     assert rows[0] == pb.Row("GE-Proton11-12-x86_64", "GE-Proton11-12", "20261103", pb.INSTALLED, None, 566859228)
-    assert rows[1] == pb.Row("GE-Proton11-11", "GE-Proton11-11", "20261019", pb.UNSUPPORTED, pb.NO_ASSET, 0)
+    assert rows[1] == pb.Row("GE-Proton11-11", "GE-Proton11-11", "20261019", pb.UNSUPPORTED, release_assets.NO_ARCHIVE, 0)
     assert rows[2].state == pb.AVAILABLE
     assert rows[-1] == pb.Row("GE-Proton10-34", "GE-Proton10-34", "", pb.INSTALLED, None, 0)  # fell out of the ten
     assert len(rows) == len(releases) + 1  # the CachyOS tool is another build's

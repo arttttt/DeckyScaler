@@ -71,10 +71,6 @@ def build_of(name: str) -> Build | None:
 
 # ── Releases ─────────────────────────────────────────────────────────────────
 
-NO_ASSET = "no archive for this build"
-SEVERAL_ASSETS = "more than one archive"
-
-
 @dataclass(frozen=True)
 class Release:
     """A release of a build, as the download dialog offers it."""
@@ -116,7 +112,8 @@ def _release(build: Build, release: dict) -> Release:
     published_at = str(release.get("published_at") or "")
     matches = [(asset, tool) for asset in release.get("assets") or [] if isinstance(asset, dict) and (tool := _tool_name(build, asset))]
     if len(matches) != 1:
-        return Release(tag, build.id, tag, published_at, "", "", 0, SEVERAL_ASSETS if matches else NO_ASSET)
+        reason = release_assets.SEVERAL_ARCHIVES if matches else release_assets.NO_ARCHIVE
+        return Release(tag, build.id, tag, published_at, "", "", 0, reason)
     asset, tool = matches[0]
     return Release(
         tool=tool,

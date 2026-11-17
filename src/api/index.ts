@@ -90,6 +90,15 @@ export type InstalledVersion = {
 /** The downloaded versions, newest first, and what they take on disk. */
 export type InstalledLibrary = { versions: InstalledVersion[]; installed_bytes: number };
 
+/** Why a release can't be downloaded (the backend's kinds; presentation/releases.ts words them). */
+export type ReleaseReason =
+  | "uploading"
+  | "no-checksum"
+  | "elsewhere"
+  | "no-archive"
+  | "several-archives"
+  | "unknown-family";
+
 /** A published release as a download dialog lists it: an OptiScaler version or a Proton build. */
 export type ReleaseVersion = {
   id: string;
@@ -98,7 +107,7 @@ export type ReleaseVersion = {
   date: string;
   state: "installed" | "available" | "unsupported";
   /** Why an unsupported release can't be downloaded. */
-  reason: string | null;
+  reason: ReleaseReason | null;
   /** Bytes on disk when installed, the download's size otherwise. */
   size: number;
 };

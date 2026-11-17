@@ -126,9 +126,9 @@ def test_a_newest_release_still_uploading_leaves_the_previous_one_installable(wo
     github_api.body = json.dumps(listing).encode()
     proton = world.proton()
 
-    assert "can't be installed: still uploading" in proton.install(pb.GE_PROTON, NEWEST)["message"]
+    assert proton.install(pb.GE_PROTON, NEWEST)["message"] == f"{NEWEST} can't be downloaded now. Check again."
     rows = proton.versions(pb.GE_PROTON)["versions"]
-    assert (rows[0]["state"], rows[0]["reason"], rows[1]["state"]) == ("unsupported", "still uploading", "available")
+    assert (rows[0]["state"], rows[0]["reason"], rows[1]["state"]) == ("unsupported", "uploading", "available")
 
 
 def test_only_a_release_the_build_publishes_is_installed(world):
