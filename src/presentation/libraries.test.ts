@@ -17,7 +17,7 @@ import {
   librariesBlockView,
   librariesLine,
   librariesSummary,
-  pickerStarts,
+  pickerStart,
   refusalText,
   slotLabel,
 } from "./libraries";
@@ -160,8 +160,9 @@ describe("adding the user's own", () => {
   });
 
   it("opens the picker where Desktop Mode downloads land, and says so", () => {
-    expect(pickerStarts("/home/deck")).toEqual(["/home/deck/Downloads", "/home/deck"]);
-    expect(pickerStarts(null)).toEqual(["/"]);
+    expect(pickerStart({ home: "/home/deck", downloads: "/home/deck/Downloads" })).toBe("/home/deck/Downloads");
+    expect(pickerStart({ home: "/home/deck" })).toBe("/home/deck");
+    expect(pickerStart(null)).toBe("/");
     expect(ADD_HINT).toContain("Downloads");
   });
 });

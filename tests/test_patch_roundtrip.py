@@ -50,7 +50,10 @@ def test_path_defaults_point_the_picker_at_home_and_the_native_steam_library(plu
     assert defaults == {
         "home": str(home),
         "steam_common": str(home / ".local" / "share" / "Steam" / "steamapps" / "common"),
+        "downloads": str(home),  # no Downloads folder: the picker opens at home
     }
+    (home / "Downloads").mkdir()
+    assert asyncio.run(plugin.get_path_defaults())["downloads"] == str(home / "Downloads")
 
 
 def test_a_first_patch_without_the_games_launch_options_is_refused_and_changes_nothing(plugin, plugin_home, steam_library):
