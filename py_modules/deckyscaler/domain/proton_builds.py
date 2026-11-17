@@ -89,7 +89,7 @@ class Release:
     @property
     def date(self) -> str:
         """The day it was published, YYYYMMDD."""
-        return self.published_at[:10].replace("-", "")
+        return release_assets.day(self.published_at)
 
 
 def available(build_id: str, listing: object) -> list[Release]:
@@ -156,36 +156,19 @@ def newest_first(tools: list[Tool]) -> list[Tool]:
     return sorted(tools, key=lambda tool: (tool.system, -tool.modified))
 
 
-INSTALLED = "installed"
-AVAILABLE = "available"
-UNSUPPORTED = "unsupported"
-
-
-@dataclass(frozen=True)
-class Row:
-    """A release in the download dialog."""
-
-    id: str
-    version: str
-    date: str
-    state: str
-    reason: str | None
-    size: int
-
-
-def versions(build_id: str, releases: list[Release], tools: list[Tool]) -> list[Row]:
+def versions(build_id: str, releases: list[Release], tools: list[Tool]) -> list[release_assets.Row]:
     """The download dialog's rows for a build: its newest releases, then the build's installed tools no longer
     among them (they stay listed)."""
     def installed(name: str) -> bool:
         return any(tool.known_as(name) for tool in tools)
 
     rows = [
-        Row(r.tool, r.tag, r.date, INSTALLED if installed(r.tool) else UNSUPPORTED if r.unsupported else AVAILABLE, r.unsupported, r.size)
+        release_assets.Row(r.tool, r.tag, r.date, release_assets.row_state(installed(r.tool), r.unsupported), r.unsupported, r.size)
         for r in releases
     ]
     listed = [r.tool for r in releases]
     rows += [
-        Row(tool.folder, tool.folder, "", INSTALLED, None, 0)
+        release_assets.Row(tool.folder, tool.folder, "", release_assets.INSTALLED, None, 0)
         for tool in tools
         if tool.build == BUILDS[build_id] and not any(tool.known_as(name) for name in listed)
     ]

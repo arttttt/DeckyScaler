@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import TypeVar
 
 _SHA256_DIGEST = re.compile(r"^sha256:([0-9a-f]{64})$")
@@ -17,6 +18,39 @@ NO_ARCHIVE = "no-archive"
 """No asset of the release is an archive the plugin reads."""
 SEVERAL_ARCHIVES = "several-archives"
 """More than one asset could be the archive: which one is meant can't be told."""
+
+
+# What a download dialog says of a release, as kinds the frontend words (presentation/releases.ts).
+INSTALLED = "installed"
+AVAILABLE = "available"
+UNSUPPORTED = "unsupported"
+
+
+@dataclass(frozen=True)
+class Row:
+    """A release as a download dialog lists it."""
+
+    id: str
+    version: str
+    date: str
+    """YYYYMMDD; empty when unknown (something installed that the listing no longer has)."""
+    state: str
+    reason: str | None
+    """Why an UNSUPPORTED release can't be downloaded."""
+    size: int
+    """Bytes on disk when installed, the download's size otherwise."""
+
+
+def row_state(installed: bool, unsupported: str | None) -> str:
+    """What a dialog says of a release: on the device, else whether it can be downloaded."""
+    if installed:
+        return INSTALLED
+    return UNSUPPORTED if unsupported else AVAILABLE
+
+
+def day(published_at: str) -> str:
+    """The day a release was published, YYYYMMDD, from GitHub's ISO time."""
+    return published_at[:10].replace("-", "")
 
 
 def sha256(asset: dict) -> str | None:

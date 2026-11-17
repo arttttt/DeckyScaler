@@ -87,3 +87,13 @@ def test_the_frontend_words_every_reason_the_backend_gives():
     table = wording[wording.index("const REASONS") : wording.index("};", wording.index("const REASONS"))]
 
     assert set(re.findall(r'^\s*"?([a-z-]+)"?:', table, re.MULTILINE)) == reasons
+
+
+def test_a_dialog_says_a_release_is_on_the_device_else_whether_it_can_be_downloaded():
+    assert release_assets.row_state(True, release_assets.UPLOADING) == release_assets.INSTALLED
+    assert release_assets.row_state(False, release_assets.UPLOADING) == release_assets.UNSUPPORTED
+    assert release_assets.row_state(False, None) == release_assets.AVAILABLE
+
+
+def test_a_release_is_dated_by_the_day_github_published_it():
+    assert release_assets.day("2026-11-17T00:20:54Z") == "20261117"

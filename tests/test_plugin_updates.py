@@ -14,7 +14,7 @@ import pytest
 import main
 from conftest import FakeDownload, run, write
 from deckyscaler.application.plugin_updates import UNKNOWN_BUILD, PluginUpdates
-from deckyscaler.domain import dev_build
+from deckyscaler.domain import dev_build, release_assets
 from deckyscaler.infrastructure import github_releases
 
 FIXTURE = Path(__file__).parent / "fixtures" / "github_releases.json"
@@ -103,9 +103,9 @@ def test_only_the_running_channel_and_commit_count_as_installed():
         dev_build.build_info(REPOSITORY, "pr-12", DEV_COMMIT), "", "", "https://x/a.zip", "0" * 64
     )
 
-    assert dev_build.state(RUNNING, found["dev"]) == dev_build.INSTALLED
-    assert dev_build.state(RUNNING, found["pr-12"]) == dev_build.AVAILABLE
-    assert dev_build.state(RUNNING, same_commit_other_channel) == dev_build.AVAILABLE
+    assert dev_build.state(RUNNING, found["dev"]) == release_assets.INSTALLED
+    assert dev_build.state(RUNNING, found["pr-12"]) == release_assets.AVAILABLE
+    assert dev_build.state(RUNNING, same_commit_other_channel) == release_assets.AVAILABLE
 
 
 # ── contract: Decky Loader's installer ───────────────────────────────────────

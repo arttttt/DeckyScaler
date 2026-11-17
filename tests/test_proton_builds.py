@@ -136,10 +136,10 @@ def test_releases_say_whether_they_are_installed_and_installed_builds_stay_liste
 
     rows = pb.versions(pb.GE_PROTON, releases, installed)
 
-    assert rows[0] == pb.Row("GE-Proton11-12-x86_64", "GE-Proton11-12", "20261103", pb.INSTALLED, None, 566859228)
-    assert rows[1] == pb.Row("GE-Proton11-11", "GE-Proton11-11", "20261019", pb.UNSUPPORTED, release_assets.NO_ARCHIVE, 0)
-    assert rows[2].state == pb.AVAILABLE
-    assert rows[-1] == pb.Row("GE-Proton10-34", "GE-Proton10-34", "", pb.INSTALLED, None, 0)  # fell out of the ten
+    assert rows[0] == release_assets.Row("GE-Proton11-12-x86_64", "GE-Proton11-12", "20261103", release_assets.INSTALLED, None, 566859228)
+    assert rows[1] == release_assets.Row("GE-Proton11-11", "GE-Proton11-11", "20261019", release_assets.UNSUPPORTED, release_assets.NO_ARCHIVE, 0)
+    assert rows[2].state == release_assets.AVAILABLE
+    assert rows[-1] == release_assets.Row("GE-Proton10-34", "GE-Proton10-34", "", release_assets.INSTALLED, None, 0)  # fell out of the ten
     assert len(rows) == len(releases) + 1  # the CachyOS tool is another build's
 
 
