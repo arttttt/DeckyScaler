@@ -187,6 +187,10 @@ def _slots(providers: tuple[Provider, ...], dlls: tuple[Dll, ...]) -> tuple[str,
 
 # ── A library on the device ──────────────────────────────────────────────────
 
+MAX_BYTES = 1_000_000_000
+"""The most a library may take on the device: what is kept of a zip, a folder or a download is refused past it
+(a library is DLLs and their data: ANR's is about 6 MB, Intel's XeSS DLLs well under 100 MB)."""
+
 DOWNLOADED = "downloaded"
 YOUR_FILE = "file"
 ENTRY_FILENAME = "entry.json"
