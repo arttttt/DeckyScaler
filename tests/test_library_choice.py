@@ -109,3 +109,16 @@ def test_a_game_needs_its_choice_applied_while_a_patch_would_place_other_librari
     assert lc.needs_applying(recorded, {UP: "fsr"}, [XESS, FSR], V10)
     assert lc.needs_applying(recorded, {UP: "xess"}, [], V10)  # the library left the device
     assert not lc.needs_applying([], {UP: "xess"}, [XESS], V09)  # 0.9 takes none
+
+
+def test_a_slot_takes_none_following_or_a_library_serving_it():
+    assert lc.can_choose(UP, None, []) and lc.can_choose(UP, NONE, [])
+    assert lc.can_choose(UP, "xess", [XESS])
+    assert not lc.can_choose(FG, "fsr", [FSR])  # FSR's upscaler file serves no frame generation
+    assert not lc.can_choose(UP, "gone", [XESS])
+
+
+def test_a_library_that_left_the_device_is_nobodys_choice():
+    choices = Choices({UP: "xess", FG: "anr"}, {"620": {UP: "xess", FG: NONE}, "570": {UP: "fsr"}})
+
+    assert lc.without(choices, "xess") == Choices({FG: "anr"}, {"620": {FG: NONE}, "570": {UP: "fsr"}})

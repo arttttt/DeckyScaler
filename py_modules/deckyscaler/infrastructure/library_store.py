@@ -40,11 +40,6 @@ class LibraryStore(EntryStore):
             else:
                 aside.replace(current)
 
-    @staticmethod
-    def files_in(directory: Path) -> frozenset[str]:
-        """Every file under `directory`, as paths relative to it with '/'."""
-        return frozenset(path.relative_to(directory).as_posix() for path in directory.rglob("*") if path.is_file())
-
     def commit(self, stage: Path, installed: library.Installed) -> None:
         """Write the version's entry inside the staged version, then move it into the library in one rename."""
         self.commit_entry(stage, installed.id, library.entry_json(installed))

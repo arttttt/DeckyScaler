@@ -9,7 +9,7 @@ from pathlib import Path
 
 from deckyscaler.domain import library
 from deckyscaler.infrastructure import archive
-from deckyscaler.infrastructure.files import sha256
+from deckyscaler.infrastructure.files import files_under, sha256
 from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
 from deckyscaler.infrastructure.library_store import LibraryStore
 
@@ -118,7 +118,7 @@ class Library:
             files = stage / library.FILES_DIRNAME
             archive.extract_7z(self.seven_zip, archive_path, files)
             family = library.family_of(version.version)
-            missing = library.missing_files(family, self.store.files_in(files)) if family else {"a known layout"}
+            missing = library.missing_files(family, files_under(files)) if family else {"a known layout"}
             if missing:
                 return _error(f"The {version_id} archive lacks {', '.join(sorted(missing))}; not added.")
             installed = library.entry(version, datetime.now(timezone.utc).isoformat())

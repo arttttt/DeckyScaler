@@ -160,7 +160,7 @@ class Patcher:
                 dll_name, reset_ini, str(fsr4_driver) if fsr4_driver else None, placement.copies
             )
             operations = version_placement.plan_patch(
-                entries, self.library.files_in(source), family, request
+                entries, files.files_under(source), family, request
             )
             log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(picks)}")
             recorded = patch_record.record(
@@ -413,6 +413,12 @@ class Patcher:
             log.error(str(exc))
             return _error(str(exc))
         return {"status": "success", "games": games}
+
+    @staticmethod
+    def is_running(directory: Path) -> bool:
+        """Whether a game in `directory` runs: one of its executables is in a process's command line."""
+        executables = [exe for exe in directory.glob("*.exe") if exe.is_file()]
+        return bool(executables) and exe_target.running_executable(executables, processes.command_lines()) is not None
 
     def _running_executable(self, candidates: list[Path]) -> Path | None:
         if not candidates:

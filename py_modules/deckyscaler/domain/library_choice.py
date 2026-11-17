@@ -65,6 +65,23 @@ def with_choice(choices: Choices, scope: str, slot: str, value: str | None) -> C
     return Choices(choices.global_choice, {**choices.games, scope: game})
 
 
+def can_choose(slot: str, value: str | None, installed: list[Library]) -> bool:
+    """Whether a slot can be set to `value`: following the global choice or none (None, NONE), or a library on the
+    device that serves the slot."""
+    if value is None or value == NONE:
+        return True
+    return any(library.id == value and slot in library.slots for library in installed)
+
+
+def without(choices: Choices, library_id: str) -> Choices:
+    """The choices once a library has left the device: no game is left choosing it. A game that chose it follows
+    the global choice again."""
+    return Choices(
+        {slot: value for slot, value in choices.global_choice.items() if value != library_id},
+        {appid: {slot: value for slot, value in slots.items() if value != library_id} for appid, slots in choices.games.items()},
+    )
+
+
 def resolved(choices: Choices, appid: str | None) -> dict[str, str]:
     """slot → the library a game's choice comes to: its own, else the global one; a game patched by a path, with
     no appid, takes the global one."""

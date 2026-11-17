@@ -218,3 +218,13 @@ def test_of_two_providers_of_one_name_the_one_nearest_the_top_is_kept():
     contents = ul.recognize(frozenset({"a/b/Uniscaler/ffx/x.dll", "zz/Uniscaler/ffx/x.dll"}))
 
     assert contents.providers == (ul.Provider("Uniscaler", ("ffx",), "zz/Uniscaler"),)
+
+
+def test_a_library_is_listed_with_what_it_serves_takes_and_which_games_have_it():
+    library = ul.downloaded(ul.releases(ul.ANR, ANR_LISTING)[0], ul.recognize(ANR_MEMBERS), "t")
+
+    assert ul.library_json(library, 5_700_000, ["Hades II"]) == {
+        "id": "anr-v-b19", "label": "Apex Neural Rendering FG V.B19", "origin": ul.DOWNLOADED,
+        "slots": [ul.FRAME_GENERATION], "size": 5_700_000, "games": ["Hades II"],
+    }
+    assert ul.space_needed(3_418_118) == 4 * 3_418_118

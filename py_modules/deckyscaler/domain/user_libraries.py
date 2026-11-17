@@ -191,6 +191,14 @@ MAX_BYTES = 1_000_000_000
 """The most a library may take on the device: what is kept of a zip, a folder or a download is refused past it
 (a library is DLLs and their data: ANR's is about 6 MB, Intel's XeSS DLLs well under 100 MB)."""
 
+SPACE_FACTOR = 4
+"""Free space a download needs, as a multiple of the zip: the zip, and what it unpacks to (ANR's 3.4 MB zip unpacks
+to 5.7 MB)."""
+
+
+def space_needed(download_size: int) -> int:
+    return download_size * SPACE_FACTOR
+
 DOWNLOADED = "downloaded"
 YOUR_FILE = "file"
 ENTRY_FILENAME = "entry.json"
@@ -223,6 +231,18 @@ class Library:
     @property
     def slots(self) -> tuple[str, ...]:
         return _slots(self.providers, self.dlls)
+
+
+def library_json(library: Library, size: int, games: list[str]) -> dict:
+    """A library as the plugin's pages list it: `size` its bytes on the device, `games` those whose patch placed it."""
+    return {
+        "id": library.id,
+        "label": library.label,
+        "origin": library.origin,
+        "slots": list(library.slots),
+        "size": size,
+        "games": games,
+    }
 
 
 def _slug(text: str) -> str:
@@ -325,6 +345,11 @@ SOURCES = {
         ((("FrameGen", "DisableHudless"), "false"),),
     ),
 }
+
+
+def sources_json() -> list[dict]:
+    """The sources the download dialog offers."""
+    return [{"id": source.id, "label": source.label} for source in SOURCES.values()]
 
 
 @dataclass(frozen=True)
