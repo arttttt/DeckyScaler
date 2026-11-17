@@ -256,3 +256,10 @@ def test_pending_moves_survive_a_file_and_junk_in_it_doesnt():
             pb.PROTON_CACHYOS_V3: "x", pb.GE_PROTON: {"target": "GE", "sources": ["A"], "appids": [730]}}
     assert pb.parse_pending(junk) == {pb.GE_PROTON: pb.PendingMove("GE", frozenset({"a"}), ("730",))}
     assert pb.parse_pending([]) == {}
+
+
+def test_the_devices_own_tools_come_newest_first_then_the_systems():
+    old, new = pb.Tool("old", frozenset(), modified=100.0), pb.Tool("new", frozenset(), modified=200.0)
+    system = pb.Tool("system", frozenset(), system=True, modified=300.0)
+
+    assert pb.newest_first([old, system, new]) == [new, old, system]

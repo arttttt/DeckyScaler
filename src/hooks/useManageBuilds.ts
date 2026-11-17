@@ -16,7 +16,7 @@ export const useManageBuilds = (onChanged: () => void) => {
   const [pending, setPending] = useState<{ id: string; confirmation: ProtonRemoveConfirmation } | null>(null);
 
   const load = useCallback(() => {
-    void safeAsyncOperation(protonInstalled, "ManageBuilds -> protonInstalled").then((installed) => {
+    void safeAsyncOperation(() => protonInstalled(true), "ManageBuilds -> protonInstalled").then((installed) => {
       if (installed) setState((s) => ({ ...s, installed }));
     });
   }, []);

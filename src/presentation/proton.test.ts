@@ -42,9 +42,11 @@ const installed = (overrides: Partial<InstalledProton> = {}): InstalledProton =>
 describe("the Proton page", () => {
   it("counts the installed builds, or says there is none, and always says where a game's Proton is chosen", () => {
     expect(protonPageView(installed())).toEqual({
-      summary: "3 builds installed.", restart: false, moves: [], moveMessage: null, dialogsEnabled: true, hint: CHOOSING_HINT,
+      summary: "2 builds installed. Newest: GE-Proton11-12-x86_64.", restart: false, moves: [], moveMessage: null,
+      dialogsEnabled: true, hint: CHOOSING_HINT,
     });
-    expect(protonPageView(installed({ tools: [GE] })).summary).toBe("1 build installed.");
+    expect(protonPageView(installed({ tools: [GE] })).summary).toBe("1 build installed. Newest: GE-Proton11-12-x86_64.");
+    expect(protonPageView(installed({ tools: [SYSTEM] })).summary).toBe("No Proton build is installed yet."); // the system's
     expect(protonPageView(installed({ tools: [] })).summary).toBe("No Proton build is installed yet.");
     expect(protonPageView(null)).toMatchObject({ summary: "Loading…", dialogsEnabled: false });
   });
@@ -144,6 +146,9 @@ describe("the manage dialog", () => {
       { id: SYSTEM.id, label: SYSTEM.id, description: "Installed system-wide · can't be removed here", action: null },
     ]);
     expect(view.usage).toBe("Installed builds take 3.0 GB.");
+    const unsized = protonManageView({ installed: installed({ tools: [{ ...GE, size: null }], installed_bytes: null }), busy: null, message: null });
+    expect(unsized.rows[0].description).toBe("GE-Proton · used by 3 games");
+    expect(unsized.usage).toBeNull();
     expect(PROTON_MENU).toEqual([{ action: "remove", label: "Remove", destructive: true }]);
   });
 

@@ -78,10 +78,13 @@ export const protonPageView = (installed: InstalledProton | null, move: MoveStat
   const base = { hint: CHOOSING_HINT, moves: [], moveMessage: move?.message ?? null };
   if (installed === null) return { ...base, summary: "Loading…", restart: false, dialogsEnabled: false };
   if (installed.problem) return { ...base, summary: problemText(installed.problem), restart: false, dialogsEnabled: false };
-  const tools = installed.tools.length;
+  // The device's own builds come newest first; the system's are Steam's to keep.
+  const own = installed.tools.filter((tool) => !tool.system);
   return {
     ...base,
-    summary: tools ? `${count(tools, "build", "builds")} installed.` : "No Proton build is installed yet.",
+    summary: own.length
+      ? `${count(own.length, "build", "builds")} installed. Newest: ${own[0].id}.`
+      : "No Proton build is installed yet.",
     restart: installed.restart_needed,
     moves: installed.moves.map((offer) => moveOffer(offer, move)),
     dialogsEnabled: true,
@@ -187,7 +190,8 @@ const usedBy = (tool: InstalledProtonTool): string => {
 
 const describeTool = (tool: InstalledProtonTool): string => {
   if (tool.system) return "Installed system-wide · can't be removed here";
-  return [tool.build_label ?? "Not installed by DeckyScaler", byteSize(tool.size), usedBy(tool)].join(" · ");
+  const size = tool.size === null ? [] : [byteSize(tool.size)];
+  return [tool.build_label ?? "Not installed by DeckyScaler", ...size, usedBy(tool)].join(" · ");
 };
 
 export const protonManageView = (state: ProtonManageState): ProtonManageView => {
@@ -202,7 +206,7 @@ export const protonManageView = (state: ProtonManageState): ProtonManageView => 
       description: busy === tool.id ? "Removing…" : describeTool(tool),
       action: tool.system ? null : { label: "Manage", enabled: idle },
     })),
-    usage: installed && installed.installed_bytes > 0 ? `Installed builds take ${byteSize(installed.installed_bytes)}.` : null,
+    usage: installed?.installed_bytes ? `Installed builds take ${byteSize(installed.installed_bytes)}.` : null,
     message: state.message ?? nothing,
   };
 };

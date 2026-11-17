@@ -118,13 +118,16 @@ def test_every_tool_steam_would_find_is_listed_whoever_installed_it(tmp_path):
     build_tree(tools / PARTIAL_DIRNAME / "GE-Proton11-13-x86_64")  # an install in progress is no tool yet
     write(system / "proton-cachyos" / "compatibilitytool.vdf", manifest("proton-cachyos"))
 
+    os.utime(tools / TOOL, (1_700_000_000, 1_700_000_000))  # unpacking keeps the archive's times
+
     found = CompatToolsStore(tools, system).installed()
 
-    assert found == [
-        Tool(TOOL, frozenset({TOOL.lower()})),
-        Tool("Proton-EM-10.0-37", frozenset({"proton-em-10.0-37"})),
-        Tool("proton-cachyos", frozenset({"proton-cachyos"}), system=True),
+    assert [(t.folder, t.names, t.system) for t in found] == [
+        (TOOL, frozenset({TOOL.lower()}), False),
+        ("Proton-EM-10.0-37", frozenset({"proton-em-10.0-37"}), False),
+        ("proton-cachyos", frozenset({"proton-cachyos"}), True),
     ]
+    assert found[0].modified == 1_700_000_000
     assert CompatToolsStore(tmp_path / "missing").installed() == []
 
 

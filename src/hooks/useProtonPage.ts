@@ -12,7 +12,7 @@ export const useProtonPage = () => {
   const [move, setMove] = useState<MoveState>(null);
 
   const reload = useCallback(() => {
-    void safeAsyncOperation(protonInstalled, "ProtonPage -> protonInstalled").then((answer) => {
+    void safeAsyncOperation(() => protonInstalled(), "ProtonPage -> protonInstalled").then((answer) => {
       if (answer) setInstalled(answer);
     });
   }, []);

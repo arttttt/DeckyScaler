@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -151,7 +152,7 @@ def test_installed_builds_list_every_tool_with_the_games_whose_user_chose_it(wor
     build_tree(world.tools, "Proton-EM-10.0-37")
     build_tree(home.parent / "system-compatibilitytools.d", "proton-cachyos-11.0-20261015-slr-x86_64")
 
-    listed = world.proton().installed()
+    listed = world.proton().installed(with_sizes=True)
 
     tools = {tool["id"]: tool for tool in listed["tools"]}
     assert tools[NEWEST] | {"size": 0} == {
@@ -167,6 +168,12 @@ def test_installed_builds_list_every_tool_with_the_games_whose_user_chose_it(wor
     system = tools["proton-cachyos-11.0-20261015-slr-x86_64"]
     assert system["system"] is True and system["build"] == pb.PROTON_CACHYOS
     assert listed["installed_bytes"] == tools[NEWEST]["size"] + tools["Proton-EM-10.0-37"]["size"]
+    assert [tool["id"] for tool in listed["tools"]][-1] == "proton-cachyos-11.0-20261015-slr-x86_64"  # the system's last
+    os.utime(world.tools / "Proton-EM-10.0-37", (2_000_000_000, 2_000_000_000))
+    assert [tool["id"] for tool in world.proton().installed()["tools"]][:2] == ["Proton-EM-10.0-37", NEWEST]  # newest first
+
+    page = world.proton().installed()  # the page counts builds: sizing thousands of files is the manage dialog's
+    assert {tool["size"] for tool in page["tools"]} == {None} and page["installed_bytes"] is None
 
 
 def test_removing_a_build_games_use_warns_first_and_then_removes_it(world, steam_library):
@@ -328,3 +335,47 @@ def test_the_games_on_a_tool_follow_steams_config_as_it_rewrites_it(world, steam
     steam_library.set_compat_tools({"730": NEWEST})
 
     assert [g["appid"] for g in world.proton().games(NEWEST)["games"]] == ["730"]
+
+
+def test_the_games_on_a_tool_count_the_names_it_is_known_by_as_its_rows_do(world, steam_library):
+    tool_dir = build_tree(world.tools, "my-ge")
+    (tool_dir / "compatibilitytool.vdf").write_text((tool_dir / "compatibilitytool.vdf").read_text().replace('"my-ge"', f'"{OLDER}"'))
+    steam_library.set_compat_tools({"730": OLDER})
+
+    assert world.proton().games("my-ge")["games"] == [{"appid": "730", "name": "Counter-Strike 2", "kind": "steam"}]
+    assert world.proton().removal("my-ge")["games"] == world.proton().games("my-ge")["games"]
+
+
+def test_moves_changed_at_once_keep_both_changes(world, monkeypatch):
+    import threading
+
+    from deckyscaler.application import proton_builds as owner
+
+    moves = {
+        pb.GE_PROTON: {"target": NEWEST, "sources": ["ge-proton11-11-x86_64"], "appids": ["730", "440"]},
+        pb.PROTON_CACHYOS: {"target": "proton-cachyos-11.0-20261015-slr-x86_64", "sources": ["proton-cachyos-x"], "appids": ["570"]},
+    }
+    world.moves_file.parent.mkdir(parents=True, exist_ok=True)
+    world.moves_file.write_text(json.dumps(moves))
+    read, both_reading = owner.read_json, threading.Barrier(2)
+
+    def read_together(path):
+        """Each change waits for the other to read too: without one-at-a-time, both read the same old moves."""
+        try:
+            both_reading.wait(timeout=0.5)
+        except threading.BrokenBarrierError:
+            pass
+        return read(path)
+
+    monkeypatch.setattr(owner, "read_json", read_together)
+
+    calls = [lambda: world.proton().moved(NEWEST, ["730"]), lambda: world.proton().keep("proton-cachyos-11.0-20261015-slr-x86_64")]
+    threads = [threading.Thread(target=call) for call in calls]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert json.loads(world.moves_file.read_text()) == {
+        pb.GE_PROTON: {"target": NEWEST, "sources": ["ge-proton11-11-x86_64"], "appids": ["440"]},
+    }

@@ -29,11 +29,18 @@ def _declared(manifest: Path) -> frozenset[str]:
     return frozenset(compat_tools.custom_tools(keyvalues.parse(text)))
 
 
+def _modified(directory: Path) -> float:
+    try:
+        return directory.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def _scan(directory: Path, system: bool) -> list[Tool]:
     if not directory.is_dir():
         return []
     return [
-        Tool(manifest.parent.name, _declared(manifest), system)
+        Tool(manifest.parent.name, _declared(manifest), system, _modified(manifest.parent))
         for manifest in sorted(directory.glob(f"*/{MANIFEST}"))
         if not manifest.parent.name.startswith(".")
     ]

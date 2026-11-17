@@ -8,19 +8,24 @@ after a restart.
 from __future__ import annotations
 
 import logging
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from deckyscaler.domain import proton_builds, steam
 from deckyscaler.infrastructure import archive, proton
 from deckyscaler.infrastructure import steam as steam_library
 from deckyscaler.infrastructure.compat_tools_store import CompatToolsStore
-from deckyscaler.infrastructure.files import read_json, sha256, write_json
+from deckyscaler.infrastructure.files import read_json, replace_json, sha256
 from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
 
 log = logging.getLogger(__name__)
 
 
 UNPACKED_DIRNAME = "unpacked"
+
+_PENDING = threading.Lock()
+"""Each call builds its own owner, and an install's end can meet a move's: the pending moves change one at a time."""
 
 
 def _error(message: str) -> dict:
@@ -65,18 +70,21 @@ class ProtonBuilds:
     def _store(self, root: Path) -> CompatToolsStore:
         return CompatToolsStore(root / "compatibilitytools.d", self.system_tools)
 
-    def _games(self, root: Path, appids: list[str]) -> list[dict]:
-        named = steam.name_apps(appids, steam_library.app_names(self.home), steam_library.shortcut_names(root))
-        return [_app_json(app) for app in named]
+    def _namer(self, root: Path) -> Callable[[list[str]], list[dict]]:
+        """Names games by what the device holds, read once for every list an answer needs."""
+        installed, shortcuts = steam_library.app_names(self.home), steam_library.shortcut_names(root)
+        return lambda appids: [_app_json(app) for app in steam.name_apps(appids, installed, shortcuts)]
 
     def _pending(self) -> dict[str, proton_builds.PendingMove]:
         return proton_builds.parse_pending(read_json(self.moves_file))
 
-    def _save_pending(self, moves: dict[str, proton_builds.PendingMove]) -> None:
-        self.moves_file.parent.mkdir(parents=True, exist_ok=True)
-        write_json(self.moves_file, proton_builds.pending_to_json(moves))
+    def _change_pending(self, change: Callable[[dict[str, proton_builds.PendingMove]], None]) -> None:
+        with _PENDING:
+            moves = self._pending()
+            change(moves)
+            replace_json(self.moves_file, proton_builds.pending_to_json(moves))
 
-    def _offers(self, root: Path, tools: list[proton_builds.Tool], forced) -> list[dict]:
+    def _offers(self, tools: list[proton_builds.Tool], forced, name: Callable[[list[str]], list[dict]]) -> list[dict]:
         """The moves to offer now: games still on an older build of a build whose newer one Steam lists."""
         offers = []
         for build, pending in self._pending().items():
@@ -86,13 +94,13 @@ class ProtonBuilds:
                     "build": build,
                     "target": pending.target,
                     "sources": sorted({forced.games[appid] for appid in appids}),
-                    "games": self._games(root, appids),
+                    "games": name(appids),
                 })
         return offers
 
-    def installed(self) -> dict:
-        """Every build Steam would find, with what it takes on disk and the games whose user chose it, and whether
-        Steam must restart to see the builds as they are now."""
+    def installed(self, with_sizes: bool = False) -> dict:
+        """Every build Steam would find, newest first, with the games whose user chose it, and whether Steam must
+        restart to see the builds as they are now. Sizing walks thousands of files per build: only when asked."""
         clients = steam_library.running_clients()
         active = self._active(clients)
         if active.root is None:
@@ -100,7 +108,8 @@ class ProtonBuilds:
                     "moves": []}
         store = self._store(active.root)
         forced = proton.forced_mappings(active.root)
-        tools = store.installed()
+        name = self._namer(active.root)
+        tools = proton_builds.newest_first(store.installed())
         rows = []
         for tool in tools:
             appids, global_default = proton_builds.chosen_for(tool, forced)
@@ -110,14 +119,14 @@ class ProtonBuilds:
                 "build": build.id if build else None,
                 "build_label": build.label if build else None,
                 "system": tool.system,
-                "size": store.size(tool),
-                "games": self._games(active.root, appids),
+                "size": store.size(tool) if with_sizes else None,
+                "games": name(appids),
                 "global_default": global_default,
             })
-        own = sum(row["size"] for row in rows if not row["system"])
+        own = sum(row["size"] for row in rows if not row["system"]) if with_sizes else None
         restart = steam.restart_needed(active.root, clients, store.changed_at())
         # Steam takes a game's move only to a build it lists, which a restart due means it doesn't yet.
-        moves = [] if restart else self._offers(active.root, tools, forced)
+        moves = [] if restart else self._offers(tools, forced, name)
         return {"status": "success", "problem": None, "tools": rows, "installed_bytes": own, "restart_needed": restart,
                 "moves": moves}
 
@@ -192,31 +201,37 @@ class ProtonBuilds:
         """Keep the move an update leaves for after Steam's restart; the build is installed either way."""
         if pending is None:
             return
-        try:
-            moves = self._pending()
+        def remember(moves: dict[str, proton_builds.PendingMove]) -> None:
             merged = proton_builds.merge(moves.get(build_id), pending)
             if merged is not None:
                 moves[build_id] = merged
-            self._save_pending(moves)
+
+        try:
+            self._change_pending(remember)
         except OSError as exc:
             log.warning(f"Keeping the games to move to {pending.target} failed: {exc}")
 
     def moved(self, target: str, appids: list[str]) -> dict:
         """These games were moved to `target`: they are offered no more."""
-        moves = self._pending()
-        for build, pending in list(moves.items()):
-            if pending.target == target:
-                left = proton_builds.moved(pending, appids)
-                if left is None:
-                    del moves[build]
-                else:
-                    moves[build] = left
-        self._save_pending(moves)
+        def forget(moves: dict[str, proton_builds.PendingMove]) -> None:
+            for build, pending in list(moves.items()):
+                if pending.target == target:
+                    left = proton_builds.moved(pending, appids)
+                    if left is None:
+                        del moves[build]
+                    else:
+                        moves[build] = left
+
+        self._change_pending(forget)
         return {"status": "success"}
 
     def keep(self, target: str) -> dict:
         """The user keeps the games where they are: the move to `target` is offered no more."""
-        self._save_pending({build: m for build, m in self._pending().items() if m.target != target})
+        def drop(moves: dict[str, proton_builds.PendingMove]) -> None:
+            for build in [build for build, m in moves.items() if m.target == target]:
+                del moves[build]
+
+        self._change_pending(drop)
         return {"status": "success"}
 
     def games(self, tool_name: str) -> dict:
@@ -224,9 +239,10 @@ class ProtonBuilds:
         active = self._active()
         if active.root is None:
             return _problem(str(active.problem))
-        forced = proton.forced_mappings(active.root)
-        appids = sorted(appid for appid, name in forced.games.items() if name.lower() == tool_name.lower())
-        return {"status": "success", "games": self._games(active.root, appids)}
+        tools = self._store(active.root).installed()
+        tool = next((t for t in tools if t.known_as(tool_name)), proton_builds.Tool(tool_name, frozenset({tool_name.lower()})))
+        appids, _global_default = proton_builds.chosen_for(tool, proton.forced_mappings(active.root))
+        return {"status": "success", "games": self._namer(active.root)(appids)}
 
     def _own_tool(self, root: Path, folder: str) -> proton_builds.Tool | str:
         tool = next((t for t in self._store(root).installed() if t.folder == folder), None)
@@ -245,7 +261,7 @@ class ProtonBuilds:
         if isinstance(tool, str):
             return _error(tool)
         appids, global_default = proton_builds.chosen_for(tool, proton.forced_mappings(active.root))
-        return {"status": "success", "games": self._games(active.root, appids), "global_default": global_default}
+        return {"status": "success", "games": self._namer(active.root)(appids), "global_default": global_default}
 
     def remove(self, folder: str) -> dict:
         active = self._active()

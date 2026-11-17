@@ -140,7 +140,8 @@ export type InstalledProtonTool = {
   build_label: string | null;
   /** Installed for every user of the device: listed, never removed here. */
   system: boolean;
-  size: number;
+  /** Bytes on disk, when asked for (sizing walks thousands of files). */
+  size: number | null;
   games: ProtonGame[];
   /** The tool Steam uses for every game the user didn't pick one for. */
   global_default: boolean;
@@ -152,8 +153,9 @@ export type ProtonMove = { build: string; target: string; sources: string[]; gam
 export type InstalledProton = {
   status: "success";
   problem: ProtonProblem | null;
+  /** The device's own newest first, then the system's. */
   tools: InstalledProtonTool[];
-  installed_bytes: number;
+  installed_bytes: number | null;
   /** Builds came or went since Steam started: it lists them only after a restart. */
   restart_needed: boolean;
   moves: ProtonMove[];
@@ -172,7 +174,7 @@ export type ProtonRemoval =
   | { status: "error"; message?: string; problem?: ProtonProblem };
 
 export const protonBuildOptions = callable<[], ProtonBuildOption[]>("proton_build_options");
-export const protonInstalled = callable<[], InstalledProton>("proton_installed");
+export const protonInstalled = callable<[with_sizes?: boolean], InstalledProton>("proton_installed");
 export const protonVersions = callable<[build: string], ProtonListing>("proton_versions");
 /** Download progress arrives as "proton_download" events: tool name, bytes received, total bytes or null. */
 export const protonInstall = callable<[build: string, tool: string], ProtonResult>("proton_install");

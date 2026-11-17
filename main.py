@@ -175,8 +175,8 @@ class Plugin:
     async def proton_build_options(self) -> list:
         return builds_json()
 
-    async def proton_installed(self) -> dict:
-        return await asyncio.to_thread(self._proton().installed)
+    async def proton_installed(self, with_sizes: bool = False) -> dict:
+        return await asyncio.to_thread(self._proton().installed, with_sizes)
 
     async def proton_versions(self, build_id: str) -> dict:
         return await asyncio.to_thread(self._proton().versions, build_id)

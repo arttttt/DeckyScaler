@@ -142,6 +142,8 @@ class Tool:
     """The internal names its compatibilitytool.vdf declares, lowercased as Steam compares them."""
     system: bool = False
     """Installed for every user (/usr/share/steam/compatibilitytools.d): listed, never changed here."""
+    modified: float = 0.0
+    """When its directory last changed: unpacking keeps the archive's times, so about when the build was made."""
 
     def known_as(self, name: str) -> bool:
         """Whether Steam knows the tool by `name` (a mapping's or a release's tool name)."""
@@ -150,6 +152,11 @@ class Tool:
     @property
     def build(self) -> Build | None:
         return next((build for name in (self.folder, *sorted(self.names)) if (build := build_of(name))), None)
+
+
+def newest_first(tools: list[Tool]) -> list[Tool]:
+    """The device's own tools, newest first, then the system's."""
+    return sorted(tools, key=lambda tool: (tool.system, -tool.modified))
 
 
 INSTALLED = "installed"
@@ -249,11 +256,11 @@ def older_of_build(new: Release, releases: list[Release], tools: list[Tool]) -> 
 
 def pending_move(new: Release, releases: list[Release], tools: list[Tool], forced: ForcedMappings) -> PendingMove | None:
     """What installing `new` leaves to offer: the games whose user chose an older build of the same build."""
-    sources = [tool for tool in older_of_build(new, releases, tools) if chosen_for(tool, forced)[0]]
-    appids = sorted({appid for tool in sources for appid in chosen_for(tool, forced)[0]})
+    chosen = {tool: games for tool in older_of_build(new, releases, tools) if (games := chosen_for(tool, forced)[0])}
+    appids = sorted({appid for games in chosen.values() for appid in games})
     if not appids:
         return None
-    names = frozenset(name for tool in sources for name in (tool.folder.lower(), *tool.names))
+    names = frozenset(name for tool in chosen for name in (tool.folder.lower(), *tool.names))
     return PendingMove(new.tool, names, tuple(appids))
 
 
