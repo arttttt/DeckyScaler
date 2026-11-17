@@ -140,7 +140,8 @@ def test_a_slot_takes_only_a_library_that_serves_it(plugin, home, plugin_home):
     assert run(plugin.user_library_choose("global", UP, "anr-v-b19"))["status"] == "error"
     assert run(plugin.user_library_choose("not-a-game", FG, None))["status"] == "error"
     assert run(plugin.user_library_choose("620", FG, "none")) == {"status": "success"}
-    assert run(plugin.user_library_game_choice("620")) == {"status": "success", "own": {FG: "none"}}
+    assert run(plugin.user_library_game_choice("620")) == {"status": "success", "own": {FG: "none"}, "resolved": {}, "pending": False}
+    assert run(plugin.user_library_game_choice("570"))["resolved"] == {FG: "anr-v-b19"}
     assert run(plugin.user_libraries_installed())["global"] == {FG: "anr-v-b19"}
 
 
@@ -187,3 +188,15 @@ def test_what_would_take_more_than_a_library_may_is_refused(home, plugin_home, t
     assert "more than" in libraries.add(str(dll))["message"]
     assert "more than" in libraries.add(str(sdk))["message"]
     assert libraries.store.installed() == []
+
+
+def test_a_patched_game_says_when_its_choice_needs_patching_again(plugin, home, plugin_home, steam_library):
+    owner(home).install(ul.ANR, "anr-v-b19")
+    steam_library.add_game("1234", "Test Game")
+    run(plugin.patch_game("1234", "dxgi.dll", "", NIGHTLY))
+
+    run(plugin.user_library_choose("1234", FG, "anr-v-b19"))
+
+    assert run(plugin.user_library_game_choice("1234"))["pending"] is True
+    run(plugin.patch_game("1234", "dxgi.dll", "", NIGHTLY))
+    assert run(plugin.user_library_game_choice("1234"))["pending"] is False

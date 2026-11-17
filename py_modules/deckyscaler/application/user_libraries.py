@@ -54,8 +54,16 @@ class UserLibraries:
         }
 
     def game_choice(self, appid: str) -> dict:
-        """A game's own choice per slot: a library, none, or absent (the global choice)."""
-        return {"status": "success", "own": self.choices.read().games.get(appid, {})}
+        """A game's own choice per slot (a library, none, or absent: the global choice), what it comes to, and
+        whether the game, patched, has other libraries than that ("patch again")."""
+        choices, installed = self.choices.read(), self.store.installed()
+        patched = [entry for entry in self.patcher.patched_markers() if str(entry[2].get("appid") or "") == appid]
+        return {
+            "status": "success",
+            "own": choices.games.get(appid, {}),
+            "resolved": library_choice.resolved(choices, appid),
+            "pending": bool(self._to_apply(patched, choices, installed)),
+        }
 
     @staticmethod
     def _to_apply(patched: list, choices: library_choice.Choices, installed: list) -> list:
