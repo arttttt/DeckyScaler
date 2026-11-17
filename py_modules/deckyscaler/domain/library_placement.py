@@ -26,8 +26,8 @@ class Placement:
     """From the libraries on the device (absolute) into the game directory."""
     layer: LibraryLayer
     settings_files: frozenset[str]
-    """Placed files a provider keeps its settings in: rewritten by it, so ours whatever they hold, and carried over
-    when the game is patched again, as OptiScaler.ini is."""
+    """Placed files a provider keeps its settings in: rewritten by it, so ours whatever they hold (a rewrite doesn't
+    break the patch). Patching the game again puts a fresh copy in: changes made to them in the game don't last."""
     owned_dirs: tuple[str, ...]
     """Provider folders: everything in them is the library's, its logs too."""
     recorded: tuple[dict, ...]
