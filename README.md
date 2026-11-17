@@ -94,7 +94,7 @@ On Linux FSR 4 also needs AMD's driver DLL (`amdxcffx64.dll`), which neither Opt
 ### Proton builds
 **DeckyScaler → Proton** installs custom Proton builds into Steam. *Download builds…* lists the ten newest releases of GE-Proton, Proton-CachyOS and Proton-CachyOS's x86_64_v3 variant (built for newer CPUs; for experimenting), checks each download against the checksum GitHub publishes, and unpacks it into the `compatibilitytools.d` of the Steam install that is running (or the only one that has run). *Manage installed…* lists every build Steam would find, including ones other tools installed, with the games set to use it, and removes one after a warning naming those games; builds installed for every user of the device are only listed.
 
-- Steam lists builds when it starts: after an install or a removal, the page says a restart is due and has a button for it.
+- Steam lists builds when it starts: the page has a *Restart Steam* button (and says when a restart is due), and the download dialog offers it right after an install.
 - A game's Proton is chosen in Steam: the game's Properties → Compatibility.
 - To update a build, download the newer release: it is installed next to the old one, which stays for going back until you remove it. Once Steam has restarted, the page offers to move the games set to use an older build of the same kind to the new one in one tap (or to keep them where they are).
 

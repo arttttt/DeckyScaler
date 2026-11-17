@@ -5,7 +5,6 @@ import {
   CHOOSING_HINT,
   moveOutcome,
   unconfirmed,
-  PROTON_MENU,
   ProtonDownloadState,
   UNPACKING,
   shownGames,
@@ -86,7 +85,8 @@ const OPTIONS = [
   { id: "proton-cachyos-v3", label: "Proton-CachyOS (x86_64_v3)", note: "Built for newer CPUs; for experimenting." },
 ];
 const downloadState = (overrides: Partial<ProtonDownloadState> = {}): ProtonDownloadState => ({
-  options: OPTIONS, build: "ge-proton", listing: LISTING, checking: false, busy: null, download: null, message: null, ...overrides,
+  options: OPTIONS, installedOne: false, build: "ge-proton", listing: LISTING, checking: false, busy: null, download: null, message: null,
+  ...overrides,
 });
 
 describe("the download dialog", () => {
@@ -119,6 +119,12 @@ describe("the download dialog", () => {
     expect(view).toMatchObject({ buildEnabled: false, checkEnabled: false });
   });
 
+  it("offers to restart Steam once a build was installed, not while another installs", () => {
+    expect(protonDownloadView(downloadState()).restart).toBe(false);
+    expect(protonDownloadView(downloadState({ installedOne: true })).restart).toBe(true);
+    expect(protonDownloadView(downloadState({ installedOne: true, busy: "GE-Proton11-11-x86_64" })).restart).toBe(false);
+  });
+
   it("says when GitHub failed, nothing is published, there is no Steam, or how the last install went", () => {
     const empty = { ...LISTING, versions: [] };
     expect(protonDownloadView(downloadState({ listing: { ...empty, listing_error: "GitHub answered 403" } })).message).toBe(
@@ -141,15 +147,14 @@ describe("the manage dialog", () => {
     const view = protonManageView({ installed: installed(), busy: null, message: null });
 
     expect(view.rows).toEqual([
-      { id: GE.id, label: GE.id, description: "GE-Proton · 1.6 GB · used by 2 games", action: { label: "Manage", enabled: true } },
-      { id: OTHER.id, label: OTHER.id, description: "Not installed by DeckyScaler · 1.4 GB · no games", action: { label: "Manage", enabled: true } },
+      { id: GE.id, label: GE.id, description: "GE-Proton · 1.6 GB · used by 2 games", action: { label: "Remove", enabled: true } },
+      { id: OTHER.id, label: OTHER.id, description: "Not installed by DeckyScaler · 1.4 GB · no games", action: { label: "Remove", enabled: true } },
       { id: SYSTEM.id, label: SYSTEM.id, description: "Installed system-wide · can't be removed here", action: null },
     ]);
     expect(view.usage).toBe("Installed builds take 3.0 GB.");
     const unsized = protonManageView({ installed: installed({ tools: [{ ...GE, size: null }], installed_bytes: null }), busy: null, message: null });
     expect(unsized.rows[0].description).toBe("GE-Proton · used by 2 games"); // the one nothing names isn't counted
     expect(unsized.usage).toBeNull();
-    expect(PROTON_MENU).toEqual([{ action: "remove", label: "Remove", destructive: true }]);
   });
 
   it("says when a build is the default for all games, while one is being removed, and how a removal went", () => {
@@ -159,7 +164,7 @@ describe("the manage dialog", () => {
     );
     const removing = protonManageView({ installed: installed(), busy: GE.id, message: null });
     expect(removing.rows[0].description).toBe("Removing…");
-    expect(removing.rows[1].action).toEqual({ label: "Manage", enabled: false });
+    expect(removing.rows[1].action).toEqual({ label: "Remove", enabled: false });
     expect(protonManageView({ installed: installed(), busy: null, message: removeDone(GE.id) }).message).toBe(
       "GE-Proton11-12-x86_64 is removed.",
     );

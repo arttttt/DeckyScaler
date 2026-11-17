@@ -4,7 +4,7 @@ import { VersionRows } from "./VersionRows";
 
 /** Download Proton builds from their releases; the OptiScaler download dialog's sibling. */
 export function DownloadBuildsModal({ closeModal, onChanged }: { closeModal?: () => void; onChanged: () => void }) {
-  const { view, onBuild, onCheck, onDownload } = useDownloadBuilds(onChanged);
+  const { view, onBuild, onCheck, onDownload, onRestart } = useDownloadBuilds(onChanged);
 
   return (
     <ModalRoot closeModal={closeModal} bAllowFullSize={true}>
@@ -22,6 +22,11 @@ export function DownloadBuildsModal({ closeModal, onChanged }: { closeModal?: ()
           {view.checkLabel}
         </ButtonItem>
         {view.message && <Field description={view.message} />}
+        {view.restart && (
+          <ButtonItem layout="below" onClick={onRestart}>
+            Restart Steam
+          </ButtonItem>
+        )}
         <VersionRows rows={view.rows} onAction={onDownload} />
       </DialogBody>
     </ModalRoot>

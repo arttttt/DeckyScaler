@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { protonInstalled, protonRemoval, protonRemove } from "../api";
 import {
   ProtonManageState,
@@ -32,16 +32,27 @@ export const useManageBuilds = (onChanged: () => void) => {
     load();
   };
 
+  /** A removal question being asked or shown: a second press meanwhile asks nothing more, so one question is
+   *  ever on screen. */
+  const asking = useRef(false);
+
   /** Remove picked for a build: first the warning naming the games whose user chose it. */
   const onRemove = async (id: string) => {
+    if (asking.current) return;
+    asking.current = true;
     const removal = await safeAsyncOperation(() => protonRemoval(id), "ManageBuilds -> protonRemoval");
     const named = removal?.status === "success" ? { ...removal, games: withSteamNames(removal.games) } : removal;
     setPending({ id, confirmation: protonRemoveConfirmation(id, named ?? null) });
   };
 
+  const answered = () => {
+    asking.current = false;
+    setPending(null);
+  };
+
   const onConfirm = () => {
     if (pending?.confirmation.removes) void remove(pending.id);
-    setPending(null);
+    answered();
   };
 
   return {
@@ -49,6 +60,6 @@ export const useManageBuilds = (onChanged: () => void) => {
     onRemove: (id: string) => void onRemove(id),
     confirmation: pending?.confirmation ?? null,
     onConfirm,
-    onCancel: () => setPending(null),
+    onCancel: answered,
   };
 };

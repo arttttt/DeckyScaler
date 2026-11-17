@@ -5,24 +5,22 @@ import { RESTART_TEXT } from "../presentation/proton";
 import { DownloadBuildsModal } from "./DownloadBuildsModal";
 import { ManageBuildsModal } from "./ManageBuildsModal";
 
-/** Custom Proton builds in Steam: the OptiScaler versions block's sibling, a Steam restart when one is due, and
+/** Custom Proton builds in Steam: the OptiScaler versions block's sibling, a Steam restart (noted when due), and
  *  moving an update's games to the newer build once Steam lists it. */
 export function ProtonPage() {
   const { view, reload, onRestart, onMove, onKeep } = useProtonPage();
   return (
     <PanelSection title="Proton builds">
       {view.restart && (
-        <>
-          <PanelSectionRow>
-            <Field description={RESTART_TEXT} />
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <ButtonItem layout="below" onClick={onRestart}>
-              Restart Steam
-            </ButtonItem>
-          </PanelSectionRow>
-        </>
+        <PanelSectionRow>
+          <Field description={RESTART_TEXT} />
+        </PanelSectionRow>
       )}
+      <PanelSectionRow>
+        <ButtonItem layout="below" onClick={onRestart}>
+          Restart Steam
+        </ButtonItem>
+      </PanelSectionRow>
       {view.moves.map((offer) => (
         <Fragment key={offer.move.target}>
           <PanelSectionRow>

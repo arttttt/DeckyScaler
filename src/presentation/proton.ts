@@ -13,7 +13,7 @@ import { count, plural } from "./words";
 
 /**
  * The Proton page and its two dialogs, shaped like the OptiScaler versions block: a summary, a dialog to
- * download builds and one to manage the installed ones; and, only when needed, a row to restart Steam.
+ * download builds and one to manage the installed ones, and a button to restart Steam, which a note marks as due.
  */
 
 const PROBLEMS: Record<ProtonProblem, string> = {
@@ -49,7 +49,7 @@ export type MoveOfferView = {
 
 export type ProtonPageView = {
   summary: string;
-  /** The row that restarts Steam, shown only when builds came or went since it started. */
+  /** Builds came or went since Steam started: the page says so above its Restart Steam button. */
   restart: boolean;
   moves: MoveOfferView[];
   /** How the last move went. */
@@ -121,6 +121,8 @@ export const UNPACKING = "Unpacking… this takes a minute or two";
 
 export type ProtonDownloadState = {
   options: ProtonBuildOption[];
+  /** A build was installed while the dialog was open: Steam lists it after a restart. */
+  installedOne: boolean;
   build: string | null;
   listing: ProtonListing | null;
   checking: boolean;
@@ -142,6 +144,8 @@ export type ProtonDownloadView = {
   checkEnabled: boolean;
   rows: ReleaseRowView[];
   message: string | null;
+  /** Offer to restart Steam right here once a build is installed. */
+  restart: boolean;
 };
 
 const listingProblem = (listing: ProtonListing | null): string | null =>
@@ -164,6 +168,7 @@ export const protonDownloadView = (state: ProtonDownloadState): ProtonDownloadVi
     // Without a Steam install to put it in, nothing is downloaded.
     rows: blocked ? rows.map((row) => ({ ...row, action: row.action && { ...row.action, enabled: false } })) : rows,
     message: state.message ?? blocked ?? listingMessage(listing, label, `No ${label} releases are published.`),
+    restart: state.installedOne && idle,
   };
 };
 
@@ -185,11 +190,6 @@ export type ProtonManageView = {
   usage: string | null;
   message: string | null;
 };
-
-export type ProtonMenuItem = { action: "remove"; label: string; destructive: boolean };
-
-/** What can be done with an installed build. */
-export const PROTON_MENU: ProtonMenuItem[] = [{ action: "remove", label: "Remove", destructive: true }];
 
 const usedBy = (tool: InstalledProtonTool): string => {
   const shown = shownGames(tool.games).length;
@@ -213,7 +213,8 @@ export const protonManageView = (state: ProtonManageState): ProtonManageView => 
       id: tool.id,
       label: tool.id,
       description: busy === tool.id ? "Removing…" : describeTool(tool),
-      action: tool.system ? null : { label: "Manage", enabled: idle },
+      // Removing is all there is to do with a build: the row's button asks right away, no menu of one item.
+      action: tool.system ? null : { label: "Remove", enabled: idle },
     })),
     usage: installed?.installed_bytes ? `Installed builds take ${byteSize(installed.installed_bytes)}.` : null,
     message: state.message ?? nothing,

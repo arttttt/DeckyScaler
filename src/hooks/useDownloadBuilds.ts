@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { protonBuildOptions, protonInstall, protonVersions } from "../api";
 import { ProtonDownloadState, installDone, protonDownloadView, protonOutcome } from "../presentation/proton";
+import { restartSteam } from "../api/steamClient";
 import { safeAsyncOperation } from "../utils";
 import { useDownloadEvents } from "./useDownloadEvents";
 
@@ -10,6 +11,7 @@ const NO_ANSWER = { status: "error" as const, message: "The plugin backend did n
 export const useDownloadBuilds = (onChanged: () => void) => {
   const [state, setState] = useState<ProtonDownloadState>({
     options: [],
+    installedOne: false,
     build: null,
     listing: null,
     checking: false,
@@ -42,8 +44,9 @@ export const useDownloadBuilds = (onChanged: () => void) => {
     if (build === null) return;
     setState((s) => ({ ...s, busy: id, download: null, message: null }));
     const answer = await safeAsyncOperation(() => protonInstall(build, id), "DownloadBuilds -> protonInstall");
-    setState((s) => ({ ...s, busy: null, download: null }));
-    if (answer?.status === "success") onChanged();
+    const installed = answer?.status === "success";
+    setState((s) => ({ ...s, busy: null, download: null, installedOne: s.installedOne || installed }));
+    if (installed) onChanged();
     check(build, protonOutcome(answer ?? null, installDone(id)));
   };
 
@@ -52,5 +55,6 @@ export const useDownloadBuilds = (onChanged: () => void) => {
     onBuild: (build: string) => check(build),
     onCheck: () => state.build !== null && check(state.build),
     onDownload: (id: string) => void onDownload(id),
+    onRestart: restartSteam,
   };
 };
