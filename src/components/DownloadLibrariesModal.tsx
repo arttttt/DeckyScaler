@@ -10,17 +10,14 @@ export function DownloadLibrariesModal({ closeModal, onChanged }: { closeModal?:
     <ModalRoot closeModal={closeModal} bAllowFullSize={true}>
       <DialogHeader>Download libraries</DialogHeader>
       <DialogBody>
-        {view.sourceChoosable ? (
-          <DropdownItem
-            label="Library"
-            disabled={!view.sourceEnabled}
-            rgOptions={view.sourceOptions}
-            selectedOption={view.source}
-            onChange={(option) => onSource(String(option.data))}
-          />
-        ) : (
-          <Field label="Library" description={view.sourceLabel} />
-        )}
+        <DropdownItem
+          label="Library"
+          description={view.sourceNote ?? undefined}
+          disabled={!view.sourceEnabled}
+          rgOptions={view.sourceOptions}
+          selectedOption={view.source}
+          onChange={(option) => onSource(String(option.data))}
+        />
         <ButtonItem layout="below" onClick={onCheck} disabled={!view.checkEnabled}>
           {view.checkLabel}
         </ButtonItem>

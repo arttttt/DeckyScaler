@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { GameLibraryChoice, UserLibraries, UserLibrary } from "../api";
+import type { GameLibraryChoice, LibrarySource, UserLibraries, UserLibrary } from "../api";
 import {
   ADD_HINT,
   FOLLOW,
   NONE,
   addOutcome,
+  applyConfirmation,
   applyOutcome,
   changedChoice,
   chooseOutcome,
+  downloadOutcome,
   firstSource,
+  gameApplyConfirmation,
   gameLibraryPickers,
   launchOptionsToSet,
   libraryDownloadView,
@@ -20,6 +23,7 @@ import {
   pickerStart,
   refusalText,
   slotLabel,
+  sourcesLine,
 } from "./libraries";
 
 const ANR: UserLibrary = {
@@ -29,6 +33,9 @@ const ANR: UserLibrary = {
 const SDK: UserLibrary = {
   id: "xess-sdk-3-0-2", label: "XeSS_SDK_3.0.2", origin: "file",
   slots: ["upscaler", "frame-generation"], turns_on: ["upscaler"], size: 41_000_000, games: [],
+};
+const ANR_SOURCE: LibrarySource = {
+  id: "anr", label: "Apex Neural Rendering FG", slots: ["frame-generation"], repository: "apex-compute/ANR",
 };
 const INSTALLED: UserLibraries = {
   libraries: [ANR, SDK], slots: ["upscaler", "frame-generation"], global: { "frame-generation": "anr-v-b19" },
@@ -45,7 +52,7 @@ describe("the block on the OptiScaler page", () => {
   });
 
   it("offers per slot OptiScaler's own settings or a library serving it, with the global pick selected", () => {
-    const view = librariesBlockView({ installed: INSTALLED, busy: false, message: null });
+    const view = librariesBlockView({ installed: INSTALLED, sources: null, busy: false, message: null });
 
     expect(view.pickers.map((picker) => picker.label)).toEqual(["Upscaler", "Frame generation"]);
     expect(view.pickers[0].options).toEqual([
@@ -59,14 +66,14 @@ describe("the block on the OptiScaler page", () => {
   });
 
   it("says when a frame generation pick is only pointed at, and OptiScaler's settings turn it on", () => {
-    const view = librariesBlockView({ installed: { ...INSTALLED, global: { "frame-generation": SDK.id } }, busy: false, message: null });
+    const view = librariesBlockView({ installed: { ...INSTALLED, global: { "frame-generation": SDK.id } }, sources: null, busy: false, message: null });
 
     expect(view.pickers[1].hint).toBe("Uses its files. Frame generation itself is turned on in OptiScaler settings: FGInput and FGOutput.");
   });
 
   it("offers to apply the choice to the patched games that don't have it, and holds everything meanwhile", () => {
-    const one = librariesBlockView({ installed: { ...INSTALLED, to_apply: ["Hades II"] }, busy: false, message: null });
-    const two = librariesBlockView({ installed: { ...INSTALLED, to_apply: ["Hades II", "Cyberpunk 2077"] }, busy: true, message: null });
+    const one = librariesBlockView({ installed: { ...INSTALLED, to_apply: ["Hades II"] }, sources: null, busy: false, message: null });
+    const two = librariesBlockView({ installed: { ...INSTALLED, to_apply: ["Hades II", "Cyberpunk 2077"] }, sources: null, busy: true, message: null });
 
     expect(one.apply).toEqual({
       text: "1 patched game doesn't have the libraries picked for it yet: Hades II.", label: "Apply to it", enabled: true,
@@ -108,6 +115,44 @@ describe("the block on the OptiScaler page", () => {
   });
 });
 
+describe("what a pick reaches", () => {
+  it("asks to patch again the patched games a pick reaches, which only a patch gives it", () => {
+    expect(applyConfirmation(["Hades II", "Cyberpunk 2077"])).toEqual({
+      title: "Patch these games again?",
+      lines: [
+        "The libraries picked here reach a patched game only when it is patched again: Hades II, Cyberpunk 2077.",
+        "A running game is skipped; it gets them once patched again.",
+      ],
+      okLabel: "Patch again now",
+      cancelLabel: "Later",
+    });
+    expect(applyConfirmation(["Hades II"])?.title).toBe("Patch this game again?");
+    expect(applyConfirmation([])).toBeNull();
+    expect(applyConfirmation(undefined)).toBeNull();
+  });
+
+  it("on a game's page asks to patch that game again", () => {
+    expect(gameApplyConfirmation("Hades II", ["Hades II"])).toMatchObject({ title: "Patch Hades II again?", okLabel: "Patch again now" });
+    expect(gameApplyConfirmation("Hades II", [])).toBeNull();
+  });
+
+  it("says what Download libraries brings", () => {
+    expect(sourcesLine([ANR_SOURCE])).toBe("Apex Neural Rendering FG (frame generation)");
+    expect(sourcesLine([])).toBeNull();
+    expect(sourcesLine(null)).toBeNull();
+    expect(librariesBlockView({ installed: INSTALLED, sources: [ANR_SOURCE], busy: false, message: null }).downloadNote).toBe(
+      "Apex Neural Rendering FG (frame generation)",
+    );
+  });
+
+  it("tells after a download to pick the library to use it", () => {
+    expect(downloadOutcome({ status: "success", message: "Apex Neural Rendering FG V.B19 is downloaded." }, "anr-v-b19")).toBe(
+      "Apex Neural Rendering FG V.B19 is downloaded. Pick it under Libraries to use it.",
+    );
+    expect(downloadOutcome({ status: "error", message: "No space." }, "anr-v-b19")).toBe("No space.");
+  });
+});
+
 describe("saving a choice", () => {
   it("says nothing once saved, else why not", () => {
     expect(chooseOutcome({ status: "success" })).toBeNull();
@@ -118,24 +163,25 @@ describe("saving a choice", () => {
 
 describe("the download dialog", () => {
   const state = {
-    sources: [{ id: "anr", label: "Apex Neural Rendering FG" }], source: "anr", listing: null, checking: false,
+    sources: [ANR_SOURCE], source: "anr", listing: null, checking: false,
     busy: null, download: null, message: null,
   };
 
-  it("shows one source as a line and lists its releases", () => {
+  it("picks the library first, saying what it is for and where it comes from, then lists its versions", () => {
     const view = libraryDownloadView({
       ...state,
       listing: { status: "success", versions: [{ id: "anr-v-b19", version: "V.B19", date: "20261117", state: "available", reason: null, size: 3_418_118 }], listing_error: null },
     });
 
-    expect(view.sourceChoosable).toBe(false);
-    expect(view.sourceLabel).toBe("Apex Neural Rendering FG");
+    expect(view.sourceOptions).toEqual([{ data: "anr", label: "Apex Neural Rendering FG" }]);
+    expect(view.source).toBe("anr");
+    expect(view.sourceNote).toBe("For frame generation · from github.com/apex-compute/ANR");
     expect(view.rows[0]).toEqual({ id: "anr-v-b19", label: "V.B19 · 2026-11-17", description: "3 MB download", action: { label: "Download", enabled: true } });
     expect(view.message).toBeNull();
   });
 
   it("opens on the first source the backend offers", () => {
-    expect(firstSource([{ id: "anr", label: "ANR" }, { id: "x", label: "X" }])).toBe("anr");
+    expect(firstSource([ANR_SOURCE, { ...ANR_SOURCE, id: "x" }])).toBe("anr");
     expect(firstSource([])).toBeNull();
     expect(firstSource(null)).toBeNull();
   });
@@ -146,7 +192,7 @@ describe("the download dialog", () => {
 
     expect([busy.sourceEnabled, busy.checkEnabled]).toEqual([false, false]);
     expect(empty.message).toBe("No Apex Neural Rendering FG releases are published.");
-    expect(libraryDownloadView({ ...state, sources: [...state.sources, { id: "x", label: "X" }] }).sourceChoosable).toBe(true);
+    expect(libraryDownloadView({ ...state, source: null }).sourceNote).toBeNull();
   });
 });
 

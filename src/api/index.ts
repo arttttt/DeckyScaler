@@ -215,7 +215,8 @@ export type UserLibraries = {
 /** A library a game's patch placed, as its status says. */
 export type PlacedLibrary = { slot: LibrarySlot; id: string; label: string };
 
-export type LibrarySource = { id: string; label: string };
+/** Where libraries are downloaded from: what its library serves, and the GitHub repository it comes from. */
+export type LibrarySource = { id: string; label: string; slots: LibrarySlot[]; repository: string };
 
 /** Why what the user picked isn't added (the backend's kinds; presentation/libraries.ts words them). */
 export type LibraryRefusal = "nothing-known" | "reserved-name" | "already-added";
@@ -259,9 +260,10 @@ export const userLibraryAdd = callable<[path: string], UserLibraryResult>("user_
 export const userLibraryRemoval = callable<[library_id: string], UserLibraryRemoval>("user_library_removal");
 export const userLibraryRemove = callable<[library_id: string], { status: string; message?: string }>("user_library_remove");
 /** `scope` is "global" or a game's appid; `value` a library, "none", or null (a game follows the global choice). */
+/** A saved choice names the patched games it reaches that don't have their libraries yet. */
 export const userLibraryChoose = callable<
   [scope: string, slot: LibrarySlot, value: string | null],
-  { status: string; message?: string }
+  { status: string; message?: string; to_apply?: string[] }
 >("user_library_choose");
 export const userLibrariesApply = callable<[], LibrariesApplied>("user_libraries_apply");
 

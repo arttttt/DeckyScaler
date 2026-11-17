@@ -11,7 +11,7 @@ import type {
   UserLibraryRemoval,
   UserLibraryResult,
 } from "../api";
-import { ReleaseDownload, ReleaseRowView, byteSize, downloadRows, listingMessage } from "./releases";
+import { ReleaseDownload, ReleaseRowView, actionOutcome, byteSize, downloadRows, listingMessage } from "./releases";
 import { count, plural } from "./words";
 
 /**
@@ -65,6 +65,8 @@ export type SlotPicker = {
 
 export type LibrariesBlockView = {
   summary: string;
+  /** What Download libraries brings. */
+  downloadNote: string | null;
   /** Every game's choice, per slot; none until the libraries have answered. */
   pickers: SlotPicker[];
   /** Patched games a patch now would change, and the button that does it. */
@@ -74,6 +76,7 @@ export type LibrariesBlockView = {
 
 export type LibrariesBlockState = {
   installed: UserLibraries | null;
+  sources: LibrarySource[] | null;
   /** Applying the choice to patched games, or saving a choice. */
   busy: boolean;
   /** What the last action came to; cleared by the next one. */
@@ -92,6 +95,7 @@ export const librariesBlockView = (state: LibrariesBlockState): LibrariesBlockVi
   const pending = installed?.to_apply ?? [];
   return {
     summary: librariesSummary(installed),
+    downloadNote: sourcesLine(state.sources),
     pickers: (installed?.slots ?? []).map((slot) => ({
       slot,
       label: slotLabel(slot),
@@ -110,6 +114,41 @@ export const librariesBlockView = (state: LibrariesBlockState): LibrariesBlockVi
     message: state.message,
   };
 };
+
+/** What a source's library is for, in a sentence's middle: "frame generation". */
+const servesText = (slots: LibrarySlot[]): string => slots.map((slot) => slotLabel(slot).toLowerCase()).join(" and ");
+
+/** What Download libraries brings, said under its button before the dialog opens. */
+export const sourcesLine = (sources: LibrarySource[] | null): string | null =>
+  sources?.length ? sources.map((source) => `${source.label} (${servesText(source.slots)})`).join(", ") : null;
+
+/** A pick saved for patched games that don't have it yet asks to patch them again now: a pick reaches a game only
+ *  when it is patched. */
+export type ApplyConfirmation = { title: string; lines: string[]; okLabel: string; cancelLabel: string };
+
+export const applyConfirmation = (games: string[] | undefined): ApplyConfirmation | null =>
+  games?.length
+    ? {
+        title: `Patch ${plural(games.length, "this game", "these games")} again?`,
+        lines: [
+          `The libraries picked here reach a patched game only when it is patched again: ${games.join(", ")}.`,
+          "A running game is skipped; it gets them once patched again.",
+        ],
+        okLabel: "Patch again now",
+        cancelLabel: "Later",
+      }
+    : null;
+
+/** On a game's page, its own pick: the game itself is patched again, there and then. */
+export const gameApplyConfirmation = (game: string, games: string[] | undefined): ApplyConfirmation | null =>
+  games?.length
+    ? {
+        title: `Patch ${game} again?`,
+        lines: ["The libraries picked here reach the game only when it is patched again."],
+        okLabel: "Patch again now",
+        cancelLabel: "Later",
+      }
+    : null;
 
 /** What saving a choice came to: nothing to say once saved, else why it wasn't. */
 export const chooseOutcome = (answer: { status: string; message?: string } | null): string | null =>
@@ -147,11 +186,11 @@ export type LibraryDownloadState = {
 };
 
 export type LibraryDownloadView = {
+  /** The libraries that can be downloaded: picking one lists its versions. */
   sourceOptions: { data: string; label: string }[];
   source: string | null;
-  /** One source is a line to read, more a list to pick from. */
-  sourceChoosable: boolean;
-  sourceLabel: string;
+  /** What the picked library is for, and where it comes from. */
+  sourceNote: string | null;
   sourceEnabled: boolean;
   checkLabel: string;
   checkEnabled: boolean;
@@ -165,18 +204,24 @@ export const firstSource = (sources: LibrarySource[] | null): string | null => s
 export const libraryDownloadView = (state: LibraryDownloadState): LibraryDownloadView => {
   const { listing, checking, busy } = state;
   const idle = busy === null;
-  const label = state.sources.find((source) => source.id === state.source)?.label ?? "this library";
+  const picked = state.sources.find((source) => source.id === state.source);
+  const label = picked?.label ?? "this library";
   return {
     sourceOptions: state.sources.map((source) => ({ data: source.id, label: source.label })),
     source: state.source,
-    sourceChoosable: state.sources.length > 1,
-    sourceLabel: label,
+    sourceNote: picked ? `For ${servesText(picked.slots)} · from github.com/${picked.repository}` : null,
     sourceEnabled: idle,
     checkLabel: checking ? "Checking…" : "Check for new versions",
     checkEnabled: !checking && idle,
     rows: listing?.status === "success" ? downloadRows(listing.versions, busy, state.download) : [],
     message: state.message ?? listingMessage(listing, label, `No ${label} releases are published.`),
   };
+};
+
+/** What a download came to; a library downloaded is used once picked, which the dialog says. */
+export const downloadOutcome = (answer: UserLibraryResult | null, id: string): string => {
+  const said = actionOutcome(answer, `${id} is downloaded.`);
+  return answer?.status === "success" ? `${said} Pick it under Libraries to use it.` : said;
 };
 
 // ── Adding the user's own ────────────────────────────────────────────────────

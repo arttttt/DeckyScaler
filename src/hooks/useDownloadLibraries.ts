@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { userLibraryInstall, userLibrarySources, userLibraryVersions } from "../api";
-import { LibraryDownloadState, firstSource, libraryDownloadView } from "../presentation/libraries";
-import { actionOutcome } from "../presentation/releases";
+import { LibraryDownloadState, downloadOutcome, firstSource, libraryDownloadView } from "../presentation/libraries";
 import { safeAsyncOperation } from "../utils";
 import { useDownloadEvents } from "./useDownloadEvents";
 
@@ -39,7 +38,7 @@ export const useDownloadLibraries = (onChanged: () => void) => {
     const answer = await safeAsyncOperation(() => userLibraryInstall(source, id), "DownloadLibraries -> install");
     setState((s) => ({ ...s, busy: null, download: null }));
     if (answer?.status === "success") onChanged();
-    check(source, actionOutcome(answer ?? null, `${id} is downloaded.`));
+    check(source, downloadOutcome(answer ?? null, id));
   };
 
   return {
