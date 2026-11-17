@@ -188,8 +188,10 @@ class Patcher:
             game_directory.execute(operations, directory, source)
             files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
             if patch_record.placed_by(recorded, plan.INI_FILENAME):
-                # Keys the previous patch's libraries set and these don't are written back once, in a kept ini.
-                released = library_placement.released(marker.library_layer(previous_details), placement.layer)
+                # Keys the previous patch's libraries set and these don't are written back once, in a kept ini; a
+                # fresh one holds none of them.
+                previous = marker.library_layer(previous_details) if carried_over else {}
+                released = library_placement.released(previous, placement.layer)
                 self.apply_settings(directory, source, settings_appid, released)
         except plan.PlanError as exc:
             return _error(str(exc))

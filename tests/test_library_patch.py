@@ -202,3 +202,15 @@ def test_a_games_page_shows_what_its_libraries_set_and_wont_change_it(plugin, pl
     assert (row["source"], row["library"]) == ("library", "ANR 1")
     assert refused["status"] == "error" and "set by ANR 1" in refused["message"]
     assert run(plugin.set_setting("global", "FrameGen", "FGInput", "fsrfg"))["status"] == "success"
+
+
+def test_a_fresh_ini_gets_no_key_the_previous_libraries_set(plugin, plugin_home, tmp_path):
+    anr(plugin_home)
+    choose(plugin_home, library_choice.GLOBAL, FG, "anr")
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))  # another family: a fresh ini, no libraries
+
+    assert "FGNvngxReplacement" not in ini_of(game) and "DisableHudless" not in ini_of(game)
+    assert not (game / "OptiScaler" / "custom").exists() and marker_of(game)["libraries"] == []
