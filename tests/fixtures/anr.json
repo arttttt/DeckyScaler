@@ -1,0 +1,705 @@
+[
+ {
+  "draft": false,
+  "name": "FG V.B19",
+  "prerelease": false,
+  "published_at": "2026-11-17T00:20:54Z",
+  "tag_name": "FG-V.B19",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/anr-fg-V.B19-addon.zip",
+    "digest": "sha256:70107373e0f9744875fcbb7f46133432202ce7f132fdfff14259b8a85fba3f13",
+    "name": "anr-fg-V.B19-addon.zip",
+    "size": 3418118,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/anr-fg-V.B19-full-optiscaler-source.zip",
+    "digest": "sha256:b8305b9504890f3a4b718501714ad3097e22f132701531e015a770d618cbb57f",
+    "name": "anr-fg-V.B19-full-optiscaler-source.zip",
+    "size": 132984683,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/anr-fg-V.B19-full.zip",
+    "digest": "sha256:4a7faac8cb36a0938dd996136b7d2d3da9841dc78786c0fe61ad337def1ae14b",
+    "name": "anr-fg-V.B19-full.zip",
+    "size": 11017369,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/anr-fg-V.B19-kit-linux.tar.gz",
+    "digest": "sha256:5c118da6faa405d7ac20644b442d3bbfa13bd81f1e8d5d55397077abb31f71ff",
+    "name": "anr-fg-V.B19-kit-linux.tar.gz",
+    "size": 570109215,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/anr-fg-V.B19-kit-windows.zip",
+    "digest": "sha256:1010c597a89f356fc8a1044357d8158d2ab3f43e9ac7fab8021245c9b0ea6f3b",
+    "name": "anr-fg-V.B19-kit-windows.zip",
+    "size": 594652132,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/nr-record-1.2-linux.tar.gz",
+    "digest": "sha256:4388dc8ab63c635416bcc7619df48a41b3d675ced869a176b82e39a929d22a2c",
+    "name": "nr-record-1.2-linux.tar.gz",
+    "size": 9042493,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/nr-record-1.2-SHA256SUMS.txt",
+    "digest": "sha256:dae5de75e071247680cd69e0d09cbb862c8d62534f05fa763b4a6497ed160ebe",
+    "name": "nr-record-1.2-SHA256SUMS.txt",
+    "size": 185,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/nr-record-1.2-windows.zip",
+    "digest": "sha256:fc562c45e4c03eb2641060f4e04a0791b8e4b7942f1bbb01d13e75346f9c8c1b",
+    "name": "nr-record-1.2-windows.zip",
+    "size": 8169253,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B19/SHA256SUMS.txt",
+    "digest": "sha256:08751bf86b340ce785600a806931ee1423c44d149cb276ecc9c63e2e3467b7c4",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B18",
+  "prerelease": false,
+  "published_at": "2026-11-14T23:54:24Z",
+  "tag_name": "FG-V.B18",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/anr-fg-V.B18-addon.zip",
+    "digest": "sha256:6dfce1ce2240f6ce8d820a7eb66b4d7d349655e9238c30df820297d70b9963f3",
+    "name": "anr-fg-V.B18-addon.zip",
+    "size": 3161126,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/anr-fg-V.B18-full-optiscaler-source.zip",
+    "digest": "sha256:5d87e34b8d4e34cd45d8f08761886d08c68733a744c4a690cb36ba1c7a091690",
+    "name": "anr-fg-V.B18-full-optiscaler-source.zip",
+    "size": 132981332,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/anr-fg-V.B18-full.zip",
+    "digest": "sha256:ed70eef1dc92ba71685daad59f1d9ef1d9897b46df009f04b1dc51c4933cd300",
+    "name": "anr-fg-V.B18-full.zip",
+    "size": 10786376,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/anr-fg-V.B18-kit-linux.tar.gz",
+    "digest": "sha256:7105d286c973258012c15bd9186cf1167e9665ad254c76a7ee11785aedfe62f0",
+    "name": "anr-fg-V.B18-kit-linux.tar.gz",
+    "size": 569997603,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/anr-fg-V.B18-kit-windows.zip",
+    "digest": "sha256:fdc230865b27b7b855bbf13259ec0d253e81a74a8c1c51f78a6b3593abc443bc",
+    "name": "anr-fg-V.B18-kit-windows.zip",
+    "size": 594572923,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/nr-record-1.2-linux.tar.gz",
+    "digest": "sha256:4388dc8ab63c635416bcc7619df48a41b3d675ced869a176b82e39a929d22a2c",
+    "name": "nr-record-1.2-linux.tar.gz",
+    "size": 9042493,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/nr-record-1.2-SHA256SUMS.txt",
+    "digest": "sha256:dae5de75e071247680cd69e0d09cbb862c8d62534f05fa763b4a6497ed160ebe",
+    "name": "nr-record-1.2-SHA256SUMS.txt",
+    "size": 185,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/nr-record-1.2-windows.zip",
+    "digest": "sha256:fc562c45e4c03eb2641060f4e04a0791b8e4b7942f1bbb01d13e75346f9c8c1b",
+    "name": "nr-record-1.2-windows.zip",
+    "size": 8169253,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B18/SHA256SUMS.txt",
+    "digest": "sha256:d1cc714711d7b1d2b5eaa05f515e2b20552d64467c1799021154a85b63714e57",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B17",
+  "prerelease": false,
+  "published_at": "2026-11-14T21:17:21Z",
+  "tag_name": "FG-V.B17",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B17/anr-fg-V.B17-addon.zip",
+    "digest": "sha256:031e7251ffbb05e941c5fa2499e491dda578626653e16d480e28177140ff16c9",
+    "name": "anr-fg-V.B17-addon.zip",
+    "size": 3160408,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B17/anr-fg-V.B17-full-optiscaler-source.zip",
+    "digest": "sha256:bc17fea5bb4fcffae36c621b9b5e65bab7f9722a816d9f12b8a394ebd3f86144",
+    "name": "anr-fg-V.B17-full-optiscaler-source.zip",
+    "size": 132981332,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B17/anr-fg-V.B17-full.zip",
+    "digest": "sha256:91dbcfea1db82d58e5cf0ff9a38f3a3b583c70ed362caef4c247b5a368491b7c",
+    "name": "anr-fg-V.B17-full.zip",
+    "size": 10785667,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B17/anr-fg-V.B17-kit-linux.tar.gz",
+    "digest": "sha256:5ddc78a4c6193328695cc0b2daa707f2d4d5e9a3c7ba0ba00409c96920663c8a",
+    "name": "anr-fg-V.B17-kit-linux.tar.gz",
+    "size": 569997450,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B17/anr-fg-V.B17-kit-windows.zip",
+    "digest": "sha256:d19af8457579652824ed8eb9f46eddc465cab17da5175baca1990bb21be61800",
+    "name": "anr-fg-V.B17-kit-windows.zip",
+    "size": 594572933,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B17/SHA256SUMS.txt",
+    "digest": "sha256:e506c971997a16202e6c1bdee44335c3eb08aadcc157427ead4c08fe73619df2",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B16",
+  "prerelease": false,
+  "published_at": "2026-11-14T09:54:33Z",
+  "tag_name": "FG-V.B16",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B16/anr-fg-V.B16-addon.zip",
+    "digest": "sha256:764f1e182258484c763fb92187f1e16c849dcb7146a342db49367e15477d641d",
+    "name": "anr-fg-V.B16-addon.zip",
+    "size": 3156952,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B16/anr-fg-V.B16-full-optiscaler-source.zip",
+    "digest": "sha256:d09017cc5648d3844cc8d56131accf1b8ad7e0d055a6c6b9e60ca4329654f02c",
+    "name": "anr-fg-V.B16-full-optiscaler-source.zip",
+    "size": 132981332,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B16/anr-fg-V.B16-full.zip",
+    "digest": "sha256:3abebbedb6843efb12648921e191cf7eeec23247206fe4400d2b6f7763413e7d",
+    "name": "anr-fg-V.B16-full.zip",
+    "size": 10782205,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B16/anr-fg-V.B16-kit-linux.tar.gz",
+    "digest": "sha256:272146d93dc5863811544ae90d0aac5481ad9775735eb5957a1845393c882f86",
+    "name": "anr-fg-V.B16-kit-linux.tar.gz",
+    "size": 569997504,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B16/anr-fg-V.B16-kit-windows.zip",
+    "digest": "sha256:82963431d283ef36c6ff0616cebb3aa4f64d8ee8c18a6cce273b472303027ff9",
+    "name": "anr-fg-V.B16-kit-windows.zip",
+    "size": 594572655,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B16/SHA256SUMS.txt",
+    "digest": "sha256:5dd49db220428da33d206400717c43151804f6d0f8db31e125a9eedfdb1f2970",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B15",
+  "prerelease": false,
+  "published_at": "2026-11-12T17:49:28Z",
+  "tag_name": "FG-V.B15",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/anr-fg-V.B15-addon.zip",
+    "digest": "sha256:717e93b3e63cb08dbaf6240cd585bae94d498c2749d8603d800d17ad97ef9e41",
+    "name": "anr-fg-V.B15-addon.zip",
+    "size": 3231158,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/anr-fg-V.B15-full-optiscaler-source.zip",
+    "digest": "sha256:f3ea0a1c36e79012f48b27049c3b5e3f8dde94ada803aacbb4982093d3091a91",
+    "name": "anr-fg-V.B15-full-optiscaler-source.zip",
+    "size": 132981332,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/anr-fg-V.B15-full.zip",
+    "digest": "sha256:45969be1cf9916f404c5e7e6999a494619ef167a7fdb7393b2fa3136e9b7160a",
+    "name": "anr-fg-V.B15-full.zip",
+    "size": 10856642,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/anr-fg-V.B15-kit-linux.tar.gz",
+    "digest": "sha256:fe9fe9d1782637868ff7b654c44e1aea4551e6e48e89580785ead1cdc5731756",
+    "name": "anr-fg-V.B15-kit-linux.tar.gz",
+    "size": 570335862,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/anr-fg-V.B15-kit-macos.tar.gz",
+    "digest": "sha256:d1b9607c0779e501d3ae319811f7cc090b0f54a8860fc0a2ce8d8392e099b2a3",
+    "name": "anr-fg-V.B15-kit-macos.tar.gz",
+    "size": 466791077,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/anr-fg-V.B15-kit-windows.zip",
+    "digest": "sha256:0e8015c70275b92c0ca588074f4e41d2eaad161db23fbf8980a568227bb1ef58",
+    "name": "anr-fg-V.B15-kit-windows.zip",
+    "size": 594886525,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/nr-record-1.1-linux.tar.gz",
+    "digest": "sha256:8596d0f8407a1dcea7afc2754557c7a0f75c5d7b53cc16e07365cd5a25ab7e4f",
+    "name": "nr-record-1.1-linux.tar.gz",
+    "size": 9001276,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/nr-record-1.1-windows.zip",
+    "digest": "sha256:db1a6f9c1aefc69afc464bbfd5ff9e741367c511939f03e43366fb528c2fc536",
+    "name": "nr-record-1.1-windows.zip",
+    "size": 8098117,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B15/SHA256SUMS.txt",
+    "digest": "sha256:f40a4c678499a0dcad73c46c9ecde42c819e41ed8d193108ed589400154ab669",
+    "name": "SHA256SUMS.txt",
+    "size": 755,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B14",
+  "prerelease": false,
+  "published_at": "2026-11-12T06:04:34Z",
+  "tag_name": "FG-V.B14",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/anr-fg-V.B14-addon.zip",
+    "digest": "sha256:cf123530037b2f349d70f6e13331cd255bbb69a17b610d4bc7fc103559f20d7e",
+    "name": "anr-fg-V.B14-addon.zip",
+    "size": 3219169,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/anr-fg-V.B14-full-optiscaler-source.zip",
+    "digest": "sha256:1a14dda09e896e079941b8736b14aebe23ec7dccace3dd7e4931ab65bbd8db68",
+    "name": "anr-fg-V.B14-full-optiscaler-source.zip",
+    "size": 132981332,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/anr-fg-V.B14-full.zip",
+    "digest": "sha256:03e3fab62fa4d044dacd795eddc562c70a3d77e6c4ba1d4846180fc50d2974a8",
+    "name": "anr-fg-V.B14-full.zip",
+    "size": 10844652,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/anr-fg-V.B14-kit-linux.tar.gz",
+    "digest": "sha256:01f57747c69c5f34e5e14c954abefda1140e747f4f246ddf729015ac26a460b2",
+    "name": "anr-fg-V.B14-kit-linux.tar.gz",
+    "size": 570336730,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/anr-fg-V.B14-kit-macos.tar.gz",
+    "digest": "sha256:0e2abcadf32bf3588199908dff23765fb7693cf74e6e2f8d5562867a3512dc50",
+    "name": "anr-fg-V.B14-kit-macos.tar.gz",
+    "size": 466791152,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/anr-fg-V.B14-kit-windows.zip",
+    "digest": "sha256:2734addf79801d79d6830facc47daa491c5307514483a8fb330d347372ad8eca",
+    "name": "anr-fg-V.B14-kit-windows.zip",
+    "size": 594886185,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/nr-record-1.0-linux.tar.gz",
+    "digest": "sha256:8aed74af8900ebe65abea2f7a7bdb06a86013a5fc712114e72025ddad321d9ad",
+    "name": "nr-record-1.0-linux.tar.gz",
+    "size": 5876604,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/nr-record-1.0-windows.zip",
+    "digest": "sha256:49866930fb637181568848851be09038abc4906d2483e277e637cabf944fea16",
+    "name": "nr-record-1.0-windows.zip",
+    "size": 4968004,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B14/SHA256SUMS.txt",
+    "digest": "sha256:ac64d01ca14765f20d4be3f84322b0879933c2fa7a4cfbbdf13d40f8001970f8",
+    "name": "SHA256SUMS.txt",
+    "size": 755,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B13",
+  "prerelease": false,
+  "published_at": "2026-11-12T04:05:55Z",
+  "tag_name": "FG-V.B13",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B13/anr-fg-V.B13-addon.zip",
+    "digest": "sha256:9d749ac52652d0d6eb41fa1fd424089234ac6987a4c9b644bb1bb012e57a4165",
+    "name": "anr-fg-V.B13-addon.zip",
+    "size": 3219170,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B13/anr-fg-V.B13-full-optiscaler-source.zip",
+    "digest": "sha256:83ffef58f8d3abd0042a1ccd17dde80fa1c119b0f795d9a595ff4546da610777",
+    "name": "anr-fg-V.B13-full-optiscaler-source.zip",
+    "size": 132979769,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B13/anr-fg-V.B13-full.zip",
+    "digest": "sha256:a55c04eb99c9d19128220b78c37106e18d8b791349d04dc1115afee81f7e3d2c",
+    "name": "anr-fg-V.B13-full.zip",
+    "size": 10846473,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B13/anr-fg-V.B13-kit-linux.tar.gz",
+    "digest": "sha256:2cef5477582e11a655e4de4469a769ce47f92c7daa6891bc7030e2fb7e24618b",
+    "name": "anr-fg-V.B13-kit-linux.tar.gz",
+    "size": 570336791,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B13/anr-fg-V.B13-kit-macos.tar.gz",
+    "digest": "sha256:3381b0c143e7916ba4d9a1deec23937bae7007ccc2946266408de9c9dda00d90",
+    "name": "anr-fg-V.B13-kit-macos.tar.gz",
+    "size": 466791153,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B13/anr-fg-V.B13-kit-windows.zip",
+    "digest": "sha256:e8bb0269a263245f9443ef26ce757a1faf5e0018d9cf068ebd99dd628de02f74",
+    "name": "anr-fg-V.B13-kit-windows.zip",
+    "size": 594886185,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B13/SHA256SUMS.txt",
+    "digest": "sha256:f02743b8128b12236d17688e39d6b8383ba1c6b1ba6b06d9d1a3eeb0ee35d9f5",
+    "name": "SHA256SUMS.txt",
+    "size": 570,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B12",
+  "prerelease": false,
+  "published_at": "2026-11-11T22:41:20Z",
+  "tag_name": "FG-V.B12",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B12/anr-fg-V.B12-addon.zip",
+    "digest": "sha256:e512df03aa2533c520cde0b3427015f272decf8eab3e9a602e7d9515398220d3",
+    "name": "anr-fg-V.B12-addon.zip",
+    "size": 3190495,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B12/anr-fg-V.B12-full-optiscaler-source.zip",
+    "digest": "sha256:4e4fe525c44071602c052d3a8cd89224102b402b9b687fa41cb8648040ec12c9",
+    "name": "anr-fg-V.B12-full-optiscaler-source.zip",
+    "size": 132979769,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B12/anr-fg-V.B12-full.zip",
+    "digest": "sha256:5cb36868e6d7b6111fb948c8a7991ae8b435ae421bcc3bfa21683a9ce69432eb",
+    "name": "anr-fg-V.B12-full.zip",
+    "size": 10817805,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B12/anr-fg-V.B12-kit-linux.tar.gz",
+    "digest": "sha256:34e2e031ccfdb70c3ef4d622e59c2a7bcdbbfed6581a03772bc5723419d0d9ec",
+    "name": "anr-fg-V.B12-kit-linux.tar.gz",
+    "size": 571173464,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B12/anr-fg-V.B12-kit-windows.zip",
+    "digest": "sha256:cc82a610a61f6112e1cee80e01c9acdeaa79dffe09dcf1855787c24694b7ee9f",
+    "name": "anr-fg-V.B12-kit-windows.zip",
+    "size": 595645032,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B12/SHA256SUMS.txt",
+    "digest": "sha256:7e7c7985db7714253e29d36975a0fa71a96ea61dc3f2e056bf9187d08efb5d89",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B11",
+  "prerelease": false,
+  "published_at": "2026-11-11T20:42:16Z",
+  "tag_name": "FG-V.B11",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B11/anr-fg-V.B11-addon.zip",
+    "digest": "sha256:04584b4d14105f94771759a910e8ac78cb3255470fc0fd521a0ca15067f0c6ba",
+    "name": "anr-fg-V.B11-addon.zip",
+    "size": 2932555,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B11/anr-fg-V.B11-full-optiscaler-source.zip",
+    "digest": "sha256:59e61ca3672050f5129f7a408328f700df25f2e7fc1812c693f4d6a76ee1fd67",
+    "name": "anr-fg-V.B11-full-optiscaler-source.zip",
+    "size": 132979769,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B11/anr-fg-V.B11-full.zip",
+    "digest": "sha256:a60744da3019f900864a36e156b251884e79c1a9518938224ea18a9cc4008220",
+    "name": "anr-fg-V.B11-full.zip",
+    "size": 10559776,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B11/anr-fg-V.B11-kit-linux.tar.gz",
+    "digest": "sha256:dec0eadf479ec317b2203b9418920bfa41f653daeb6e47c19b8a712226b54db6",
+    "name": "anr-fg-V.B11-kit-linux.tar.gz",
+    "size": 570934193,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B11/anr-fg-V.B11-kit-windows.zip",
+    "digest": "sha256:f858a9baf3978b19db3634636f8afdf38dae641d9ff857a476c33a0959428cb4",
+    "name": "anr-fg-V.B11-kit-windows.zip",
+    "size": 595389850,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B11/SHA256SUMS.txt",
+    "digest": "sha256:b47f95764f035efb14c754425e9ead75736ca35b3f8260df3b97c6b8e106a522",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B10",
+  "prerelease": false,
+  "published_at": "2026-11-11T20:04:20Z",
+  "tag_name": "FG-V.B10",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B10/anr-fg-V.B10-addon.zip",
+    "digest": "sha256:14750b6bb4beba64a5058ded51a9e78b3eca9effeeab5f460c2b28fe1e9d227b",
+    "name": "anr-fg-V.B10-addon.zip",
+    "size": 2928281,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B10/anr-fg-V.B10-full-optiscaler-source.zip",
+    "digest": "sha256:d1633466c617d518c9d61705537cd7a11e1efebc5b4c3838cacc66c9cdf173ce",
+    "name": "anr-fg-V.B10-full-optiscaler-source.zip",
+    "size": 132979769,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B10/anr-fg-V.B10-full.zip",
+    "digest": "sha256:fac8c6f3be1b7c21740bf4e2148561d1306537c1e24e825be85e7c750df4af10",
+    "name": "anr-fg-V.B10-full.zip",
+    "size": 10555500,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B10/anr-fg-V.B10-kit-linux.tar.gz",
+    "digest": "sha256:6b5580eb9a9f89adbfd553f75ab049687b451bf19668218af0670150cdc88818",
+    "name": "anr-fg-V.B10-kit-linux.tar.gz",
+    "size": 570934329,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B10/anr-fg-V.B10-kit-windows.zip",
+    "digest": "sha256:4daec1710ceb7b0bc0b03ab74be793fdd2ce4b9e650a040d1abf2b1218ff7a21",
+    "name": "anr-fg-V.B10-kit-windows.zip",
+    "size": 595389851,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B10/SHA256SUMS.txt",
+    "digest": "sha256:78032560886ccb0d7ce21ae9e1f9d33c1f83b33dfb2f9967e248567ce5255ad7",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B09",
+  "prerelease": false,
+  "published_at": "2026-11-11T19:30:48Z",
+  "tag_name": "FG-V.B09",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B09/anr-fg-V.B09-addon.zip",
+    "digest": "sha256:a838030420eb4d08eefb57b04f1f8e8d8b83273e2d4d34934f41dd9141fd09d7",
+    "name": "anr-fg-V.B09-addon.zip",
+    "size": 2927240,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B09/anr-fg-V.B09-full-optiscaler-source.zip",
+    "digest": "sha256:26479332736c85f33109a7101b6cc640b00baca43ab7f8680037246e080a59f3",
+    "name": "anr-fg-V.B09-full-optiscaler-source.zip",
+    "size": 132979769,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B09/anr-fg-V.B09-full.zip",
+    "digest": "sha256:fa9505c1a2a173f2cd93620788a7ce30202f6a120857ce415689b41b5fea5052",
+    "name": "anr-fg-V.B09-full.zip",
+    "size": 10554458,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B09/anr-fg-V.B09-kit-linux.tar.gz",
+    "digest": "sha256:a6d3a57cba5ffeb1e168cb55b2ea7d5300d7a1708e0cb2fdd7cdfd21503dcf41",
+    "name": "anr-fg-V.B09-kit-linux.tar.gz",
+    "size": 570934399,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B09/anr-fg-V.B09-kit-windows.zip",
+    "digest": "sha256:c7ac453bcf3330bd3f7d73ad9fdb05dc719340b5e0b245e51a363ab064f906c3",
+    "name": "anr-fg-V.B09-kit-windows.zip",
+    "size": 595389851,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B09/SHA256SUMS.txt",
+    "digest": "sha256:7eaef7f78628948176b9ffb71d337a89c8729c3be9a69c5b30408d30d78b8e38",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ },
+ {
+  "draft": false,
+  "name": "FG V.B08",
+  "prerelease": false,
+  "published_at": "2026-11-11T19:19:47Z",
+  "tag_name": "FG-V.B08",
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B08/anr-fg-V.B08-addon.zip",
+    "digest": "sha256:b61561e53f2ab4b8d8d696addd18ff434b5a79f3cb090e61b0a2580c58fe0f92",
+    "name": "anr-fg-V.B08-addon.zip",
+    "size": 2926050,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B08/anr-fg-V.B08-full-optiscaler-source.zip",
+    "digest": "sha256:bc2e4cf03ab158383f86e0bb17294f20e5438760c13d59a4b4442161ed1f3637",
+    "name": "anr-fg-V.B08-full-optiscaler-source.zip",
+    "size": 132979769,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B08/anr-fg-V.B08-full.zip",
+    "digest": "sha256:a22c5a8c44ffc3abea9f69d2f9a4cec787df3446cbc35579b22690e651d9f1a5",
+    "name": "anr-fg-V.B08-full.zip",
+    "size": 10553267,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B08/anr-fg-V.B08-kit-linux.tar.gz",
+    "digest": "sha256:0e651eed64a941e60dbff74fb3f459c11c92ce7de6dd8ae2b82b634d8d9f7643",
+    "name": "anr-fg-V.B08-kit-linux.tar.gz",
+    "size": 570934334,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B08/anr-fg-V.B08-kit-windows.zip",
+    "digest": "sha256:0e22629f1d8b5d789d97ac20047793f4a4a5a97905890946a07b07e467e3214f",
+    "name": "anr-fg-V.B08-kit-windows.zip",
+    "size": 595389850,
+    "state": "uploaded"
+   },
+   {
+    "browser_download_url": "https://github.com/apex-compute/ANR/releases/download/FG-V.B08/SHA256SUMS.txt",
+    "digest": "sha256:e11cfbdfe5b2141c2634d9a9553f3c078d8e706d77582026b2cdac2c6e301e25",
+    "name": "SHA256SUMS.txt",
+    "size": 474,
+    "state": "uploaded"
+   }
+  ]
+ }
+]
