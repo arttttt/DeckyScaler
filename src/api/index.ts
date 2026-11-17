@@ -146,6 +146,9 @@ export type InstalledProtonTool = {
   global_default: boolean;
 };
 
+/** Games an update left on older builds of a build, to move to the newer one now that Steam lists it. */
+export type ProtonMove = { build: string; target: string; sources: string[]; games: ProtonGame[] };
+
 export type InstalledProton = {
   status: "success";
   problem: ProtonProblem | null;
@@ -153,6 +156,7 @@ export type InstalledProton = {
   installed_bytes: number;
   /** Builds came or went since Steam started: it lists them only after a restart. */
   restart_needed: boolean;
+  moves: ProtonMove[];
 };
 
 export type ProtonListing =
@@ -174,6 +178,15 @@ export const protonVersions = callable<[build: string], ProtonListing>("proton_v
 export const protonInstall = callable<[build: string, tool: string], ProtonResult>("proton_install");
 export const protonRemoval = callable<[tool: string], ProtonRemoval>("proton_removal");
 export const protonRemove = callable<[tool: string], ProtonResult>("proton_remove");
+/** These games were moved to `target`: offered no more. */
+export const protonMoved = callable<[target: string, appids: string[]], { status: "success" }>("proton_moved");
+/** The games stay where they are: the move to `target` is offered no more. */
+export const protonKeep = callable<[target: string], { status: "success" }>("proton_keep");
+/** The games whose user chose a tool now, as Steam's config says. */
+export const protonGames = callable<
+  [tool: string],
+  { status: "success"; games: ProtonGame[] } | { status: "error"; problem?: ProtonProblem; message?: string }
+>("proton_games");
 
 // ── Development builds ───────────────────────────────────────────────────────
 

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { InstalledProton, InstalledProtonTool, ProtonListing, ReleaseVersion } from "../api";
+import type { ProtonMove } from "../api";
 import {
   CHOOSING_HINT,
+  moveOutcome,
+  unconfirmed,
   PROTON_MENU,
   ProtonDownloadState,
   UNPACKING,
@@ -32,12 +35,15 @@ const SYSTEM: InstalledProtonTool = {
   id: "proton-cachyos", build: null, build_label: null, system: true, size: 1_700_000_000, games: [], global_default: true,
 };
 const installed = (overrides: Partial<InstalledProton> = {}): InstalledProton => ({
-  status: "success", problem: null, tools: [GE, OTHER, SYSTEM], installed_bytes: 3_000_000_000, restart_needed: false, ...overrides,
+  status: "success", problem: null, tools: [GE, OTHER, SYSTEM], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
+  ...overrides,
 });
 
 describe("the Proton page", () => {
   it("counts the installed builds, or says there is none, and always says where a game's Proton is chosen", () => {
-    expect(protonPageView(installed())).toEqual({ summary: "3 builds installed.", restart: false, dialogsEnabled: true, hint: CHOOSING_HINT });
+    expect(protonPageView(installed())).toEqual({
+      summary: "3 builds installed.", restart: false, moves: [], moveMessage: null, dialogsEnabled: true, hint: CHOOSING_HINT,
+    });
     expect(protonPageView(installed({ tools: [GE] })).summary).toBe("1 build installed.");
     expect(protonPageView(installed({ tools: [] })).summary).toBe("No Proton build is installed yet.");
     expect(protonPageView(null)).toMatchObject({ summary: "Loading…", dialogsEnabled: false });
@@ -215,5 +221,63 @@ describe("how an action went", () => {
     expect(protonOutcome({ status: "error", problem: "no-steam" }, "Done.")).toBe(problemText("no-steam"));
     expect(protonOutcome({ status: "success" }, "Done.")).toBe("Done.");
     expect(protonOutcome(null, "Done.")).toBe("The plugin backend did not answer.");
+  });
+});
+
+const MOVE: ProtonMove = {
+  build: "ge-proton",
+  target: "GE-Proton11-13-x86_64",
+  sources: ["GE-Proton11-12-x86_64"],
+  games: [GE.games[0], GE.games[2], GE.games[1]],
+};
+
+describe("moving an update's games", () => {
+  it("offers to move the games still on the older build, named and sorted", () => {
+    const [offer] = protonPageView(installed({ moves: [MOVE] })).moves;
+
+    expect(offer).toEqual({
+      move: MOVE,
+      text: "3 games still use GE-Proton11-12-x86_64: app 1245620 · not installed, Counter-Strike 2, Heroic.",
+      moveLabel: "Move them to GE-Proton11-13-x86_64",
+      keepLabel: "Keep them on GE-Proton11-12-x86_64",
+      enabled: true,
+    });
+  });
+
+  it("speaks of one game as one, and of several older builds as where they are", () => {
+    const one = { ...MOVE, games: [GE.games[0]], sources: ["GE-Proton11-11-x86_64", "GE-Proton11-12-x86_64"] };
+
+    expect(protonPageView(installed({ moves: [one] })).moves[0]).toMatchObject({
+      text: "1 game still uses GE-Proton11-11-x86_64, GE-Proton11-12-x86_64: Counter-Strike 2.",
+      moveLabel: "Move it to GE-Proton11-13-x86_64",
+      keepLabel: "Keep them where they are",
+    });
+    expect(protonPageView(installed({ moves: [{ ...one, sources: ["GE-Proton11-12-x86_64"] }] })).moves[0].keepLabel).toBe(
+      "Keep it on GE-Proton11-12-x86_64",
+    );
+  });
+
+  it("holds every offer while a move runs, then says how it went", () => {
+    const moving = protonPageView(installed({ moves: [MOVE] }), { target: MOVE.target, busy: true, message: null });
+    expect(moving.moves[0]).toMatchObject({ text: "Moving 3 games to GE-Proton11-13-x86_64…", enabled: false });
+    expect(moving.moveMessage).toBeNull();
+
+    const done = protonPageView(installed(), { target: MOVE.target, busy: false, message: moveOutcome(MOVE, []) });
+    expect(done.moveMessage).toBe("Moved 3 games to GE-Proton11-13-x86_64.");
+  });
+
+  it("names the games Steam didn't confirm on the new build", () => {
+    const onTarget = [GE.games[0]];
+
+    const pending = unconfirmed(["730", "4294967291", "1245620"], onTarget);
+
+    expect(pending).toEqual(["4294967291", "1245620"]);
+    expect(moveOutcome(MOVE, pending)).toBe(
+      "Steam hasn't confirmed the move of Heroic, app 1245620 · not installed. Moving again is harmless.",
+    );
+  });
+
+  it("offers nothing when there is no Steam to work with", () => {
+    expect(protonPageView(installed({ problem: "no-steam", moves: [MOVE] })).moves).toEqual([]);
   });
 });

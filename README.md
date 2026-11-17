@@ -96,7 +96,7 @@ On Linux FSR 4 also needs AMD's driver DLL (`amdxcffx64.dll`), which neither Opt
 
 - Steam lists builds when it starts: after an install or a removal, the page says a restart is due and has a button for it.
 - A game's Proton is chosen in Steam: the game's Properties → Compatibility.
-- To update a build, download the newer release: it is installed next to the old one, which stays for going back until you remove it.
+- To update a build, download the newer release: it is installed next to the old one, which stays for going back until you remove it. Once Steam has restarted, the page offers to move the games set to use an older build of the same kind to the new one in one tap (or to keep them where they are).
 
 ## Technical Details
 

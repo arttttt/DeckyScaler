@@ -63,3 +63,10 @@ export const restartSteam = (): void => {
     SteamClient.User.StartRestart(false);
   }
 };
+
+/** Sets the Proton a game runs with, as its Properties → Compatibility does; only for a build Steam lists. */
+export const specifyCompatTool = (appId: number, toolName: string): void => {
+  if (typeof SteamClient !== "undefined" && SteamClient?.Apps?.SpecifyCompatTool) {
+    SteamClient.Apps.SpecifyCompatTool(appId, toolName);
+  }
+};

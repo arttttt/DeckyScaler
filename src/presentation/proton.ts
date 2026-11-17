@@ -4,6 +4,7 @@ import type {
   ProtonBuildOption,
   ProtonGame,
   ProtonListing,
+  ProtonMove,
   ProtonProblem,
   ProtonRemoval,
 } from "../api";
@@ -33,10 +34,25 @@ export const protonOutcome = (
 export const CHOOSING_HINT = "A game's Proton is chosen in Steam: its Properties → Compatibility.";
 export const RESTART_TEXT = "Steam needs a restart to see changes to its Proton builds.";
 
+/** A move under way, or how the last one went. */
+export type MoveState = { target: string; busy: boolean; message: string | null } | null;
+
+/** The rows offering to move an update's games to the newer build. */
+export type MoveOfferView = {
+  move: ProtonMove;
+  text: string;
+  moveLabel: string;
+  keepLabel: string;
+  enabled: boolean;
+};
+
 export type ProtonPageView = {
   summary: string;
   /** The row that restarts Steam, shown only when builds came or went since it started. */
   restart: boolean;
+  moves: MoveOfferView[];
+  /** How the last move went. */
+  moveMessage: string | null;
   /** The dialogs open only when there is a Steam install to work with. */
   dialogsEnabled: boolean;
   hint: string;
@@ -44,8 +60,23 @@ export type ProtonPageView = {
 
 const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
-export const protonPageView = (installed: InstalledProton | null): ProtonPageView => {
-  const base = { hint: CHOOSING_HINT };
+const moveOffer = (move: ProtonMove, state: MoveState): MoveOfferView => {
+  const names = move.games.map(gameName).sort((a, b) => a.localeCompare(b)).join(", ");
+  const from = move.sources.join(", ");
+  const busy = state?.busy === true;
+  return {
+    move,
+    text: busy && state?.target === move.target
+      ? `Moving ${count(move.games.length, "game", "games")} to ${move.target}…`
+      : `${count(move.games.length, "game", "games")} still ${move.games.length === 1 ? "uses" : "use"} ${from}: ${names}.`,
+    moveLabel: `Move ${move.games.length === 1 ? "it" : "them"} to ${move.target}`,
+    keepLabel: move.sources.length === 1 ? `Keep ${move.games.length === 1 ? "it" : "them"} on ${from}` : "Keep them where they are",
+    enabled: !busy,
+  };
+};
+
+export const protonPageView = (installed: InstalledProton | null, move: MoveState = null): ProtonPageView => {
+  const base = { hint: CHOOSING_HINT, moves: [], moveMessage: move?.message ?? null };
   if (installed === null) return { ...base, summary: "Loading…", restart: false, dialogsEnabled: false };
   if (installed.problem) return { ...base, summary: problemText(installed.problem), restart: false, dialogsEnabled: false };
   const tools = installed.tools.length;
@@ -53,8 +84,25 @@ export const protonPageView = (installed: InstalledProton | null): ProtonPageVie
     ...base,
     summary: tools ? `${count(tools, "build", "builds")} installed.` : "No Proton build is installed yet.",
     restart: installed.restart_needed,
+    moves: installed.moves.map((offer) => moveOffer(offer, move)),
     dialogsEnabled: true,
   };
+};
+
+/** How long Steam has to write a move into its config before the plugin says it didn't (Steam writes it after
+ *  the call returns), and how often it looks meanwhile. */
+export const MOVE_CONFIRM_MS = 10_000;
+export const MOVE_POLL_MS = 1_000;
+
+/** The games Steam's config doesn't show on the new build yet. */
+export const unconfirmed = (appids: string[], onTarget: ProtonGame[]): string[] =>
+  appids.filter((appid) => !onTarget.some((game) => game.appid === appid));
+
+/** How a move went: all the games are on the new build, or which ones Steam didn't confirm. */
+export const moveOutcome = (move: ProtonMove, pending: string[]): string => {
+  if (pending.length === 0) return `Moved ${count(move.games.length, "game", "games")} to ${move.target}.`;
+  const names = move.games.filter((game) => pending.includes(game.appid)).map(gameName).join(", ");
+  return `Steam hasn't confirmed the move of ${names}. Moving again is harmless.`;
 };
 
 // ── Download dialog ──────────────────────────────────────────────────────────
