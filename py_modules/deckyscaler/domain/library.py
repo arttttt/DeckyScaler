@@ -247,6 +247,7 @@ def choice_json(installed: Installed, size: int) -> dict:
         "channel": installed.channel,
         "date": installed.date,
         "size": size,
+        "libraries": FAMILIES[installed.family].libraries,
     }
 
 

@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from deckyscaler.application.patcher import NO_VERSION, Patcher
-from deckyscaler.domain import exe_target, ini_schema, library, patch_record, settings_layers
+from deckyscaler.domain import exe_target, ini_schema, library, library_choice, marker, patch_record, settings_layers
 from deckyscaler.domain import patch_plan as plan
 from deckyscaler.domain.settings_layers import Key
 from deckyscaler.infrastructure import files, processes
@@ -22,6 +22,10 @@ def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
 
+def _set_by(section: str, key: str, owned: settings_layers.Owned) -> str:
+    return f"{section}.{key} is set by {owned.library}. Pick another library to change it."
+
+
 class Settings:
     def __init__(self, home: Path):
         self.patcher = Patcher(home)
@@ -31,14 +35,19 @@ class Settings:
 
     # ── schemas ──────────────────────────────────────────────────────────────
 
-    def _schema(self, version_id: str | None) -> tuple[str, tuple[ini_schema.Section, ...]] | None:
+    def _schema(self, version_id: str | None) -> tuple[library.Installed, tuple[ini_schema.Section, ...]] | None:
         """The settings of a version: the one named while it is downloaded, else the newest."""
         installed = self.library.installed()
         entry = library.version_to_patch_with(installed, version_id)
         if entry is None:
             return None
         source = self.library.version_dir(entry.id) / library.FILES_DIRNAME / plan.INI_FILENAME
-        return entry.id, ini_schema.parse(files.read_text(source))
+        return entry, ini_schema.parse(files.read_text(source))
+
+    def _global_libraries(self, entry: library.Installed) -> settings_layers.LibraryLayer:
+        """What the libraries chosen for every game set in a game patched with this version."""
+        chosen = library_choice.resolved(self.patcher.library_choices.read(), None)
+        return self.patcher.chosen_layer(chosen, library.FAMILIES[entry.family])
 
     def _game(self, appid: str) -> tuple[Path | None, dict]:
         """A Steam game's patched directory (None when it isn't patched) and its marker."""
@@ -56,12 +65,12 @@ class Settings:
         schema = self._schema(None)
         if schema is None:
             return _error(NO_VERSION)
-        version_id, sections = schema
+        entry, sections = schema
         global_layer = self.store.global_layer()
         return {
             "status": "success",
-            "version": version_id,
-            "sections": settings_layers.view_json(sections, global_layer),
+            "version": entry.id,
+            "sections": settings_layers.view_json(sections, global_layer, None, self._global_libraries(entry)),
             "unsupported": [f"{s}.{k}" for s, k in settings_layers.unsupported(sections, global_layer)],
         }
 
@@ -72,15 +81,15 @@ class Settings:
         schema = self._schema(details.get("optiscaler_version"))
         if schema is None:
             return _error(NO_VERSION)
-        version_id, sections = schema
+        entry, sections = schema
         game_layer = self.store.game_layer(appid)
         return {
             "status": "success",
-            "version": version_id,
+            "version": entry.id,
             "name": game.name if game else appid,
             "patched": directory is not None,
             "running": directory is not None and self._running(directory),
-            "sections": settings_layers.view_json(sections, self.store.global_layer(), game_layer),
+            "sections": settings_layers.view_json(sections, self.store.global_layer(), game_layer, marker.library_layer(details)),
             "unsupported": [f"{s}.{k}" for s, k in settings_layers.unsupported(sections, game_layer)],
         }
 
@@ -95,6 +104,9 @@ class Settings:
             schema = self._schema(None)
             if schema is None:
                 return _error(NO_VERSION)
+            owned = self._global_libraries(schema[0]).get(target)
+            if owned is not None:
+                return _error(_set_by(section, key, owned))
             if value is not None and not self._accepted(schema[1], target, value):
                 return _error(f"{section}.{key} doesn't take {value!r}.")
             self.store.save_global(settings_layers.with_value(self.store.global_layer(), target, value))
@@ -106,6 +118,9 @@ class Settings:
         schema = self._schema(details.get("optiscaler_version"))
         if schema is None:
             return _error(NO_VERSION)
+        owned = marker.library_layer(details).get(target)
+        if owned is not None:
+            return _error(_set_by(section, key, owned))
         if value is not None and not self._accepted(schema[1], target, value):
             return _error(f"{section}.{key} doesn't take {value!r}.")
         self.store.save_game(scope, settings_layers.with_value(self.store.game_layer(scope), target, value))

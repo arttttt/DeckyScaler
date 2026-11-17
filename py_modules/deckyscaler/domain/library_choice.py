@@ -107,6 +107,20 @@ def kept(recorded: tuple[Pick, ...], installed: list[Library]) -> dict[str, str]
     return {slot: library_id for slot, library_id in recorded if library_id in on_device}
 
 
+def to_patch_with(
+    choices: Choices, appid: str | None, recorded: tuple[Pick, ...] | None, installed: list[Library]
+) -> dict[str, str]:
+    """The choice a patch goes by: what the game's patch placed when the patch keeps it (`recorded`, the launch
+    wrapper's patch of a game it patched before), else what the game's choice resolves to."""
+    return resolved(choices, appid) if recorded is None else kept(recorded, installed)
+
+
+def needs_applying(recorded: object, chosen: dict[str, str], installed: list[Library], family: Family) -> bool:
+    """Whether patching a game again would place other libraries than its marker records: its choice changed, or
+    a library it has left the device."""
+    return recorded_picks(recorded) != picks(to_place(chosen, installed, family))
+
+
 def users(library_id: str, patched: list[tuple[str, object]]) -> list[str]:
     """The games, by name, whose patch placed a library: `patched` pairs each game's name with what its marker
     recorded."""

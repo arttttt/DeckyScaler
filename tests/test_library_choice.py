@@ -92,3 +92,20 @@ def test_a_librarys_users_are_the_games_whose_patch_placed_it():
 
     assert lc.users("anr", patched) == ["Cyberpunk 2077", "Hades II"]
     assert lc.users("xess", patched) == []
+
+
+def test_the_wrappers_patch_keeps_what_the_game_has_and_any_other_goes_by_the_choice():
+    choices = Choices({UP: "fsr"}, {})
+
+    assert lc.to_patch_with(choices, "620", ((UP, "xess"), (FG, "gone")), [XESS, FSR]) == {UP: "xess"}
+    assert lc.to_patch_with(choices, "620", (), [XESS, FSR]) == {}
+    assert lc.to_patch_with(choices, "620", None, [XESS, FSR]) == {UP: "fsr"}
+
+
+def test_a_game_needs_its_choice_applied_while_a_patch_would_place_other_libraries():
+    recorded = [{"slot": UP, "id": "xess", "label": "xess"}]
+
+    assert not lc.needs_applying(recorded, {UP: "xess"}, [XESS], V10)
+    assert lc.needs_applying(recorded, {UP: "fsr"}, [XESS, FSR], V10)
+    assert lc.needs_applying(recorded, {UP: "xess"}, [], V10)  # the library left the device
+    assert not lc.needs_applying([], {UP: "xess"}, [XESS], V09)  # 0.9 takes none

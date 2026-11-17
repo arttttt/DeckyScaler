@@ -83,8 +83,9 @@ def test_patching_offers_installed_versions_newest_first():
     offered = [library.choice_json(entry, 5) for entry in library.newest_first([stable, nightly])]
 
     assert offered == [
-        {"id": NEWEST, "version": "10.0.0-pre1", "channel": "nightly", "date": "20261023", "size": 5},
-        {"id": "stable-0.9.4", "version": "0.9.4", "channel": "stable", "date": "20260718", "size": 5},
+        # Whether a version takes the user's libraries is its family's: 10 does, 0.9 doesn't.
+        {"id": NEWEST, "version": "10.0.0-pre1", "channel": "nightly", "date": "20261023", "size": 5, "libraries": True},
+        {"id": "stable-0.9.4", "version": "0.9.4", "channel": "stable", "date": "20260718", "size": 5, "libraries": False},
     ]
 
 
