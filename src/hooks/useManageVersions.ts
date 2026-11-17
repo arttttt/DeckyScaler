@@ -10,13 +10,13 @@ import {
   ManageMenuItem,
   ManageState,
   RemoveConfirmation,
-  actionOutcome,
   manageDone,
   manageView,
   removeConfirmation,
 } from "../presentation/library";
+import { actionOutcome } from "../presentation/releases";
 import { safeAsyncOperation } from "../utils";
-import { useLibraryDownloadEvents } from "./useLibraryDownloadEvents";
+import { useDownloadEvents } from "./useDownloadEvents";
 
 const CALLS: Record<ManageAction, (id: string) => Promise<{ status: string; message?: string }>> = {
   reinstall: libraryReinstall,
@@ -28,7 +28,7 @@ export const useManageVersions = (onChanged: () => void) => {
   const [state, setState] = useState<ManageState>({ library: null, busy: null, download: null, message: null });
   const [pending, setPending] = useState<{ id: string; confirmation: RemoveConfirmation } | null>(null);
 
-  useLibraryDownloadEvents((id, received, total) =>
+  useDownloadEvents("library_download", (id, received, total) =>
     setState((s) => (s.busy?.id === id && s.busy.action === "reinstall" ? { ...s, download: { received, total } } : s)),
   );
 

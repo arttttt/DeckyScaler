@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { LibraryChannel, libraryInstall, libraryVersions } from "../api";
-import { DownloadState, actionOutcome, downloadView } from "../presentation/library";
+import { DownloadState, downloadView } from "../presentation/library";
+import { actionOutcome } from "../presentation/releases";
 import { safeAsyncOperation } from "../utils";
-import { useLibraryDownloadEvents } from "./useLibraryDownloadEvents";
+import { useDownloadEvents } from "./useDownloadEvents";
 
 /** State and calls behind the download dialog; `onChanged` runs after a version is added. */
 export const useDownloadVersions = (onChanged: () => void) => {
@@ -15,7 +16,7 @@ export const useDownloadVersions = (onChanged: () => void) => {
     message: null,
   });
 
-  useLibraryDownloadEvents((id, received, total) =>
+  useDownloadEvents("library_download", (id, received, total) =>
     setState((s) => (s.busy === id ? { ...s, download: { received, total } } : s)),
   );
 

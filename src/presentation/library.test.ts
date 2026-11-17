@@ -3,7 +3,6 @@ import type { InstalledLibrary, LibraryRemoval, LibraryVersion } from "../api";
 import {
   DownloadState,
   ManageState,
-  actionOutcome,
   downloadView,
   librarySummary,
   manageDone,
@@ -11,6 +10,7 @@ import {
   manageView,
   removeConfirmation,
 } from "./library";
+import { actionOutcome } from "./releases";
 
 const downloaded: LibraryVersion = {
   id: "nightly-20261023", version: "10.0.0-pre1", date: "20261023", family: "10",

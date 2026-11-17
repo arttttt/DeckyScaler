@@ -1,6 +1,6 @@
 import type { InstalledLibrary, InstalledVersion } from "../api";
 import { ProxyDllView, patchReady } from "./launch";
-import { versionLabel } from "./library";
+import { versionLabel } from "./releases";
 
 /**
  * Patching needs an installed OptiScaler; looking at games, unpatching them and resetting
