@@ -85,6 +85,8 @@ export type InstalledVersion = {
   date: string;
   /** Bytes on disk. */
   size: number;
+  /** Whether a game patched with it takes the user's libraries (OptiScaler 10 does). */
+  libraries: boolean;
 };
 
 /** The downloaded versions, newest first, and what they take on disk. */
@@ -181,6 +183,87 @@ type ProtonResult =
 export type ProtonRemoval =
   | { status: "success"; games: ProtonGame[]; global_default: boolean }
   | { status: "error"; message?: string; problem?: ProtonProblem };
+
+// ── The user's libraries ──────────────────────────────────────────────────────
+
+/** What a library serves in a game (the backend's slots, in its order). */
+export type LibrarySlot = "upscaler" | "frame-generation";
+
+export type UserLibrary = {
+  id: string;
+  label: string;
+  origin: "downloaded" | "file";
+  slots: LibrarySlot[];
+  /** The slots picking it switches on by itself; in the others it is only pointed at. */
+  turns_on: LibrarySlot[];
+  /** Bytes on the device. */
+  size: number;
+  /** The games whose patch placed it. */
+  games: string[];
+};
+
+export type UserLibraries = {
+  libraries: UserLibrary[];
+  slots: LibrarySlot[];
+  /** The library picked for every game, per slot. */
+  global: Partial<Record<LibrarySlot, string>>;
+  /** The patched games a patch now would give other libraries. */
+  to_apply: string[];
+  installed_bytes: number;
+};
+
+/** A library a game's patch placed, as its status says. */
+export type PlacedLibrary = { slot: LibrarySlot; id: string; label: string };
+
+export type LibrarySource = { id: string; label: string };
+
+/** Why what the user picked isn't added (the backend's kinds; presentation/libraries.ts words them). */
+export type LibraryRefusal = "nothing-known" | "reserved-name" | "already-added";
+
+export type UserLibraryResult =
+  | { status: "success"; id?: string; message?: string }
+  | { status: "error"; message?: string; reason?: LibraryRefusal };
+
+export type UserLibraryListing =
+  | { status: "success"; versions: ReleaseVersion[]; listing_error: string | null }
+  | { status: "error"; message: string };
+
+export type UserLibraryRemoval =
+  | { status: "success"; games: string[]; global: boolean }
+  | { status: "error"; message: string };
+
+export type LibrariesApplied = {
+  status: "success";
+  /** A Steam game's launch options are Steam's to set: the frontend sets them. */
+  applied: { name: string; appid: string; launch_options: string | null }[];
+  skipped: string[];
+  failed: { name: string; message: string }[];
+};
+
+/** A game's own choice per slot (a library, "none", or absent: it follows the global choice), what that comes to,
+ *  and whether the game, patched, has other libraries than that. */
+export type GameLibraryChoice = {
+  status: "success";
+  own: Partial<Record<LibrarySlot, string>>;
+  resolved: Partial<Record<LibrarySlot, string>>;
+  pending: boolean;
+};
+
+export const userLibrarySources = callable<[], LibrarySource[]>("user_library_sources");
+export const userLibrariesInstalled = callable<[], UserLibraries>("user_libraries_installed");
+export const userLibraryGameChoice = callable<[appid: string], GameLibraryChoice>("user_library_game_choice");
+export const userLibraryVersions = callable<[source: string], UserLibraryListing>("user_library_versions");
+/** Download progress arrives as "user_library_download" events: release id, bytes received, total bytes or null. */
+export const userLibraryInstall = callable<[source: string, release_id: string], UserLibraryResult>("user_library_install");
+export const userLibraryAdd = callable<[path: string], UserLibraryResult>("user_library_add");
+export const userLibraryRemoval = callable<[library_id: string], UserLibraryRemoval>("user_library_removal");
+export const userLibraryRemove = callable<[library_id: string], { status: string; message?: string }>("user_library_remove");
+/** `scope` is "global" or a game's appid; `value` a library, "none", or null (a game follows the global choice). */
+export const userLibraryChoose = callable<
+  [scope: string, slot: LibrarySlot, value: string | null],
+  { status: string; message?: string }
+>("user_library_choose");
+export const userLibrariesApply = callable<[], LibrariesApplied>("user_libraries_apply");
 
 export const protonBuildOptions = callable<[], ProtonBuildOption[]>("proton_build_options");
 export const protonInstalled = callable<[with_sizes?: boolean], InstalledProton>("proton_installed");
@@ -297,7 +380,7 @@ export const previewUnpatchDirectory = callable<[directory: string], UnpatchPrev
 // ── OptiScaler settings ──────────────────────────────────────────────────────
 
 /** Where a setting's value comes from: OptiScaler's default ("auto"), the global settings or the game's own. */
-export type SettingSource = "default" | "global" | "game";
+export type SettingSource = "default" | "global" | "game" | "library";
 
 /** A setting as a version's OptiScaler.ini describes it, with its value for the page asked for. */
 export type SettingInfo = {
@@ -313,6 +396,8 @@ export type SettingInfo = {
   integer: boolean;
   value: string;
   source: SettingSource;
+  /** The library that sets it, for a value whose source is "library". */
+  library: string | null;
   /** The value without the page's own: global for a game's page, auto for the global page. */
   inherited: { value: string; source: SettingSource };
 };

@@ -237,3 +237,16 @@ def test_a_provider_and_an_upscaler_dll_switch_on_by_themselves_and_a_frame_gene
     assert sdk.slots == (ul.UPSCALER, ul.FRAME_GENERATION) and sdk.turns_on == (ul.UPSCALER,)
     assert fg_only.turns_on == ()
     assert ul.added(ul.recognize(ANR_MEMBERS), "anr.zip", None, set(), "t").turns_on == (ul.FRAME_GENERATION,)
+
+
+def test_the_frontend_words_every_slot_and_every_refusal_the_backend_gives():
+    import re
+
+    wording = (Path(__file__).parent.parent / "src" / "presentation" / "libraries.ts").read_text()
+
+    def table(name: str) -> set[str]:
+        body = wording[wording.index(f"const {name}") : wording.index("};", wording.index(f"const {name}"))]
+        return set(re.findall(r'^\s*"?([a-z-]+)"?:', body, re.MULTILINE))
+
+    assert table("SLOT_LABELS") == set(ul.SLOTS)
+    assert table("REFUSALS") == {ul.NOTHING_KNOWN, ul.RESERVED_NAME, ul.ALREADY_ADDED}

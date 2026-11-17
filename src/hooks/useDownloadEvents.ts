@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { addEventListener, removeEventListener } from "@decky/api";
 
 /** The backend's downloads report as events: what is downloading, bytes received, total bytes or null. */
-export type DownloadEvent = "library_download" | "proton_download";
+export type DownloadEvent = "library_download" | "proton_download" | "user_library_download";
 
 /** Progress of a download the backend is running, from the event it reports it as. */
 export const useDownloadEvents = (

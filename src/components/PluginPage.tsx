@@ -7,6 +7,7 @@ import { ClipboardCommands } from "./ClipboardCommands";
 import { ManualPatchControls } from "./CustomPathOverride";
 import { DeveloperSection } from "./DeveloperSection";
 import { GamesPage } from "./GamesPage";
+import { LibrariesSection } from "./LibrariesSection";
 import { LibrarySection } from "./LibrarySection";
 import { OptiScalerWiki } from "./OptiScalerWiki";
 import { PatchPickers } from "./PatchPickers";
@@ -41,6 +42,7 @@ function OptiScalerPage() {
   return (
     <>
       <LibrarySection library={library} onChanged={reload} />
+      <LibrariesSection />
       <PanelSection title="Settings">
         <PanelSectionRow>
           <ButtonItem layout="below" description="The OptiScaler settings every game gets, unless it has its own." onClick={() => openSettingsPage(GLOBAL_SCOPE)}>

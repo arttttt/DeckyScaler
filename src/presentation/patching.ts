@@ -1,5 +1,6 @@
-import type { InstalledLibrary, InstalledVersion } from "../api";
+import type { InstalledLibrary, InstalledVersion, PlacedLibrary } from "../api";
 import { ProxyDllView, patchReady } from "./launch";
+import { librariesLine } from "./libraries";
 import { versionLabel } from "./releases";
 
 /**
@@ -23,6 +24,8 @@ export type PatchChoiceView = {
   ready: boolean;
   /** The version id the patch calls send. */
   patchWith: string;
+  /** Whether a game patched with it takes the user's libraries. */
+  takesLibraries: boolean;
 };
 
 /**
@@ -42,6 +45,7 @@ export const patchChoice = (
     versionHint: version ? null : "No OptiScaler version is downloaded. Open DeckyScaler → OptiScaler to download one.",
     ready: version !== undefined,
     patchWith: version?.id ?? "",
+    takesLibraries: version?.libraries ?? false,
   };
 };
 
@@ -91,6 +95,8 @@ export type GameStatus = {
   optiscaler_version?: string | null;
   newer_version?: string | null;
   fsr4?: Fsr4State | null;
+  /** The user's libraries its patch placed. */
+  libraries?: PlacedLibrary[];
 };
 
 export type StatusTone = "neutral" | "warning" | "good";
@@ -103,6 +109,8 @@ export type SteamGameView = {
   status: { text: string; tone: StatusTone };
   versionLine: string | null;
   fsr4Line: string | null;
+  /** The user's libraries the game's patch placed. */
+  librariesLine: string | null;
   patch: { label: string; enabled: boolean };
   unpatchVisible: boolean;
   unpatch: { label: string; enabled: boolean };
@@ -146,6 +154,7 @@ export const steamGameView = (s: {
     status: statusLine,
     versionLine: gameVersionLine(s.statusLoading ? null : status),
     fsr4Line: s.statusLoading ? null : fsr4Line(status?.fsr4),
+    librariesLine: s.statusLoading || !status?.patched ? null : librariesLine(status.libraries),
     patch: { label: patch.label, enabled: patch.enabled && canPatch },
     unpatchVisible: Boolean(status?.patched),
     unpatch: { label: busy === "unpatch" ? "Unpatching..." : "Unpatch this game", enabled: busy === null },

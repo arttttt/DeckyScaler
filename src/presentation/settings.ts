@@ -11,7 +11,9 @@ export const INHERIT = "\u0000inherit";
 export type SettingControl =
   | { kind: "dropdown"; options: { data: string; label: string }[]; selected: string }
   /** Empty text clears the page's own value. */
-  | { kind: "text"; value: string };
+  | { kind: "text"; value: string }
+  /** A library in the game sets it: it changes with the library, not here. */
+  | { kind: "locked" };
 
 export type SettingRow = {
   section: string;
@@ -74,6 +76,7 @@ const rangeLine = (setting: SettingInfo): string | null => {
 /** A setting's control: a dropdown when its values are a list, else a text field. The first option
  *  (or empty text) is the value below the page's; a game's page also offers auto over global. */
 const control = (scope: string, setting: SettingInfo): SettingControl => {
+  if (setting.source === "library") return { kind: "locked" };
   const own = ownValue(scope, setting);
   if (setting.kind !== "bool" && setting.kind !== "enum") {
     return { kind: "text", value: own ? setting.value : "" };
@@ -89,16 +92,20 @@ const control = (scope: string, setting: SettingInfo): SettingControl => {
   return { kind: "dropdown", options, selected };
 };
 
+/** What a library in the game set a setting to, and which library: the first line of its locked row. */
+const lockedLine = (setting: SettingInfo): string | null =>
+  setting.source === "library" ? `${valueLabel(setting, setting.value)} · Set by ${setting.library}` : null;
+
 const row = (scope: string, section: string, setting: SettingInfo): SettingRow => {
   const textHint =
-    setting.kind === "bool" || setting.kind === "enum"
+    setting.source === "library" || setting.kind === "bool" || setting.kind === "enum"
       ? null
       : `Empty: ${isGlobal(scope) ? autoLabel(setting).toLowerCase() : inheritLabel(scope, setting).toLowerCase()}.`;
   return {
     section,
     key: setting.key,
     label: setting.key,
-    description: [setting.description, rangeLine(setting), textHint].filter(Boolean).join("\n"),
+    description: [lockedLine(setting), setting.description, rangeLine(setting), textHint].filter(Boolean).join("\n"),
     control: control(scope, setting),
   };
 };

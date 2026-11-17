@@ -36,8 +36,10 @@ function SettingItem({ row, disabled, onChange }: { row: SettingRow; disabled: b
           disabled={disabled}
           onChange={(option) => onChange(row.section, row.key, option.data)}
         />
-      ) : (
+      ) : control.kind === "text" ? (
         <SettingText row={row} value={control.value} disabled={disabled} onChange={onChange} />
+      ) : (
+        <Field label={row.label} description={describe(row.description)} />
       )}
     </PanelSectionRow>
   );
