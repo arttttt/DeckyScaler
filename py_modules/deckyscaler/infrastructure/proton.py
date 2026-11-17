@@ -56,6 +56,14 @@ def compat_tool(home: Path, appid: str) -> str | None:
     return None
 
 
+def forced_mappings(steam_root: Path) -> compat_tools.ForcedMappings:
+    """The tools the user chose in one Steam install, from its config.vdf."""
+    config = steam_root / "config" / "config.vdf"
+    if not config.is_file():
+        return compat_tools.ForcedMappings({}, None)
+    return compat_tools.forced_mappings(_cached("config", config, lambda: keyvalues.parse(_read(config))))
+
+
 def tool_directory(home: Path, name: str) -> Path | None:
     """A custom tool's directory (compatibilitytools.d), found by the internal name its manifest declares.
     Valve's own Protons live elsewhere and have no FSR 4 upgrade, so they are not looked up."""
