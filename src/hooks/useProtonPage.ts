@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { InstalledProton, ProtonMove, protonGames, protonInstalled, protonKeep, protonMoved } from "../api";
-import { installedWithSteamNames, restartSteam, specifyCompatTool } from "../api/steamClient";
+import { installedWithSteamNames, specifyCompatTool } from "../api/steamClient";
 import { MOVE_CONFIRM_MS, MOVE_POLL_MS, MoveState, moveOutcome, protonPageView, unconfirmed } from "../presentation/proton";
 import { safeAsyncOperation } from "../utils";
 
@@ -45,7 +45,6 @@ export const useProtonPage = () => {
   return {
     view: protonPageView(installed, move),
     reload,
-    onRestart: restartSteam,
     onMove: (offer: ProtonMove) => void onMove(offer),
     onKeep: (offer: ProtonMove) => void onKeep(offer),
   };

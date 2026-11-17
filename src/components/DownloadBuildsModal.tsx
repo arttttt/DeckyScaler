@@ -1,10 +1,13 @@
 import { ButtonItem, DialogBody, DialogHeader, DropdownItem, Field, ModalRoot } from "@decky/ui";
 import { useDownloadBuilds } from "../hooks/useDownloadBuilds";
+import { useRestartSteam } from "../hooks/useRestartSteam";
+import { Confirmation } from "./Confirmation";
 import { VersionRows } from "./VersionRows";
 
 /** Download Proton builds from their releases; the OptiScaler download dialog's sibling. */
 export function DownloadBuildsModal({ closeModal, onChanged }: { closeModal?: () => void; onChanged: () => void }) {
-  const { view, onBuild, onCheck, onDownload, onRestart } = useDownloadBuilds(onChanged);
+  const { view, onBuild, onCheck, onDownload } = useDownloadBuilds(onChanged);
+  const restart = useRestartSteam();
 
   return (
     <ModalRoot closeModal={closeModal} bAllowFullSize={true}>
@@ -23,12 +26,13 @@ export function DownloadBuildsModal({ closeModal, onChanged }: { closeModal?: ()
         </ButtonItem>
         {view.message && <Field description={view.message} />}
         {view.restart && (
-          <ButtonItem layout="below" onClick={onRestart}>
+          <ButtonItem layout="below" onClick={restart.onRestart}>
             Restart Steam
           </ButtonItem>
         )}
         <VersionRows rows={view.rows} onAction={onDownload} />
       </DialogBody>
+      <Confirmation confirmation={restart.confirmation} onConfirm={restart.onConfirm} onCancel={restart.onCancel} />
     </ModalRoot>
   );
 }

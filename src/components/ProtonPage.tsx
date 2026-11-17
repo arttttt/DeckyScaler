@@ -1,6 +1,8 @@
 import { ButtonItem, Field, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
 import { Fragment } from "react";
 import { useProtonPage } from "../hooks/useProtonPage";
+import { useRestartSteam } from "../hooks/useRestartSteam";
+import { Confirmation } from "./Confirmation";
 import { RESTART_TEXT } from "../presentation/proton";
 import { DownloadBuildsModal } from "./DownloadBuildsModal";
 import { ManageBuildsModal } from "./ManageBuildsModal";
@@ -8,7 +10,8 @@ import { ManageBuildsModal } from "./ManageBuildsModal";
 /** Custom Proton builds in Steam: the OptiScaler versions block's sibling, a Steam restart (noted when due), and
  *  moving an update's games to the newer build once Steam lists it. */
 export function ProtonPage() {
-  const { view, reload, onRestart, onMove, onKeep } = useProtonPage();
+  const { view, reload, onMove, onKeep } = useProtonPage();
+  const restart = useRestartSteam();
   return (
     <PanelSection title="Proton builds">
       {view.restart && (
@@ -17,7 +20,7 @@ export function ProtonPage() {
         </PanelSectionRow>
       )}
       <PanelSectionRow>
-        <ButtonItem layout="below" onClick={onRestart}>
+        <ButtonItem layout="below" onClick={restart.onRestart}>
           Restart Steam
         </ButtonItem>
       </PanelSectionRow>
@@ -67,6 +70,7 @@ export function ProtonPage() {
       <PanelSectionRow>
         <Field description={view.hint} />
       </PanelSectionRow>
+      <Confirmation confirmation={restart.confirmation} onConfirm={restart.onConfirm} onCancel={restart.onCancel} />
     </PanelSection>
   );
 }

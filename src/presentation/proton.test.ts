@@ -3,6 +3,7 @@ import type { InstalledProton, InstalledProtonTool, ProtonListing, ReleaseVersio
 import type { ProtonMove } from "../api";
 import {
   CHOOSING_HINT,
+  RESTART_CONFIRMATION,
   moveOutcome,
   unconfirmed,
   ProtonDownloadState,
@@ -306,5 +307,15 @@ describe("moving an update's games", () => {
   it("offers nothing when there is no Steam to work with, or no game it could name", () => {
     expect(protonPageView(installed({ problem: "no-steam", moves: [MOVE] })).moves).toEqual([]);
     expect(protonPageView(installed({ moves: [{ ...MOVE, games: [GE.games[1]] }] })).moves).toEqual([]);
+  });
+});
+
+describe("restarting Steam", () => {
+  it("asks first, saying a running game closes with it", () => {
+    expect(RESTART_CONFIRMATION).toEqual({
+      title: "Restart Steam?",
+      lines: ["Steam closes and opens again, and then lists its Proton builds as they are now.", "A running game closes with it."],
+      okLabel: "Restart",
+    });
   });
 });

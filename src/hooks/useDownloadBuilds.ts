@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { protonBuildOptions, protonInstall, protonVersions } from "../api";
 import { ProtonDownloadState, installDone, protonDownloadView, protonOutcome } from "../presentation/proton";
-import { restartSteam } from "../api/steamClient";
 import { safeAsyncOperation } from "../utils";
 import { useDownloadEvents } from "./useDownloadEvents";
 
@@ -55,6 +54,5 @@ export const useDownloadBuilds = (onChanged: () => void) => {
     onBuild: (build: string) => check(build),
     onCheck: () => state.build !== null && check(state.build),
     onDownload: (id: string) => void onDownload(id),
-    onRestart: restartSteam,
   };
 };

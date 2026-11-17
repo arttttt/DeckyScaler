@@ -35,6 +35,13 @@ export const protonOutcome = (
 export const CHOOSING_HINT = "A game's Proton is chosen in Steam: its Properties → Compatibility.";
 export const RESTART_TEXT = "Steam needs a restart to see changes to its Proton builds.";
 
+/** Restarting Steam closes a running game with it, so the button asks first. */
+export const RESTART_CONFIRMATION = {
+  title: "Restart Steam?",
+  lines: ["Steam closes and opens again, and then lists its Proton builds as they are now.", "A running game closes with it."],
+  okLabel: "Restart",
+};
+
 /** A move under way, or how the last one went. */
 export type MoveState = { target: string; busy: boolean; message: string | null } | null;
 
