@@ -190,3 +190,20 @@ def test_the_running_steam_is_the_one_to_work_with(tmp_path, monkeypatch):
 
     (flatpak / "config" / "config.vdf").unlink()
     assert steam_library.active_root(home) == steam.ActiveRoot(native)
+
+
+def test_apps_are_named_from_every_librarys_manifests_and_every_users_shortcuts(tmp_path):
+    from test_binary_keyvalues import encode
+
+    home = tmp_path / "home"
+    native = home / ".local/share/Steam"
+    sd_card = tmp_path / "sdcard"
+    write(native / "steamapps/libraryfolders.vdf", f'\t"path"\t\t"{sd_card}"\n'.encode())
+    write(native / "steamapps/appmanifest_10.acf", manifest("10", "Beta", "Beta").encode())
+    write(sd_card / "steamapps/appmanifest_1493710.acf", manifest("1493710", "Proton Experimental", "Proton").encode())
+    write(native / "userdata/1/config/shortcuts.vdf", encode({"shortcuts": {"0": {"appid": -5, "AppName": "Mine"}}}))
+    write(native / "userdata/2/config/shortcuts.vdf", encode({"shortcuts": {"0": {"appid": 99, "AppName": "Theirs"}}}))
+    write(native / "userdata/3/config/shortcuts.vdf", b"\x05broken")
+
+    assert steam_library.app_names(home) == {"10": "Beta", "1493710": "Proton Experimental"}
+    assert steam_library.shortcut_names(native.resolve()) == {str(2**32 - 5): "Mine", "99": "Theirs"}

@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from deckyscaler.domain import steam
+from deckyscaler.domain import binary_keyvalues, steam
 from deckyscaler.infrastructure import processes
 
 log = logging.getLogger(__name__)
@@ -83,6 +83,32 @@ def installed_games(home: Path, appid: str | None = None) -> list[InstalledGame]
             install_path = steamapps / "common" / manifest.installdir if manifest.installdir else Path()
             by_appid[manifest.appid] = InstalledGame(manifest.appid, manifest.name, library_path, install_path)
     return sorted(by_appid.values(), key=lambda game: game.name.lower())
+
+
+def app_names(home: Path) -> dict[str, str]:
+    """appid → name of every app installed in any library, games and Steam's tools alike."""
+    names: dict[str, str] = {}
+    for library_path in library_paths(home):
+        for manifest_file in (library_path / "steamapps").glob("appmanifest_*.acf"):
+            try:
+                manifest = steam.parse_app_manifest(manifest_file.read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                continue
+            if manifest.appid and manifest.name:
+                names[manifest.appid] = manifest.name
+    return names
+
+
+def shortcut_names(steam_root: Path) -> dict[str, str]:
+    """appid → name of the non-Steam games every user of a Steam install added; a file that can't be read is
+    skipped."""
+    names: dict[str, str] = {}
+    for shortcuts in sorted(steam_root.glob("userdata/*/config/shortcuts.vdf")):
+        try:
+            names.update(steam.shortcut_names(binary_keyvalues.parse(shortcuts.read_bytes())))
+        except (OSError, ValueError) as exc:
+            log.warning(f"[DeckyScaler] skipping {shortcuts}: {exc}")
+    return names
 
 
 def find_game(home: Path, appid: str) -> InstalledGame | None:

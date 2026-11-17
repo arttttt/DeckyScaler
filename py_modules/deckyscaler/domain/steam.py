@@ -95,3 +95,45 @@ def is_game(manifest: AppManifest) -> bool:
     if not manifest.appid or not manifest.name:
         return False
     return not any(marker in manifest.name for marker in _TOOL_NAME_MARKERS)
+
+
+# ── Naming an app ─────────────────────────────────────────────────────────────
+
+STEAM_APP = "steam"
+SHORTCUT = "shortcut"
+UNKNOWN_APP = "unknown"
+
+_UINT32 = 1 << 32
+
+
+def shortcut_names(shortcuts: dict) -> dict[str, str]:
+    """appid → name of the non-Steam games in a parsed shortcuts.vdf. The file keeps an appid as a signed 32-bit
+    number; Steam's other files (config.vdf's CompatToolMapping) spell it unsigned, as here."""
+    entries = shortcuts.get("shortcuts")
+    names: dict[str, str] = {}
+    for entry in entries.values() if isinstance(entries, dict) else []:
+        appid, name = (entry.get("appid"), entry.get("appname")) if isinstance(entry, dict) else (None, None)
+        if isinstance(appid, int) and isinstance(name, str) and name:
+            names[str(appid % _UINT32)] = name
+    return names
+
+
+@dataclass(frozen=True)
+class NamedApp:
+    appid: str
+    name: str | None
+    kind: str
+    """STEAM_APP (installed), SHORTCUT (a non-Steam game) or UNKNOWN_APP (no longer installed, or unknown here)."""
+
+
+def name_apps(appids: list[str], installed: dict[str, str], shortcuts: dict[str, str]) -> list[NamedApp]:
+    """Each app by the name Steam shows it under, where the device still has one."""
+    named = []
+    for appid in appids:
+        if appid in installed:
+            named.append(NamedApp(appid, installed[appid], STEAM_APP))
+        elif appid in shortcuts:
+            named.append(NamedApp(appid, shortcuts[appid], SHORTCUT))
+        else:
+            named.append(NamedApp(appid, None, UNKNOWN_APP))
+    return named
