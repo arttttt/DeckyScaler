@@ -8,7 +8,6 @@ after a restart.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from pathlib import Path
 
 from deckyscaler.domain import proton_builds, steam
@@ -16,14 +15,10 @@ from deckyscaler.infrastructure import archive, proton
 from deckyscaler.infrastructure import steam as steam_library
 from deckyscaler.infrastructure.compat_tools_store import CompatToolsStore
 from deckyscaler.infrastructure.files import read_json, sha256, write_json
-from deckyscaler.infrastructure.github_releases import ReleasesUnavailable
+from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
 
 log = logging.getLogger(__name__)
 
-ListReleases = Callable[[str], list]
-Download = Callable[[str, Path, Callable[[int, int | None], None]], None]
-Report = Callable[[str, int, int | None], None]
-"""Tells the frontend how a download goes: tool name, bytes received, total bytes if known."""
 
 UNPACKED_DIRNAME = "unpacked"
 

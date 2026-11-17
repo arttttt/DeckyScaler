@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import run, sha256, write
+from conftest import FakeDownload, run, sha256, write
 from deckyscaler.application.proton_builds import ProtonBuilds
 from deckyscaler.domain import proton_builds as pb
 from deckyscaler.domain import steam
@@ -20,15 +20,6 @@ FIXTURES = Path(__file__).parent / "fixtures"
 NEWEST = "GE-Proton11-12-x86_64"
 SHORTCUT_APPID = str(2**32 - 5)
 
-
-class FakeDownload:
-    def __init__(self, content: bytes):
-        self.content, self.urls = content, []
-
-    def __call__(self, url, destination, on_progress):
-        self.urls.append(url)
-        destination.write_bytes(self.content)
-        on_progress(len(self.content), len(self.content))
 
 
 @pytest.fixture

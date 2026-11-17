@@ -9,16 +9,11 @@ from pathlib import Path
 
 from deckyscaler.domain import dev_build
 from deckyscaler.infrastructure.files import read_json, sha256, write_json
-from deckyscaler.infrastructure.github_releases import ReleasesUnavailable
+from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
 
 log = logging.getLogger(__name__)
 
-ListReleases = Callable[[str], list]
 LatestRelease = Callable[[str], "dict | None"]
-Download = Callable[[str, Path, Callable[[int, int | None], None]], None]
-"""github_releases.download: (url, destination, on_progress(received, total))."""
-Report = Callable[[str, int, int | None], None]
-"""Tells the frontend how a download goes: channel, bytes received, total bytes if known."""
 
 UNKNOWN_BUILD = "This build doesn't know where it came from (built by hand?), so it can't update itself. Install a release."
 DEVELOPER_MODE_OFF = "Turn on Developer mode to install development builds."

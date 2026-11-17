@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import main
-from conftest import FAKE_7Z, REPO_ROOT, install_tools, run, sha256, write
+from conftest import FakeDownload, FAKE_7Z, REPO_ROOT, install_tools, run, sha256, write
 from deckyscaler.application.library import Library
 from deckyscaler.domain import library
 from deckyscaler.infrastructure import archive, github_releases
@@ -115,15 +115,6 @@ def zip_archive(files: dict[str, bytes]) -> bytes:
             zf.writestr(zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0)), data)
     return buffer.getvalue()
 
-
-class FakeDownload:
-    def __init__(self, content: bytes):
-        self.content, self.urls = content, []
-
-    def __call__(self, url, destination, on_progress):
-        self.urls.append(url)
-        destination.write_bytes(self.content)
-        on_progress(len(self.content), len(self.content))
 
 
 @pytest.fixture

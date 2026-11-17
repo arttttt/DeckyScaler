@@ -69,6 +69,13 @@ CHUNK_BYTES = 64 * 1024
 Progress = Callable[[int, int | None], None]
 """Bytes received so far, and the total when the server said it."""
 
+ListReleases = Callable[[str], list]
+"""list_releases: a repository's releases."""
+Download = Callable[[str, Path, Progress], None]
+"""download: (url, destination, on_progress)."""
+Report = Callable[[str, int, int | None], None]
+"""Tells the frontend how a download goes: what is downloading, bytes received, total bytes if known."""
+
 
 def download(url: str, destination: Path, on_progress: Progress | None = None) -> None:
     """Save a release asset to `destination`, replacing it only once the whole file has arrived."""

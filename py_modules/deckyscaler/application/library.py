@@ -10,15 +10,11 @@ from pathlib import Path
 from deckyscaler.domain import library
 from deckyscaler.infrastructure import archive
 from deckyscaler.infrastructure.files import sha256
-from deckyscaler.infrastructure.github_releases import ReleasesUnavailable
+from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
 from deckyscaler.infrastructure.library_store import LibraryStore
 
 log = logging.getLogger(__name__)
 
-ListReleases = Callable[[str], list]
-Download = Callable[[str, Path, Callable[[int, int | None], None]], None]
-Report = Callable[[str, int, int | None], None]
-"""Tells the frontend how a download goes: version id, bytes received, total bytes if known."""
 
 
 def _error(message: str) -> dict:
