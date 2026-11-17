@@ -340,6 +340,8 @@ class Source:
     repository: str
     asset: re.Pattern[str]
     """The asset to download; its group is the version."""
+    slots: tuple[str, ...]
+    """What its library serves, for the page to say before anything is downloaded."""
     settings: tuple[tuple[Key, str], ...] = ()
     """Other keys set along with the library, as the project's own installer sets them."""
 
@@ -351,6 +353,7 @@ SOURCES = {
         "apex-compute/ANR",
         # anr-fg-V.B19-addon.zip: the frame generation provider alone (the -full zip carries its own OptiScaler).
         re.compile(r"^anr-fg-(V\.B\d+)-addon\.zip$"),
+        (FRAME_GENERATION,),
         # install.sh: "ANR FG draws the HUD over the HUD-less color; keep OptiScaler from stripping it".
         ((("FrameGen", "DisableHudless"), "false"),),
     ),
@@ -359,7 +362,10 @@ SOURCES = {
 
 def sources_json() -> list[dict]:
     """The sources the download dialog offers."""
-    return [{"id": source.id, "label": source.label} for source in SOURCES.values()]
+    return [
+        {"id": source.id, "label": source.label, "slots": list(source.slots), "repository": source.repository}
+        for source in SOURCES.values()
+    ]
 
 
 @dataclass(frozen=True)

@@ -250,3 +250,12 @@ def test_the_frontend_words_every_slot_and_every_refusal_the_backend_gives():
 
     assert table("SLOT_LABELS") == set(ul.SLOTS)
     assert table("REFUSALS") == {ul.NOTHING_KNOWN, ul.RESERVED_NAME, ul.ALREADY_ADDED}
+
+
+def test_a_source_says_what_its_library_serves_and_where_it_comes_from():
+    library = ul.downloaded(ul.releases(ul.ANR, ANR_LISTING)[0], ul.recognize(ANR_MEMBERS), "t")
+
+    assert ul.sources_json() == [
+        {"id": ul.ANR, "label": ANR_PROVIDER, "slots": [ul.FRAME_GENERATION], "repository": "apex-compute/ANR"},
+    ]
+    assert library.slots == ul.SOURCES[ul.ANR].slots  # what the page says before the download is what it serves

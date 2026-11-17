@@ -136,10 +136,10 @@ def test_what_isnt_a_library_is_refused_with_why(home, plugin_home, tmp_path):
 def test_a_slot_takes_only_a_library_that_serves_it(plugin, home, plugin_home):
     owner(home).install(ul.ANR, "anr-v-b19")
 
-    assert run(plugin.user_library_choose("global", FG, "anr-v-b19")) == {"status": "success"}
+    assert run(plugin.user_library_choose("global", FG, "anr-v-b19")) == {"status": "success", "to_apply": []}
     assert run(plugin.user_library_choose("global", UP, "anr-v-b19"))["status"] == "error"
     assert run(plugin.user_library_choose("not-a-game", FG, None))["status"] == "error"
-    assert run(plugin.user_library_choose("620", FG, "none")) == {"status": "success"}
+    assert run(plugin.user_library_choose("620", FG, "none")) == {"status": "success", "to_apply": []}
     assert run(plugin.user_library_game_choice("620")) == {"status": "success", "own": {FG: "none"}, "resolved": {}, "pending": False}
     assert run(plugin.user_library_game_choice("570"))["resolved"] == {FG: "anr-v-b19"}
     assert run(plugin.user_libraries_installed())["global"] == {FG: "anr-v-b19"}
@@ -151,7 +151,8 @@ def test_a_new_choice_is_applied_to_patched_games_and_a_running_one_is_left_alon
     running = make_game_dir(tmp_path / "games" / "Running")
     run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
     run(plugin.manual_patch_directory(str(running), "dxgi.dll", NIGHTLY))
-    run(plugin.user_library_choose("global", FG, "anr-v-b19"))
+    chosen = run(plugin.user_library_choose("global", FG, "anr-v-b19"))
+    assert sorted(chosen["to_apply"]) == sorted([str(game), str(running)])  # what the change reaches, said at once
     assert sorted(run(plugin.user_libraries_installed())["to_apply"]) == sorted([str(game), str(running)])
     monkeypatch.setattr(patcher_module.processes, "command_lines", lambda: [f"wine {running / 'Game.exe'}"])
 
@@ -190,13 +191,17 @@ def test_what_would_take_more_than_a_library_may_is_refused(home, plugin_home, t
     assert libraries.store.installed() == []
 
 
-def test_a_patched_game_says_when_its_choice_needs_patching_again(plugin, home, plugin_home, steam_library):
+def test_a_patched_game_says_when_its_choice_needs_patching_again(plugin, home, plugin_home, steam_library, tmp_path):
     owner(home).install(ul.ANR, "anr-v-b19")
     steam_library.add_game("1234", "Test Game")
     run(plugin.patch_game("1234", "dxgi.dll", "", NIGHTLY))
+    other = make_game_dir(tmp_path / "games" / "Other")
+    run(plugin.manual_patch_directory(str(other), "dxgi.dll", NIGHTLY))
+    run(plugin.user_library_choose("global", FG, "anr-v-b19"))  # both games now lack what they'd get
 
-    run(plugin.user_library_choose("1234", FG, "anr-v-b19"))
+    chosen = run(plugin.user_library_choose("1234", FG, "anr-v-b19"))
 
+    assert chosen["to_apply"] == ["Test Game"]  # a game's own change reaches that game alone
     assert run(plugin.user_library_game_choice("1234"))["pending"] is True
     run(plugin.patch_game("1234", "dxgi.dll", "", NIGHTLY))
     assert run(plugin.user_library_game_choice("1234"))["pending"] is False

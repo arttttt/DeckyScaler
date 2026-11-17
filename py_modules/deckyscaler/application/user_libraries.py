@@ -201,15 +201,23 @@ class UserLibraries:
 
     def choose(self, scope: str, slot: str, value: str | None) -> dict:
         """Set a slot for every game (scope "global") or a game's own (its appid): a library, NONE, or None (for a
-        game, following the global choice). Patched games get it once it is applied or they are patched again."""
+        game, following the global choice). Patched games get it once it is applied or they are patched again: the
+        answer names those the change reaches."""
         if slot not in user_libraries.SLOTS:
             return _error(f"Not a slot: {slot}")
         if scope != library_choice.GLOBAL and not scope.isdigit():
             return _error(f"Not a Steam app id: {scope}")
-        if not library_choice.can_choose(slot, value, self.store.installed()):
+        installed = self.store.installed()
+        if not library_choice.can_choose(slot, value, installed):
             return _error(f"{value} isn't a library for that.")
-        self.choices.write(library_choice.with_choice(self.choices.read(), scope, slot, value))
-        return {"status": "success"}
+        choices = library_choice.with_choice(self.choices.read(), scope, slot, value)
+        self.choices.write(choices)
+        # The patched games the change reaches that don't have their libraries yet: every game for a global change.
+        patched = [
+            entry for entry in self.patcher.patched_markers()
+            if scope == library_choice.GLOBAL or str(entry[2].get("appid") or "") == scope
+        ]
+        return {"status": "success", "to_apply": [name for _, name, _ in self._to_apply(patched, choices, installed)]}
 
     def apply(self) -> dict:
         """Patch again the games a patch now would give other libraries, with their version and proxy; running ones
