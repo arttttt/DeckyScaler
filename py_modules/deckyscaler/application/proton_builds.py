@@ -61,8 +61,8 @@ class ProtonBuilds:
         self.report = report
         self.system_tools = system_tools if system_tools is not None else proton.SYSTEM_TOOLS
 
-    def _active(self) -> steam.ActiveRoot:
-        return steam_library.active_root(self.home)
+    def _active(self, clients: list[tuple[Path, float]] | None = None) -> steam.ActiveRoot:
+        return steam_library.active_root(self.home, steam_library.running_clients() if clients is None else clients)
 
     def _store(self, root: Path) -> CompatToolsStore:
         return CompatToolsStore(root / "compatibilitytools.d", self.system_tools)
@@ -72,10 +72,12 @@ class ProtonBuilds:
         return [_app_json(app) for app in named]
 
     def installed(self) -> dict:
-        """Every build Steam would find, with what it takes on disk and the games whose user chose it."""
-        active = self._active()
+        """Every build Steam would find, with what it takes on disk and the games whose user chose it, and whether
+        Steam must restart to see the builds as they are now."""
+        clients = steam_library.running_clients()
+        active = self._active(clients)
         if active.root is None:
-            return {"status": "success", "problem": active.problem, "tools": [], "installed_bytes": 0}
+            return {"status": "success", "problem": active.problem, "tools": [], "installed_bytes": 0, "restart_needed": False}
         store = self._store(active.root)
         forced = proton.forced_mappings(active.root)
         rows = []
@@ -92,7 +94,8 @@ class ProtonBuilds:
                 "global_default": global_default,
             })
         own = sum(row["size"] for row in rows if not row["system"])
-        return {"status": "success", "problem": None, "tools": rows, "installed_bytes": own}
+        restart = steam.restart_needed(active.root, clients, store.changed_at())
+        return {"status": "success", "problem": None, "tools": rows, "installed_bytes": own, "restart_needed": restart}
 
     def _published(self, build_id: str) -> list[proton_builds.Release]:
         return proton_builds.available(build_id, self.list_releases(proton_builds.BUILDS[build_id].repository))

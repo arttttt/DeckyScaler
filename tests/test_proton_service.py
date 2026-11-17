@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,7 @@ class FakeDownload:
 def world(home, tmp_path, steam_library, github_api, monkeypatch):
     """A native Steam that has run (its config names the games' tools), no Steam client running, and GitHub
     publishing GE-Proton with the newest x86_64 archive being `world.archive`."""
-    monkeypatch.setattr(processes, "command_lines", lambda: [])
+    monkeypatch.setattr(processes, "started_processes", lambda: [])
 
     class World:
         root = steam_library.root.resolve()
@@ -147,7 +148,8 @@ def test_without_a_steam_to_install_into_nothing_is_written_and_the_frontend_is_
     proton = world.proton()
 
     assert proton.install(pb.GE_PROTON, NEWEST) == {"status": "error", "problem": steam.NO_STEAM}
-    assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "installed_bytes": 0}
+    assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "installed_bytes": 0,
+                                  "restart_needed": False}
     assert proton.versions(pb.GE_PROTON)["problem"] == steam.NO_STEAM
     assert world.tree() == []
 
@@ -229,3 +231,21 @@ def test_the_plugin_offers_the_builds_and_installs_with_progress_events(plugin, 
     assert run(plugin.proton_versions(pb.GE_PROTON))["versions"][0]["state"] == "installed"
     assert run(plugin.proton_removal(NEWEST))["status"] == "success"
     assert run(plugin.proton_remove(NEWEST))["status"] == "success"
+
+
+def test_steam_running_since_before_an_install_or_a_removal_needs_a_restart(world, monkeypatch):
+    client = f"{world.root}/ubuntu12_32/steam -gamepadui"
+    monkeypatch.setattr(processes, "started_processes", lambda: [(1.0, client)])  # started long ago
+    proton = world.proton()
+
+    assert proton.installed()["restart_needed"] is False  # no compatibilitytools.d yet
+    proton.install(pb.GE_PROTON, NEWEST)
+    assert proton.installed()["restart_needed"] is True
+
+    monkeypatch.setattr(processes, "started_processes", lambda: [(time.time() + 60, client)])  # restarted since
+    assert proton.installed()["restart_needed"] is False
+    proton.remove(NEWEST)
+    assert proton.installed()["restart_needed"] is False  # restarted "after" the removal too
+
+    monkeypatch.setattr(processes, "started_processes", lambda: [])
+    assert proton.installed()["restart_needed"] is False  # Steam isn't running

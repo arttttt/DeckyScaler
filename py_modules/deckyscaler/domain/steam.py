@@ -66,6 +66,14 @@ def active_root(configured: list[Path], running: list[Path]) -> ActiveRoot:
     return ActiveRoot(None, SEVERAL_STEAMS if configured else NO_STEAM)
 
 
+def restart_needed(root: Path, clients: list[tuple[Path, float]], tools_changed_at: float | None) -> bool:
+    """Whether Steam has yet to see a compatibility tool come or go: Steam reads compatibilitytools.d when its
+    client starts, so a change made since (by the plugin or anything else) needs a restart. `clients` are the
+    running Steam clients' installs and start times; no client of this install running, nothing to restart."""
+    started = [at for client, at in clients if client == root]
+    return bool(started) and tools_changed_at is not None and tools_changed_at > max(started)
+
+
 def _quoted_value(line: str, key: str) -> str:
     return line.split(f'"{key}"', 1)[1].strip().strip('"')
 

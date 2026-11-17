@@ -1,12 +1,14 @@
 """Steam library metadata: pure parsing (unit) and discovery on a real filesystem (integration)."""
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from conftest import put_tools_on_path, write
 from deckyscaler.domain import steam
+from deckyscaler.infrastructure import processes
 from deckyscaler.infrastructure import steam as steam_library
 
 LIBRARY_FOLDERS = '''"libraryfolders"
@@ -168,8 +170,12 @@ def test_one_install_seen_through_links_is_one_steam(tmp_path):
 
 
 def ps_printing(lines: list[str]) -> dict[str, str]:
-    body = "".join(f"echo '{line}'\n" for line in lines)
-    return {"ps": f"#!/bin/sh\n{body}"}
+    """A `ps` answering `-eo lstart=,args=` with these command lines, all started at STARTED."""
+    body = "".join(f"echo '{STARTED} {line}'\n" for line in lines)
+    return {"ps": f"#!/bin/sh\n[ \"$*\" = '-eo lstart=,args=' ] || exit 1\n[ \"$LC_ALL\" = C ] || exit 1\n{body}"}
+
+
+STARTED = "Fri Nov  7 09:05:01 2026"
 
 
 def configured(root: Path) -> Path:
@@ -183,13 +189,57 @@ def test_the_running_steam_is_the_one_to_work_with(tmp_path, monkeypatch):
     flatpak = configured(home / ".var/app/com.valvesoftware.Steam/data/Steam")
 
     put_tools_on_path(monkeypatch, tmp_path / "bin", ps_printing(["/sbin/init", f"{flatpak}/ubuntu12_32/steam -no-cef-sandbox"]))
-    assert steam_library.active_root(home) == steam.ActiveRoot(flatpak)
+    clients = steam_library.running_clients()
+    assert clients == [(flatpak, processes.parse_started(f"{STARTED} x")[0])]
+    assert steam_library.active_root(home, clients) == steam.ActiveRoot(flatpak)
 
     put_tools_on_path(monkeypatch, tmp_path / "bin", ps_printing(["/sbin/init"]))
-    assert steam_library.active_root(home) == steam.ActiveRoot(None, steam.SEVERAL_STEAMS)
+    assert steam_library.active_root(home, steam_library.running_clients()) == steam.ActiveRoot(None, steam.SEVERAL_STEAMS)
 
     (flatpak / "config" / "config.vdf").unlink()
-    assert steam_library.active_root(home) == steam.ActiveRoot(native)
+    assert steam_library.active_root(home, []) == steam.ActiveRoot(native)
+
+
+def test_no_ps_means_no_steam_seen_running(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+
+    assert processes.started_processes() == []
+    assert steam_library.running_clients() == []
+
+
+@pytest.mark.parametrize(
+    ("line", "parsed"),
+    [
+        ("Fri Nov  7 09:05:01 2026 /home/deck/.local/share/Steam/ubuntu12_32/steam -gamepadui",
+         (datetime(2026, 11, 7, 9, 5, 1).timestamp(), "/home/deck/.local/share/Steam/ubuntu12_32/steam -gamepadui")),
+        ("Mon Nov 17 02:16:05 2026 /sbin/init splash", (datetime(2026, 11, 17, 2, 16, 5).timestamp(), "/sbin/init splash")),
+        ("  Mon Nov 17 02:16:05 2026   [kworker/0:1]", (datetime(2026, 11, 17, 2, 16, 5).timestamp(), "[kworker/0:1]")),
+        ("Mon Nov 31 02:16:05 2026 /bin/x", None),  # no such day
+        ("lun. nov. 17 02:16:05 2026 /bin/x", None),  # another locale's names
+        ("", None),
+    ],
+)
+def test_a_process_line_gives_its_local_start_time_and_command_line(line, parsed):
+    assert processes.parse_started(line) == parsed
+
+
+NOW = 1_800_000_000.0
+
+
+@pytest.mark.parametrize(
+    ("clients", "changed_at", "needed"),
+    [
+        ([(NATIVE, NOW)], NOW + 5, True),  # a build came or went since Steam started
+        ([(NATIVE, NOW)], NOW - 5, False),  # Steam started after: it has read them
+        ([(NATIVE, NOW)], NOW, False),
+        ([(NATIVE, NOW - 100), (NATIVE, NOW)], NOW - 50, False),  # the newest client counts
+        ([(FLATPAK, NOW)], NOW + 5, False),  # another install's client
+        ([], NOW + 5, False),  # Steam isn't running: nothing to restart
+        ([(NATIVE, NOW)], None, False),  # no compatibilitytools.d
+    ],
+)
+def test_steam_needs_a_restart_when_its_tools_changed_after_it_started(clients, changed_at, needed):
+    assert steam.restart_needed(NATIVE, clients, changed_at) is needed
 
 
 def test_apps_are_named_from_every_librarys_manifests_and_every_users_shortcuts(tmp_path):

@@ -30,12 +30,16 @@ def steam_roots(home: Path) -> list[Path]:
     return roots
 
 
-def active_root(home: Path) -> steam.ActiveRoot:
+def running_clients() -> list[tuple[Path, float]]:
+    """The running Steam clients: the install each runs from (by its real path) and when it started."""
+    return [(root.resolve(), started) for started, line in processes.started_processes() if (root := steam.client_root(line))]
+
+
+def active_root(home: Path, clients: list[tuple[Path, float]]) -> steam.ActiveRoot:
     """The Steam install the plugin works with: the running client's, else the only one that has run."""
     roots = steam_roots(home)
     configured = [root for root in roots if (root / "config" / "config.vdf").is_file()]
-    running = [root.resolve() for line in processes.command_lines() if (root := steam.client_root(line))]
-    return steam.active_root(configured, running)
+    return steam.active_root(configured, [root for root, _started in clients])
 
 
 def library_paths(home: Path) -> list[Path]:
