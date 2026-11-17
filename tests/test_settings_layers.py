@@ -150,3 +150,66 @@ def test_a_games_page_gets_its_own_values_over_the_global_ones_it_would_inherit(
     enabled = view[0]["settings"][0]
     assert (enabled["value"], enabled["source"]) == ("false", GAME)
     assert enabled["inherited"] == {"value": "true", "source": GLOBAL}
+
+
+# ── what the libraries in a game set ─────────────────────────────────────────
+
+ANR = "Apex Neural Rendering FG B18"
+
+
+def test_a_librarys_value_wins_over_every_user_layer_and_needs_no_listed_value():
+    library_layer = {("FrameGen", "FGInput"): settings_layers.Owned("Apex Neural Rendering FG", ANR)}
+
+    resolved = settings_layers.resolve(SCHEMA, {("FrameGen", "FGInput"): "fsrfg"}, {("FrameGen", "FGInput"): "xefg"}, library_layer)
+
+    assert resolved[("FrameGen", "FGInput")] == Resolved("Apex Neural Rendering FG", settings_layers.LIBRARY, ANR)
+
+
+def test_a_library_writes_its_keys_even_those_the_versions_ini_doesnt_list():
+    library_layer = {
+        ("FrameGen", "FGInput"): settings_layers.Owned("nvngxfg", ANR),
+        ("Libraries", "XeSSPath"): settings_layers.Owned("OptiScaler\\user-libraries\\libxess.dll", "XeSS SDK"),
+    }
+
+    written = settings_layers.to_write(SCHEMA, {("FrameGen", "Enabled"): "true"}, {}, library_layer)
+
+    assert written == [
+        ("FrameGen", "Enabled", "true"),
+        ("FrameGen", "FGInput", "nvngxfg"),
+        ("Libraries", "XeSSPath", "OptiScaler\\user-libraries\\libxess.dll"),
+    ]
+
+
+def test_a_key_a_library_let_go_of_goes_back_to_the_users_value_or_auto():
+    released = frozenset({("FrameGen", "FGInput"), ("FrameGen", "Enabled"), ("Libraries", "XeSSPath")})
+
+    written = settings_layers.to_write(SCHEMA, {("FrameGen", "Enabled"): "true"}, {}, {}, released)
+
+    assert written == [("FrameGen", "Enabled", "true"), ("FrameGen", "FGInput", AUTO), ("Libraries", "XeSSPath", AUTO)]
+
+
+def test_a_released_key_another_library_now_sets_gets_that_librarys_value():
+    library_layer = {("Libraries", "XeSSPath"): settings_layers.Owned("new.dll", "Another")}
+
+    written = settings_layers.to_write(SCHEMA, {}, {}, library_layer, frozenset({("Libraries", "XeSSPath")}))
+
+    assert written == [("Libraries", "XeSSPath", "new.dll")]
+
+
+def test_a_settings_page_names_the_library_that_sets_a_value():
+    library_layer = {("FrameGen", "FGInput"): settings_layers.Owned("nvngxfg", ANR)}
+
+    view = settings_layers.view_json(SCHEMA, {}, {}, library_layer)
+
+    fg_input = view[0]["settings"][1]
+    assert (fg_input["value"], fg_input["source"], fg_input["library"]) == ("nvngxfg", settings_layers.LIBRARY, ANR)
+    assert view[0]["settings"][0]["library"] is None
+
+
+def test_a_library_layer_is_kept_by_section_and_key_and_anything_else_reads_as_empty():
+    layer = {("FrameGen", "FGInput"): settings_layers.Owned("nvngxfg", ANR)}
+
+    assert settings_layers.parse_library_layer(settings_layers.library_layer_json(layer)) == layer
+    assert settings_layers.library_layer_json(layer) == {"FrameGen": {"FGInput": {"value": "nvngxfg", "library": ANR}}}
+    assert settings_layers.parse_library_layer({"FrameGen": {"FGInput": "nvngxfg"}}) == {}
+    assert settings_layers.parse_library_layer(None) == {}
