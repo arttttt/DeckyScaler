@@ -42,9 +42,14 @@ def build_tree(root: Path, name: str = TOOL) -> Path:
     return tool
 
 
+BUILT_AT = 1_700_000_000
+"""When the archives' builds were made: their top directory carries it."""
+
+
 def tarball(tmp_path: Path, mode: str = "w:gz", name: str = TOOL) -> Path:
     source = tmp_path / "source"
     build_tree(source, name)
+    os.utime(source / name, (BUILT_AT, BUILT_AT))
     archive_path = tmp_path / f"{name}.tar.{mode[2:]}"
     with tarfile.open(archive_path, mode) as tar:
         tar.add(source / name, arcname=name)
@@ -62,6 +67,7 @@ def test_a_proton_archive_unpacks_with_its_links_and_executables(tmp_path, mode)
     assert link.is_symlink() and link.read_bytes() == b"regedit"
     assert os.stat(tool / "proton").st_mode & stat.S_IXUSR
     assert not os.stat(tool / "files/share/notes.txt").st_mode & stat.S_IWOTH  # the data filter drops world-write
+    assert tool.stat().st_mtime == BUILT_AT  # kept from the archive: installed builds sort by when they were made
 
 
 def evil(tmp_path: Path, member: tarfile.TarInfo) -> Path:
