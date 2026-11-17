@@ -41,8 +41,11 @@
         "family": "0.9",
         "format": 2,
         "game_name": "",
+        "libraries": [],
+        "library_settings": {},
         "optiscaler_version": "stable-0.9.4",
         "original_launch_options": "",
+        "owned_dirs": [],
         "placed": [
           {
             "path": "version.dll",

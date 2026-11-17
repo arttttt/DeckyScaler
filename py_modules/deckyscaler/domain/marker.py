@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import library_choice, settings_layers
 from .launch_options import is_managed
 
 
@@ -28,10 +29,14 @@ def build(
     family: str,
     patched_at: str,
     steam_game: SteamGame | None = None,
+    libraries: tuple[dict, ...] = (),
+    library_layer: settings_layers.LibraryLayer | None = None,
 ) -> dict:
     """The marker's details; every patch writes one, a Steam patch also records the game.
 
-    `optiscaler_version` is the library version's id (stable-0.9.4, nightly-20261023).
+    `optiscaler_version` is the library version's id (stable-0.9.4, nightly-20261023). `libraries` is what the
+    patch placed of the user's libraries (domain/library_placement), and `library_layer` the ini keys they own:
+    the game's later settings writes read them from here, whatever the device holds by then.
     """
     return {
         "appid": steam_game.appid if steam_game else "",
@@ -43,17 +48,25 @@ def build(
         "optiscaler_version": optiscaler_version,
         "family": family,
         "patched_at": patched_at,
+        "libraries": list(libraries),
+        "library_settings": settings_layers.library_layer_json(library_layer or {}),
     }
 
 
-def describes(details: dict, version_id: str, dll_name: str) -> bool:
-    """Whether a marker records a finished patch with this version under this proxy name: patching again
-    would place the same."""
+def describes(details: dict, version_id: str, dll_name: str, picks: tuple[library_choice.Pick, ...] = ()) -> bool:
+    """Whether a marker records a finished patch with this version under this proxy name and these libraries:
+    patching again would place the same."""
     return (
         details.get("complete") is True
         and details.get("optiscaler_version") == version_id
         and details.get("dll_name") == dll_name
+        and library_choice.recorded_picks(details.get("libraries")) == picks
     )
+
+
+def library_layer(details: dict) -> settings_layers.LibraryLayer:
+    """The ini keys the libraries a marker's patch placed own; a marker from before libraries owns none."""
+    return settings_layers.parse_library_layer(details.get("library_settings"))
 
 
 def original_launch_options(current: str | None, stored: str | None) -> str | None:
