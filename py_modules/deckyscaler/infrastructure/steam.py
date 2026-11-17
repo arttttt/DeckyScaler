@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from deckyscaler.domain import steam
+from deckyscaler.infrastructure import processes
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +20,24 @@ class InstalledGame:
     install_path: Path
 
 
+def steam_roots(home: Path) -> list[Path]:
+    """Every Steam install on the device once, by its real path: ~/.steam/steam and ~/.steam/root are links
+    to ~/.local/share/Steam, Flatpak's data/Steam to its sandbox's .local/share/Steam."""
+    roots: list[Path] = []
+    for candidate in steam.steam_root_candidates(home):
+        if candidate.is_dir() and (real := candidate.resolve()) not in roots:
+            roots.append(real)
+    return roots
+
+
+def active_root(home: Path) -> steam.ActiveRoot:
+    """The Steam install the plugin works with: the running client's, else the only one that has run."""
+    roots = steam_roots(home)
+    configured = [root for root in roots if (root / "config" / "config.vdf").is_file()]
+    running = [root.resolve() for line in processes.command_lines() if (root := steam.client_root(line))]
+    return steam.active_root(configured, running)
+
+
 def library_paths(home: Path) -> list[Path]:
     """Every Steam library: each existing Steam root plus the folders its libraryfolders.vdf lists."""
     paths: list[Path] = []
@@ -29,9 +48,8 @@ def library_paths(home: Path) -> list[Path]:
             paths.append(path)
             seen.add(str(path))
 
-    for steam_root in steam.steam_root_candidates(home):
-        if steam_root.exists():
-            add(steam_root)
+    for steam_root in steam_roots(home):
+        add(steam_root)
         library_file = steam_root / "steamapps" / "libraryfolders.vdf"
         if not library_file.exists():
             continue

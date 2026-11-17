@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
-_FLATPAK_HOME = Path(".var") / "app" / "com.valvesoftware.Steam" / "home"
+_FLATPAK_APP = Path(".var") / "app" / "com.valvesoftware.Steam"
+_FLATPAK_HOME = _FLATPAK_APP / "home"
 
 # Steam installs these as apps, but they are tools, not games.
 _TOOL_NAME_MARKERS = ("Proton", "Steam Linux Runtime")
@@ -19,14 +21,49 @@ class AppManifest:
 
 
 def steam_root_candidates(home: Path) -> list[Path]:
-    """Where a Steam install may live: native layouts first, then the Flatpak sandbox."""
+    """Where a Steam install may live: native layouts first, then the Flatpak sandbox (its data/Steam, which
+    flathub's steam_wrapper links to the sandbox's .local/share, then the links Steam makes in the sandbox
+    home). Several of them can be one install seen through links."""
     return [
         home / ".local" / "share" / "Steam",
         home / ".steam" / "steam",
         home / ".steam" / "root",
+        home / _FLATPAK_APP / "data" / "Steam",
         home / _FLATPAK_HOME / ".local" / "share" / "Steam",
         home / _FLATPAK_HOME / ".steam" / "steam",
     ]
+
+
+_CLIENT = re.compile(r"(?:^|\s)(/\S+)/ubuntu12_(?:32|64)/steam(?=\s|$)")
+
+NO_STEAM = "no-steam"
+SEVERAL_STEAMS = "several-steams"
+
+
+def client_root(command_line: str) -> Path | None:
+    """The Steam install a process runs from, when it is the Steam client itself (<root>/ubuntu12_32/steam,
+    or ubuntu12_64); None for any other process, steamwebhelper and the game launch wrappers included."""
+    match = _CLIENT.search(command_line)
+    return Path(match.group(1)) if match else None
+
+
+@dataclass(frozen=True)
+class ActiveRoot:
+    """The Steam install the plugin works with, or why there is none to pick."""
+
+    root: Path | None
+    problem: str | None = None
+
+
+def active_root(configured: list[Path], running: list[Path]) -> ActiveRoot:
+    """Which Steam install to use: the one running now, else the only one that has ever run (has a
+    config.vdf). With none, NO_STEAM; with several and none running, SEVERAL_STEAMS — starting Steam tells."""
+    for root in running:
+        if root in configured:
+            return ActiveRoot(root)
+    if len(configured) == 1:
+        return ActiveRoot(configured[0])
+    return ActiveRoot(None, SEVERAL_STEAMS if configured else NO_STEAM)
 
 
 def _quoted_value(line: str, key: str) -> str:

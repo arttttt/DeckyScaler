@@ -1,8 +1,11 @@
 """Steam library metadata: pure parsing (unit) and discovery on a real filesystem (integration)."""
 
+import os
 from pathlib import Path
 
-from conftest import write
+import pytest
+
+from conftest import put_tools_on_path, write
 from deckyscaler.domain import steam
 from deckyscaler.infrastructure import steam as steam_library
 
@@ -58,7 +61,47 @@ def test_steam_root_candidates_cover_native_and_flatpak_installs():
     roots = [p.as_posix() for p in steam.steam_root_candidates(Path("/home/deck"))]
 
     assert "/home/deck/.local/share/Steam" in roots
+    assert "/home/deck/.var/app/com.valvesoftware.Steam/data/Steam" in roots  # Flatpak's own, flathub's wrapper
     assert "/home/deck/.var/app/com.valvesoftware.Steam/home/.local/share/Steam" in roots
+
+
+@pytest.mark.parametrize(
+    ("command_line", "root"),
+    [
+        ("/home/deck/.local/share/Steam/ubuntu12_32/steam -steamdeck -steamos3 -gamepadui", "/home/deck/.local/share/Steam"),
+        ("/home/deck/.local/share/Steam/ubuntu12_64/steam", "/home/deck/.local/share/Steam"),
+        ("/home/deck/.var/app/com.valvesoftware.Steam/data/Steam/ubuntu12_32/steam -no-cef-sandbox",
+         "/home/deck/.var/app/com.valvesoftware.Steam/data/Steam"),
+        ("/home/deck/.local/share/Steam/ubuntu12_64/steamwebhelper -lang=en_US", None),
+        ("/home/deck/.local/share/Steam/ubuntu12_32/reaper SteamLaunch AppId=730 -- "
+         "/home/deck/.local/share/Steam/ubuntu12_32/steam-launch-wrapper -- game.exe", None),
+        ("bash /home/deck/.local/share/Steam/steam.sh -steamdeck", None),
+        ("/usr/bin/steam", None),
+        ("", None),
+    ],
+)
+def test_the_steam_client_is_known_by_the_install_it_runs_from(command_line, root):
+    found = steam.client_root(command_line)
+
+    assert (found.as_posix() if found else None) == root
+
+
+NATIVE, FLATPAK = Path("/home/deck/.local/share/Steam"), Path("/home/deck/.var/app/com.valvesoftware.Steam/data/Steam")
+
+
+@pytest.mark.parametrize(
+    ("configured", "running", "expected"),
+    [
+        ([NATIVE, FLATPAK], [FLATPAK], steam.ActiveRoot(FLATPAK)),  # the running one wins
+        ([NATIVE], [], steam.ActiveRoot(NATIVE)),  # else the only one that ever ran
+        ([NATIVE], [Path("/opt/elsewhere")], steam.ActiveRoot(NATIVE)),  # a client from no install found here
+        ([NATIVE, FLATPAK], [], steam.ActiveRoot(None, steam.SEVERAL_STEAMS)),
+        ([], [], steam.ActiveRoot(None, steam.NO_STEAM)),
+        ([], [NATIVE], steam.ActiveRoot(None, steam.NO_STEAM)),  # running but never written a config yet
+    ],
+)
+def test_the_install_to_work_with_is_the_running_one_else_the_only_one_that_ran(configured, running, expected):
+    assert steam.active_root(configured, running) == expected
 
 
 # ── integration: discovery on disk ───────────────────────────────────────────
@@ -108,3 +151,42 @@ def test_executables_finds_exe_files_recursively(tmp_path):
 
     assert found == ["Binaries/Win64/Game-Win64-Shipping.exe", "Game.exe"]
     assert steam_library.executables(tmp_path / "missing") == []
+
+
+def test_one_install_seen_through_links_is_one_steam(tmp_path):
+    home = tmp_path / "home"
+    native = home / ".local/share/Steam"
+    native.mkdir(parents=True)
+    (home / ".steam").mkdir()
+    os.symlink(native, home / ".steam" / "steam")
+    os.symlink(native, home / ".steam" / "root")
+    flatpak = home / ".var/app/com.valvesoftware.Steam/.local/share/Steam"
+    flatpak.mkdir(parents=True)
+    os.symlink(flatpak.parent, home / ".var/app/com.valvesoftware.Steam/data")  # what flathub's wrapper leaves
+
+    assert steam_library.steam_roots(home) == [native.resolve(), flatpak.resolve()]
+
+
+def ps_printing(lines: list[str]) -> dict[str, str]:
+    body = "".join(f"echo '{line}'\n" for line in lines)
+    return {"ps": f"#!/bin/sh\n{body}"}
+
+
+def configured(root: Path) -> Path:
+    write(root / "config" / "config.vdf", b'"InstallConfigStore" { }')
+    return root.resolve()
+
+
+def test_the_running_steam_is_the_one_to_work_with(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    native = configured(home / ".local/share/Steam")
+    flatpak = configured(home / ".var/app/com.valvesoftware.Steam/data/Steam")
+
+    put_tools_on_path(monkeypatch, tmp_path / "bin", ps_printing(["/sbin/init", f"{flatpak}/ubuntu12_32/steam -no-cef-sandbox"]))
+    assert steam_library.active_root(home) == steam.ActiveRoot(flatpak)
+
+    put_tools_on_path(monkeypatch, tmp_path / "bin", ps_printing(["/sbin/init"]))
+    assert steam_library.active_root(home) == steam.ActiveRoot(None, steam.SEVERAL_STEAMS)
+
+    (flatpak / "config" / "config.vdf").unlink()
+    assert steam_library.active_root(home) == steam.ActiveRoot(native)

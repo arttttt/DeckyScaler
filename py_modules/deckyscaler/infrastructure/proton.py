@@ -7,7 +7,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
-from deckyscaler.domain import compat_tools, fsr4, keyvalues, steam
+from deckyscaler.domain import compat_tools, fsr4, keyvalues
+from deckyscaler.infrastructure import steam as steam_library
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def _cached(kind: str, path: Path, compute: Callable[[], T]) -> T:
 
 
 def _steam_roots(home: Path) -> list[Path]:
-    return [root for root in steam.steam_root_candidates(home) if root.is_dir()]
+    return steam_library.steam_roots(home)
 
 
 def compat_tool(home: Path, appid: str) -> str | None:
