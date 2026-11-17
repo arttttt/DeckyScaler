@@ -11,8 +11,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from . import keyvalues
-
 AMD_VENDOR = "0x1002"
 UPGRADE_VARIABLE = "PROTON_FSR4_UPGRADE"
 """What a Proton build with upscaler support reads to fetch FSR 4; current GE-Proton covers RDNA 3 with it too."""
@@ -21,8 +19,6 @@ PREFIX_DLL = f"pfx/drive_c/windows/system32/{DLL}"
 """Where the DLL lands, relative to the game's compatdata directory."""
 TRACKING_FILE = "upscaler_files"
 _TRACKED_DLL = f"drive_c/windows/system32/{DLL}"
-GLOBAL_MAPPING = "0"
-"""CompatToolMapping's entry for the tool the user chose for every game."""
 
 IN_PREFIX = "in-prefix"
 WILL_FETCH = "will-fetch"
@@ -32,33 +28,6 @@ UNSUPPORTED = "unsupported"
 def is_amd(vendor: str) -> bool:
     """Whether a PCI vendor id (as sysfs gives it, e.g. "0x1002\\n") is AMD's."""
     return vendor.strip().lower() == AMD_VENDOR
-
-
-def compat_tool(config: keyvalues.KeyValues, appid: str) -> str | None:
-    """The compatibility tool Steam runs a game with, by internal name (GE-Proton11-11, proton_experimental):
-    the game's own choice, else the one chosen for every game. None means Steam's default, which no file names."""
-    mapping = keyvalues.find(config, "InstallConfigStore", "Software", "Valve", "Steam", "CompatToolMapping")
-    if not isinstance(mapping, dict):
-        return None
-    for key in (str(appid), GLOBAL_MAPPING):
-        entry = mapping.get(key)
-        name = entry.get("name") if isinstance(entry, dict) else None
-        if isinstance(name, str) and name:
-            return name
-    return None
-
-
-def custom_tools(manifest: keyvalues.KeyValues) -> dict[str, str]:
-    """The tools a compatibilitytool.vdf declares: internal name, lowercased as Steam compares it → install_path
-    (relative to the file)."""
-    tools = keyvalues.find(manifest, "compatibilitytools", "compat_tools")
-    if not isinstance(tools, dict):
-        return {}
-    return {
-        name: str(entry.get("install_path") or ".")
-        for name, entry in tools.items()
-        if isinstance(entry, dict)
-    }
 
 
 def reads_upgrade_variable(source: str) -> bool:

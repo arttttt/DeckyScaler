@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
-from deckyscaler.domain import fsr4, keyvalues, steam
+from deckyscaler.domain import compat_tools, fsr4, keyvalues, steam
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def compat_tool(home: Path, appid: str) -> str | None:
     for root in _steam_roots(home):
         config = root / "config" / "config.vdf"
         if config.is_file():
-            return fsr4.compat_tool(_cached("config", config, lambda: keyvalues.parse(_read(config))), appid)
+            return compat_tools.compat_tool(_cached("config", config, lambda: keyvalues.parse(_read(config))), appid)
     return None
 
 
@@ -63,7 +63,7 @@ def tool_directory(home: Path, name: str) -> Path | None:
         if not tools.is_dir():
             continue
         for manifest in sorted(tools.glob("*/compatibilitytool.vdf")):
-            tools = _cached("tools", manifest, lambda manifest=manifest: fsr4.custom_tools(keyvalues.parse(_read(manifest))))
+            tools = _cached("tools", manifest, lambda manifest=manifest: compat_tools.custom_tools(keyvalues.parse(_read(manifest))))
             install_path = tools.get(name.lower())
             if install_path is not None:
                 return (manifest.parent / install_path).resolve()
