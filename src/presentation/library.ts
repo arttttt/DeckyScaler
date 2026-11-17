@@ -15,6 +15,7 @@ import {
   listingMessage,
   versionLabel,
 } from "./releases";
+import { count } from "./words";
 
 // ── The panel ────────────────────────────────────────────────────────────────
 
@@ -23,8 +24,7 @@ export const librarySummary = (library: InstalledLibrary | null): string => {
   if (library === null) return "Loading…";
   const [newest] = library.versions;
   if (!newest) return "No version is downloaded yet.";
-  const count = library.versions.length;
-  return `${count} ${count === 1 ? "version" : "versions"} downloaded. Newest: ${versionLabel(newest)}.`;
+  return `${count(library.versions.length, "version", "versions")} downloaded. Newest: ${versionLabel(newest)}.`;
 };
 
 // ── Download dialog ──────────────────────────────────────────────────────────

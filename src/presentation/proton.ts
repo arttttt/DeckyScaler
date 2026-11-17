@@ -9,6 +9,7 @@ import type {
   ProtonRemoval,
 } from "../api";
 import { ReleaseDownload, ReleaseRowView, actionOutcome, byteSize, downloadRows, listingMessage } from "./releases";
+import { count, plural } from "./words";
 
 /**
  * The Proton page and its two dialogs, shaped like the OptiScaler versions block: a summary, a dialog to
@@ -58,8 +59,6 @@ export type ProtonPageView = {
   hint: string;
 };
 
-const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
-
 const moveOffer = (move: ProtonMove, state: MoveState): MoveOfferView => {
   const names = move.games.map(gameName).sort((a, b) => a.localeCompare(b)).join(", ");
   const from = move.sources.join(", ");
@@ -68,9 +67,9 @@ const moveOffer = (move: ProtonMove, state: MoveState): MoveOfferView => {
     move,
     text: busy && state?.target === move.target
       ? `Moving ${count(move.games.length, "game", "games")} to ${move.target}…`
-      : `${count(move.games.length, "game", "games")} still ${move.games.length === 1 ? "uses" : "use"} ${from}: ${names}.`,
-    moveLabel: `Move ${move.games.length === 1 ? "it" : "them"} to ${move.target}`,
-    keepLabel: move.sources.length === 1 ? `Keep ${move.games.length === 1 ? "it" : "them"} on ${from}` : "Keep them where they are",
+      : `${count(move.games.length, "game", "games")} still ${plural(move.games.length, "uses", "use")} ${from}: ${names}.`,
+    moveLabel: `Move ${plural(move.games.length, "it", "them")} to ${move.target}`,
+    keepLabel: move.sources.length === 1 ? `Keep ${plural(move.games.length, "it", "them")} on ${from}` : "Keep them where they are",
     enabled: !busy,
   };
 };

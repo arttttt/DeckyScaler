@@ -1,4 +1,5 @@
 import type { SettingInfo, SettingsAnswer } from "../api";
+import { plural } from "./words";
 
 /** The scope of the global settings; any other scope is a game's appid. */
 export const GLOBAL_SCOPE = "global";
@@ -159,7 +160,7 @@ export const searchRows = (sections: SettingsSectionView[], query: string): Sett
 export const skippedMessage = (skipped: string[]): string | null =>
   skipped.length === 0
     ? null
-    : `${skipped.join(", ")} ${skipped.length === 1 ? "is" : "are"} running and ${skipped.length === 1 ? "gets" : "get"} the change once closed.`;
+    : `${skipped.join(", ")} ${plural(skipped.length, "is", "are")} running and ${plural(skipped.length, "gets", "get")} the change once closed.`;
 
 export const RESET_GAME_LABEL = "Reset to global settings";
 export const RESET_GAME_CONFIRMATION = {
