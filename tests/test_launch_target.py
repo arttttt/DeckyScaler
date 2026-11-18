@@ -118,7 +118,7 @@ def test_locate_follows_unreal_layouts_and_rejects_missing_directories(home, tmp
 
 
 def test_unpatch_refuses_to_touch_the_bundle_itself(plugin_home, home):
-    with pytest.raises(WrapperError, match="OptiScaler bundle itself"):
+    with pytest.raises(WrapperError, match="DeckyScaler's own folder"):
         LaunchWrapper(home, {}).unpatch([str(plugin_home)])
 
     assert (plugin_home / "library" / "versions").is_dir()

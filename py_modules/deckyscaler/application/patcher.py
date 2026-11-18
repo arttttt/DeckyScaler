@@ -40,7 +40,7 @@ from deckyscaler.infrastructure import steam as steam_library
 log = logging.getLogger(__name__)
 
 NO_VERSION = "No OptiScaler version is downloaded. Download one under Open DeckyScaler → OptiScaler first."
-BUNDLE_IS_NOT_A_GAME = "The target directory is the OptiScaler bundle itself. Aborting to prevent accidental deletion."
+BUNDLE_IS_NOT_A_GAME = "The target directory is in DeckyScaler's own folder (~/deckyscaler), not a game. Aborting to prevent accidental deletion."
 PATCHED_BY_DECKY_FRAMEGEN = (
     "This game was patched by Decky Framegen. Unpatch it first: the plugin shows what that removes."
 )

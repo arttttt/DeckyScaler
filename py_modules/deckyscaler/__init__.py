@@ -1,1 +1,1 @@
-"""DeckyScaler backend core: OptiScaler bundle install and game patching."""
+"""DeckyScaler backend core: OptiScaler versions, libraries and Proton builds, and game patching."""
