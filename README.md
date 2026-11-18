@@ -28,7 +28,7 @@ DeckyScaler itself runs nothing inside a game: a game loads OptiScaler and the l
 
 ## How to Use
 
-1. **Install the plugin**: download `DeckyScaler.zip` from this repository's [Releases](https://github.com/arttttt/DeckyScaler/releases) and install it with Decky Loader's *Install Plugin from Zip* in its Developer settings (turn on Decky's **Developer mode** under its General settings first). Later releases install from **DeckyScaler → Updates**.
+1. **Install the plugin**: download `DeckyScaler.zip` from this repository's [Releases](https://github.com/arttttt/DeckyScaler/releases). In Decky, turn on **Developer mode** in its General settings, then in its Developer settings press *Browse* next to **Install Plugin from ZIP File** and pick the zip; Decky first warns that it hasn't reviewed the plugin. Later releases install from **DeckyScaler → Updates**.
 2. **Get OptiScaler**: **DeckyScaler → OptiScaler → OptiScaler versions** → *Download versions…*, pick stable releases or nightly builds, and download a version.
 3. **Patch a game**: in the Quick Access panel pick the game under **Steam game** and press **Patch with dxgi.dll** (or the proxy DLL picked for it). The plugin places OptiScaler in the game's directory and sets the game's launch options. To choose the game's OptiScaler version, proxy DLL or libraries first, open its page: **Open game page**, or the **DeckyScaler** button on its page in Steam.
 4. **In the game**: turn on its DLSS, FSR or XeSS upscaling: that is what OptiScaler replaces. OptiScaler's menu (the Insert key by default; map it to a button with Steam Input) picks the upscaler and frame generation.
