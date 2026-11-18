@@ -131,6 +131,23 @@ def test_a_committed_library_is_installed_with_its_files_until_removed(tmp_path)
     assert store.installed() == []
 
 
+def test_a_library_missing_a_file_isnt_on_the_device_and_a_new_one_of_its_id_replaces_it(tmp_path):
+    store = UserLibraryStore(tmp_path / "libraries")
+    stage = store.staging("x")
+    (stage / ul.FILES_DIRNAME).mkdir()
+    (stage / ul.FILES_DIRNAME / "libxess.dll").write_bytes(b"12345")
+    store.commit(stage, _library("x"))
+    (store.files_dir("x") / "libxess.dll").unlink()
+
+    assert store.installed() == []
+    stage = store.staging("x")
+    (stage / ul.FILES_DIRNAME).mkdir()
+    (stage / ul.FILES_DIRNAME / "libxess.dll").write_bytes(b"678")
+    store.commit(stage, _library("x"))
+    assert store.installed() == [_library("x")]
+    assert (store.files_dir("x") / "libxess.dll").read_bytes() == b"678"
+
+
 def test_only_a_directory_named_as_its_entry_is_a_library(tmp_path):
     store = UserLibraryStore(tmp_path / "libraries")
     stage = store.staging("y")

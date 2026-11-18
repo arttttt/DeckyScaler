@@ -175,6 +175,17 @@ def test_the_wrapper_keeps_what_the_game_has_until_the_library_leaves_the_device
     assert {f"FGNvngxReplacement=auto", "DisableHudless=auto"} <= lines  # nobody's: back to OptiScaler's own
 
 
+def test_a_library_whose_files_went_missing_leaves_the_game_and_the_game_still_starts(plugin, plugin_home, home, tmp_path):
+    library = anr(plugin_home)
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (UserLibraryStore(plugin_home / "libraries").files_dir(library.id) / f"{ANR}/dlssg/nvngx_dlssg.dll").unlink()
+
+    wrapper_patch(home, game)
+
+    assert marker_of(game)["libraries"] == [] and not (game / "OptiScaler" / "custom").exists()
+
+
 def test_what_a_provider_rewrites_doesnt_break_the_patch_but_a_file_gone_does(plugin, plugin_home, home, tmp_path):
     anr(plugin_home)
     choose(plugin_home, library_choice.GLOBAL, FG, "anr")

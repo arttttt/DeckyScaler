@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from deckyscaler.domain import library_choice, user_libraries
@@ -15,19 +16,27 @@ class UserLibraryStore(EntryStore):
         super().__init__(root, "entries", user_libraries.ENTRY_FILENAME)
 
     def installed(self) -> list[user_libraries.Library]:
-        """Every library on disk with a readable entry; nothing else counts."""
+        """Every library on disk with a readable entry and every file it lists; nothing else counts. A library whose
+        files went missing would fail every patch it goes into, the launch wrapper's too: it isn't on the device,
+        and the games that have it lose it at their next patch."""
         found = []
         for name, data in self.entries():
             parsed = user_libraries.parse_entry(data)
-            if parsed is not None and parsed.id == name:
+            if parsed is not None and parsed.id == name and self._complete(parsed):
                 found.append(parsed)
         return found
+
+    def _complete(self, library: user_libraries.Library) -> bool:
+        files = self.files_dir(library.id)
+        return all((files / path).is_file() for path in library.files)
 
     def files_dir(self, library_id: str) -> Path:
         return self.item_dir(library_id) / user_libraries.FILES_DIRNAME
 
     def commit(self, stage: Path, library: user_libraries.Library) -> None:
-        """Write the library's entry inside the staged library, then move it in by one rename."""
+        """Write the library's entry inside the staged library, then move it in by one rename, over what is left of
+        a library of that id that isn't on the device any more."""
+        shutil.rmtree(self.item_dir(library.id), ignore_errors=True)
         self.commit_entry(stage, library.id, user_libraries.entry_json(library))
 
 
