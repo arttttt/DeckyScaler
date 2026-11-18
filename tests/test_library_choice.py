@@ -92,6 +92,15 @@ def test_one_provider_name_is_one_librarys_the_picked_one_else_the_one_added_las
     assert lc.to_place({FG: "anr-b18"}, [older, both], V10).offered == ()
 
 
+def test_a_pick_naming_a_provider_an_earlier_slots_library_has_is_left_out():
+    bundle = _library("x-v1", "X/ffx/a.dll", "X/dlssg/a.dll")
+    newer = _library("x-v2", "x/dlssg/b.dll", "Y/dlssg/c.dll")
+
+    assert lc.to_place({UP: "x-v1", FG: "x-v2"}, [bundle, newer], V10) == ToPlace(((UP, bundle),), ())
+    assert lc.to_place({UP: "x-v1", FG: "x-v1"}, [bundle], V10).picked == ((UP, bundle), (FG, bundle))  # one library
+    assert lc.to_place({FG: "x-v2"}, [bundle, newer], V10).picked == ((FG, newer),)
+
+
 def test_optiscaler_0_9_takes_no_libraries():
     assert lc.to_place({FG: "anr", UP: "xess"}, [ANR, XESS], V09) == ToPlace((), ())
 

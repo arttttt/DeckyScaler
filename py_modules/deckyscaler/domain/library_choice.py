@@ -108,18 +108,26 @@ def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -
     """The libraries a patch with a version of `family` places: each chosen one still on the device that serves its
     slot, and every other one OptiScaler's menu offers; none for a family that takes no libraries.
 
-    A provider is found by its folder's name, so one name is one library's in a game: the picked one's, else the
-    one added last's (two versions of one project share it). A library goes in whole or not at all."""
+    A provider is found by its folder's name, so one name is one library's in a game (two versions of one project
+    share it): the first pick's in slot order, the upscaler's, else the one added last's. A pick whose provider an
+    earlier slot's library already names is left out, as the game wouldn't run it. A library goes in whole or not
+    at all."""
     if not family.libraries:
         return ToPlace((), ())
     by_id = {library.id: library for library in installed}
-    picked = tuple(
-        (slot, library)
-        for slot in SLOTS
-        if (library := by_id.get(chosen.get(slot, ""))) is not None and slot in library.slots
-    )
-    # A picked library's providers take their names first: it isn't offered again, nor one sharing a name with it.
-    taken = {provider.name.lower() for _, library in picked for provider in library.providers}
+    picked: list[tuple[str, Library]] = []
+    owners: dict[str, str] = {}  # a provider's name, lowercase → the picked library placing it
+    for slot in SLOTS:
+        library = by_id.get(chosen.get(slot, ""))
+        if library is None or slot not in library.slots:
+            continue
+        names = {provider.name.lower() for provider in library.providers}
+        if any(owners.get(name, library.id) != library.id for name in names):
+            continue
+        owners.update(dict.fromkeys(names, library.id))
+        picked.append((slot, library))
+    # The picked libraries' providers take their names first: none is offered again, nor one sharing a name.
+    taken = set(owners)
     offered: list[Library] = []
     for library in sorted(installed, key=lambda item: (item.added_at, item.id), reverse=True):
         names = {provider.name.lower() for provider in library.providers}
@@ -127,7 +135,7 @@ def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -
             continue
         taken |= names
         offered.append(library)
-    return ToPlace(picked, tuple(sorted(offered, key=lambda item: (item.label.lower(), item.id))))
+    return ToPlace(tuple(picked), tuple(sorted(offered, key=lambda item: (item.label.lower(), item.id))))
 
 
 def placed(to_place: ToPlace) -> tuple[Placed, ...]:
