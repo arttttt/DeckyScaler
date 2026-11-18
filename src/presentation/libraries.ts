@@ -86,7 +86,7 @@ export type LibrariesBlockState = {
 export const librariesSummary = (installed: UserLibraries | null): string => {
   if (installed === null) return "Loading…";
   if (installed.libraries.length === 0) return "No library is added yet.";
-  return `${count(installed.libraries.length, "library", "libraries")} added. Games on OptiScaler 10 get the ones picked here unless they have their own.`;
+  return `${count(installed.libraries.length, "library", "libraries")} added. Games on OptiScaler 10 turn on the ones picked here unless they have their own; every provider is also there to pick in OptiScaler's own menu.`;
 };
 
 export const librariesBlockView = (state: LibrariesBlockState): LibrariesBlockView => {
@@ -106,7 +106,7 @@ export const librariesBlockView = (state: LibrariesBlockState): LibrariesBlockVi
     })),
     apply: pending.length
       ? {
-          text: `${count(pending.length, "patched game", "patched games")} ${plural(pending.length, "doesn't", "don't")} have the libraries picked for it yet: ${pending.join(", ")}.`,
+          text: `${count(pending.length, "patched game", "patched games")} ${plural(pending.length, "doesn't", "don't")} have the current libraries yet: ${pending.join(", ")}.`,
           label: busy ? "Applying…" : `Apply to ${plural(pending.length, "it", "them")}`,
           enabled: !busy,
         }
@@ -218,10 +218,17 @@ export const libraryDownloadView = (state: LibraryDownloadState): LibraryDownloa
   };
 };
 
-/** What a download came to; a library downloaded is used once picked, which the dialog says. */
+/** Where a library just added goes: a provider into every patched game's OptiScaler menu (the launch wrapper puts it
+ *  into a Steam game at its next launch), and any library into a game once picked for it. */
+const addedNote = (inMenu: boolean | undefined): string =>
+  inMenu
+    ? "Steam games get it in OptiScaler's menu at their next launch, other patched games once patched again. Pick it under Libraries to turn it on."
+    : "Pick it under Libraries to use it.";
+
+/** What a download came to, and where the library goes. */
 export const downloadOutcome = (answer: UserLibraryResult | null, id: string): string => {
   const said = actionOutcome(answer, `${id} is downloaded.`);
-  return answer?.status === "success" ? `${said} Pick it under Libraries to use it.` : said;
+  return answer?.status === "success" ? `${said} ${addedNote(answer.in_menu)}` : said;
 };
 
 // ── Adding the user's own ────────────────────────────────────────────────────
@@ -239,11 +246,12 @@ const REFUSALS: Record<LibraryRefusal, string> = {
 /** Why what the user picked isn't a library, in words; a reason this frontend doesn't know yet as it came. */
 export const refusalText = (reason: LibraryRefusal): string => REFUSALS[reason] ?? reason;
 
-/** What adding came to: the backend's words, why it isn't a library, or that the backend didn't answer. */
+/** What adding came to: the backend's words and where the library goes, why it isn't a library, or that the
+ *  backend didn't answer. */
 export const addOutcome = (answer: UserLibraryResult | null): string => {
   if (answer === null) return "The plugin backend did not answer.";
-  if (answer.status === "error" && answer.reason) return refusalText(answer.reason);
-  return answer.message ?? (answer.status === "success" ? "The library is added." : "Adding it failed.");
+  if (answer.status === "error") return answer.reason ? refusalText(answer.reason) : answer.message ?? "Adding it failed.";
+  return `${answer.message ?? "The library is added."} ${addedNote(answer.in_menu)}`;
 };
 
 /** Where the picker opens: the Downloads folder files from Desktop Mode land in (home when there is none, as the
@@ -266,7 +274,7 @@ const ORIGINS: Record<UserLibrary["origin"], string> = { downloaded: "downloaded
 const describeLibrary = (library: UserLibrary): string => {
   // "Upscaler, frame generation": a sentence, its first slot capitalised.
   const serves = library.slots.map((slot, index) => (index === 0 ? slotLabel(slot) : slotLabel(slot).toLowerCase())).join(", ");
-  const used = library.games.length ? `used by ${count(library.games.length, "game", "games")}` : "no games";
+  const used = library.games.length ? `in ${count(library.games.length, "game", "games")}` : "in no game";
   return [serves, ORIGINS[library.origin] ?? library.origin, byteSize(library.size), used].join(" · ");
 };
 
@@ -336,12 +344,17 @@ export const gameLibraryPickers = (
     enabled: takesLibraries,
     hint: takesLibraries ? hintFor(libraries, slot, choice.resolved[slot]) : null,
   }));
-  return { pickers, note: takesLibraries && choice.pending ? "Patch again to use the libraries picked here." : null };
+  return { pickers, note: takesLibraries && choice.pending ? "Patch again to give it the current libraries." : null };
 };
 
 /** The choice a game's pick sends: following the global one is no choice of its own. */
 export const changedChoice = (picked: string): string | null => (picked === FOLLOW ? null : picked);
 
-/** What a patched game has of the user's libraries, by slot; null when it has none. */
-export const librariesLine = (placed: PlacedLibrary[] | undefined): string | null =>
-  placed?.length ? placed.map((library) => `${slotLabel(library.slot)}: ${library.label}`).join(" · ") : null;
+/** What a patched game has of the user's libraries: those turned on, by slot, then those only there to pick in
+ *  OptiScaler's menu; null when it has none. */
+export const librariesLine = (placed: PlacedLibrary[] | undefined): string | null => {
+  const picked = (placed ?? []).flatMap((library) => (library.slot === null ? [] : [`${slotLabel(library.slot)}: ${library.label}`]));
+  const offered = (placed ?? []).filter((library) => library.slot === null).map((library) => library.label);
+  const parts = [...picked, ...(offered.length ? [`In OptiScaler's menu: ${offered.join(", ")}`] : [])];
+  return parts.length ? parts.join(" · ") : null;
+};

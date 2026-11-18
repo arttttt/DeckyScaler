@@ -196,9 +196,11 @@ export type UserLibrary = {
   slots: LibrarySlot[];
   /** The slots picking it switches on by itself; in the others it is only pointed at. */
   turns_on: LibrarySlot[];
+  /** Whether it goes into every patched game, picked or not, for OptiScaler's own menu to offer (a provider). */
+  in_menu: boolean;
   /** Bytes on the device. */
   size: number;
-  /** The games whose patch placed it. */
+  /** The games whose patch placed it, picked or offered. */
   games: string[];
 };
 
@@ -213,7 +215,8 @@ export type UserLibraries = {
 };
 
 /** A library a game's patch placed, as its status says. */
-export type PlacedLibrary = { slot: LibrarySlot; id: string; label: string };
+/** A library a game's patch placed: picked for a slot, or (slot null) only there to pick in OptiScaler's menu. */
+export type PlacedLibrary = { slot: LibrarySlot | null; id: string; label: string };
 
 /** Where libraries are downloaded from: what its library serves, and the GitHub repository it comes from. */
 export type LibrarySource = { id: string; label: string; slots: LibrarySlot[]; repository: string };
@@ -222,7 +225,7 @@ export type LibrarySource = { id: string; label: string; slots: LibrarySlot[]; r
 export type LibraryRefusal = "nothing-known" | "reserved-name" | "already-added";
 
 export type UserLibraryResult =
-  | { status: "success"; id?: string; message?: string }
+  | { status: "success"; id?: string; message?: string; in_menu?: boolean }
   | { status: "error"; message?: string; reason?: LibraryRefusal };
 
 export type UserLibraryListing =

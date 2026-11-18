@@ -28,11 +28,12 @@ import {
 
 const ANR: UserLibrary = {
   id: "anr-v-b19", label: "Apex Neural Rendering FG V.B19", origin: "downloaded",
-  slots: ["frame-generation"], turns_on: ["frame-generation"], size: 5_700_000, games: ["Hades II", "Cyberpunk 2077"],
+  slots: ["frame-generation"], turns_on: ["frame-generation"], in_menu: true, size: 5_700_000,
+  games: ["Hades II", "Cyberpunk 2077"],
 };
 const SDK: UserLibrary = {
   id: "xess-sdk-3-0-2", label: "XeSS_SDK_3.0.2", origin: "file",
-  slots: ["upscaler", "frame-generation"], turns_on: ["upscaler"], size: 41_000_000, games: [],
+  slots: ["upscaler", "frame-generation"], turns_on: ["upscaler"], in_menu: false, size: 41_000_000, games: [],
 };
 const ANR_SOURCE: LibrarySource = {
   id: "anr", label: "Apex Neural Rendering FG", slots: ["frame-generation"], repository: "apex-compute/ANR",
@@ -47,7 +48,7 @@ describe("the block on the OptiScaler page", () => {
     expect(librariesSummary(null)).toBe("Loading…");
     expect(librariesSummary({ ...INSTALLED, libraries: [] })).toBe("No library is added yet.");
     expect(librariesSummary(INSTALLED)).toBe(
-      "2 libraries added. Games on OptiScaler 10 get the ones picked here unless they have their own.",
+      "2 libraries added. Games on OptiScaler 10 turn on the ones picked here unless they have their own; every provider is also there to pick in OptiScaler's own menu.",
     );
   });
 
@@ -76,9 +77,9 @@ describe("the block on the OptiScaler page", () => {
     const two = librariesBlockView({ installed: { ...INSTALLED, to_apply: ["Hades II", "Cyberpunk 2077"] }, sources: null, busy: true, message: null });
 
     expect(one.apply).toEqual({
-      text: "1 patched game doesn't have the libraries picked for it yet: Hades II.", label: "Apply to it", enabled: true,
+      text: "1 patched game doesn't have the current libraries yet: Hades II.", label: "Apply to it", enabled: true,
     });
-    expect(two.apply?.text).toBe("2 patched games don't have the libraries picked for it yet: Hades II, Cyberpunk 2077.");
+    expect(two.apply?.text).toBe("2 patched games don't have the current libraries yet: Hades II, Cyberpunk 2077.");
     expect(two.apply?.label).toBe("Applying…");
     expect(two.apply?.enabled).toBe(false);
     expect(two.pickers.every((picker) => !picker.enabled)).toBe(true);
@@ -145,10 +146,13 @@ describe("what a pick reaches", () => {
     );
   });
 
-  it("tells after a download to pick the library to use it", () => {
-    expect(downloadOutcome({ status: "success", message: "Apex Neural Rendering FG V.B19 is downloaded." }, "anr-v-b19")).toBe(
-      "Apex Neural Rendering FG V.B19 is downloaded. Pick it under Libraries to use it.",
+  it("tells after a download where the library goes: a provider into every game's OptiScaler menu, any once picked", () => {
+    expect(
+      downloadOutcome({ status: "success", message: "Apex Neural Rendering FG V.B19 is downloaded.", in_menu: true }, "anr-v-b19"),
+    ).toBe(
+      "Apex Neural Rendering FG V.B19 is downloaded. Steam games get it in OptiScaler's menu at their next launch, other patched games once patched again. Pick it under Libraries to turn it on.",
     );
+    expect(downloadOutcome({ status: "success", in_menu: false }, "x")).toBe("x is downloaded. Pick it under Libraries to use it.");
     expect(downloadOutcome({ status: "error", message: "No space." }, "anr-v-b19")).toBe("No space.");
   });
 });
@@ -200,7 +204,13 @@ describe("adding the user's own", () => {
   it("says why what was picked isn't a library, else what the backend said", () => {
     expect(addOutcome({ status: "error", reason: "already-added" })).toBe("It is already added.");
     expect(addOutcome({ status: "error", message: "Adding x.zip failed: bad zip" })).toBe("Adding x.zip failed: bad zip");
-    expect(addOutcome({ status: "success", message: "libxess.dll 2.0.2.68 is added." })).toBe("libxess.dll 2.0.2.68 is added.");
+    expect(addOutcome({ status: "success", message: "libxess.dll 2.0.2.68 is added.", in_menu: false })).toBe(
+      "libxess.dll 2.0.2.68 is added. Pick it under Libraries to use it.",
+    );
+    expect(addOutcome({ status: "success", message: "Uniscaler is added.", in_menu: true })).toMatch(
+      /^Uniscaler is added\. Steam games get it in OptiScaler's menu at their next launch/,
+    );
+    expect(addOutcome({ status: "error" })).toBe("Adding it failed.");
     expect(addOutcome(null)).toBe("The plugin backend did not answer.");
     expect(refusalText("nothing-known")).toContain("found no library");
   });
@@ -218,8 +228,8 @@ describe("the manage dialog", () => {
     const view = libraryManageView({ installed: INSTALLED, busy: null, message: null });
 
     expect(view.rows.map((row) => row.description)).toEqual([
-      "Frame generation · downloaded · 6 MB · used by 2 games",
-      "Upscaler, frame generation · your file · 41 MB · no games",
+      "Frame generation · downloaded · 6 MB · in 2 games",
+      "Upscaler, frame generation · your file · 41 MB · in no game",
     ]);
     expect(view.rows[0].action).toEqual({ label: "Remove", enabled: true });
     expect(view.usage).toBe("Libraries take 47 MB.");
@@ -269,7 +279,7 @@ describe("a game's page", () => {
   });
 
   it("says to patch again while the game has other libraries than its choice", () => {
-    expect(gameLibraryPickers(INSTALLED, { ...choice, pending: true }, true).note).toBe("Patch again to use the libraries picked here.");
+    expect(gameLibraryPickers(INSTALLED, { ...choice, pending: true }, true).note).toBe("Patch again to give it the current libraries.");
   });
 
   it("is disabled for a version that takes no libraries", () => {
@@ -300,6 +310,14 @@ describe("a game's page", () => {
         { slot: "frame-generation", id: "a", label: "ANR V.B19" },
       ]),
     ).toBe("Upscaler: XeSS_SDK_3.0.2 · Frame generation: ANR V.B19");
+    expect(
+      librariesLine([
+        { slot: null, id: "u", label: "Uniscaler" },
+        { slot: "upscaler", id: "x", label: "XeSS_SDK_3.0.2" },
+        { slot: null, id: "a", label: "ANR V.B19" },
+      ]),
+    ).toBe("Upscaler: XeSS_SDK_3.0.2 · In OptiScaler's menu: Uniscaler, ANR V.B19");
+    expect(librariesLine([{ slot: null, id: "a", label: "ANR V.B19" }])).toBe("In OptiScaler's menu: ANR V.B19");
     expect(slotLabel("upscaler")).toBe("Upscaler");
   });
 });
