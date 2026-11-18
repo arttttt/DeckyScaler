@@ -44,8 +44,11 @@
         "family": "10",
         "format": 2,
         "game_name": "Version Game",
+        "libraries": [],
+        "library_settings": {},
         "optiscaler_version": "nightly-20261023",
         "original_launch_options": "",
+        "owned_dirs": [],
         "placed": [
           {
             "path": "dxgi.dll",
@@ -86,6 +89,7 @@
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,
+      "libraries": [],
       "message": "Patched with OptiScaler nightly-20261023 using dxgi.dll.",
       "name": "Version Game",
       "newer_version": null,
@@ -109,8 +113,11 @@
         "family": "10",
         "format": 2,
         "game_name": "Version Game",
+        "libraries": [],
+        "library_settings": {},
         "optiscaler_version": "nightly-20261023",
         "original_launch_options": "",
+        "owned_dirs": [],
         "placed": [
           {
             "path": "dxgi.dll",
@@ -173,8 +180,11 @@
         "family": "0.9",
         "format": 2,
         "game_name": "Version Game",
+        "libraries": [],
+        "library_settings": {},
         "optiscaler_version": "stable-0.9.4",
         "original_launch_options": "",
+        "owned_dirs": [],
         "placed": [
           {
             "path": "dxgi.dll",
@@ -237,6 +247,7 @@
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,
+      "libraries": [],
       "message": "Patched with OptiScaler stable-0.9.4 using dxgi.dll.",
       "name": "Version Game",
       "newer_version": null,
@@ -261,8 +272,11 @@
         "family": "0.9",
         "format": 2,
         "game_name": "Version Game",
+        "libraries": [],
+        "library_settings": {},
         "optiscaler_version": "stable-0.9.4",
         "original_launch_options": "",
+        "owned_dirs": [],
         "placed": [
           {
             "path": "dxgi.dll",

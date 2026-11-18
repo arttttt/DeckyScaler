@@ -11,6 +11,7 @@ const LIBRARY: InstalledLibrary = {
       channel: "nightly",
       date: "20261023",
       size: 300_000_000,
+      libraries: true,
     },
     {
       id: "stable-0.9.4",
@@ -18,6 +19,7 @@ const LIBRARY: InstalledLibrary = {
       channel: "stable",
       date: "20260718",
       size: 200_000_000,
+      libraries: false,
     },
   ],
 };
@@ -56,6 +58,12 @@ describe("patch choice", () => {
 
   it("keeps a picked version while it is installed", () => {
     expect(patchChoice(LIBRARY, "stable-0.9.4").patchWith).toBe("stable-0.9.4");
+  });
+
+  it("says whether the version a patch uses takes the user's libraries", () => {
+    expect(patchChoice(LIBRARY, null).takesLibraries).toBe(true);
+    expect(patchChoice(LIBRARY, "stable-0.9.4").takesLibraries).toBe(false);
+    expect(patchChoice(null, null).takesLibraries).toBe(false);
   });
 
   it("falls back to the newest when the picked version is gone", () => {
@@ -109,6 +117,15 @@ describe("steam game view", () => {
       status: { text: "Patched (dxgi.dll) — switch available", tone: "warning" },
       patch: { label: "Switch to winmm.dll" },
     });
+  });
+
+  it("names the user's libraries a patched game has", () => {
+    const withLibraries: GameStatus = { ...patched, libraries: [{ slot: "frame-generation", id: "anr", label: "ANR V.B19" }] };
+
+    expect(steamGameView({ ...base, status: withLibraries }).librariesLine).toBe("Frame generation: ANR V.B19");
+    expect(steamGameView({ ...base, status: patched }).librariesLine).toBeNull();
+    expect(steamGameView({ ...base, status: { ...withLibraries, patched: false } }).librariesLine).toBeNull();
+    expect(steamGameView({ ...base, statusLoading: true, status: withLibraries }).librariesLine).toBeNull();
   });
 
   it("holds patching without an install, a game, a library version, or while busy", () => {

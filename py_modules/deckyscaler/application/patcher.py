@@ -19,11 +19,14 @@ from deckyscaler.domain import (
     ini_schema,
     launch_options,
     library,
+    library_choice,
+    library_placement,
     marker,
     patch_record,
     settings_layers,
     steam,
     stock_reset,
+    user_libraries,
     version_placement,
 )
 from deckyscaler.domain import patch_plan as plan
@@ -31,6 +34,7 @@ from deckyscaler.infrastructure import files, game_directory, processes, proton
 from deckyscaler.infrastructure.library_store import LibraryStore
 from deckyscaler.infrastructure.patch_index import PatchIndex
 from deckyscaler.infrastructure.settings_store import SettingsStore
+from deckyscaler.infrastructure.user_library_store import LibraryChoicesStore, UserLibraryStore
 from deckyscaler.infrastructure import steam as steam_library
 
 log = logging.getLogger(__name__)
@@ -71,6 +75,8 @@ class Patcher:
         self.library = LibraryStore(self.plugin_home / "library")
         self.settings = SettingsStore(self.plugin_home / "settings")
         self.patches = PatchIndex(self.plugin_home / "patched.json")
+        self.user_libraries = UserLibraryStore(self.plugin_home / "libraries")
+        self.library_choices = LibraryChoicesStore(self.plugin_home / "settings" / "libraries.json")
 
     # ── directories ──────────────────────────────────────────────────────────
 
@@ -96,11 +102,15 @@ class Patcher:
         fsr4_driver: Path | None = None,
         unless_current: bool = False,
         settings_appid: str | None = None,
+        keep_libraries: bool = False,
     ) -> dict:
         """Patch a directory with a library version and record it in a marker. A patch that names no
         version (the launch wrapper's, unless DECKYSCALER_VERSION is set) keeps the one the directory is
         patched with, else takes the newest downloaded. `unless_current` leaves a directory alone when
-        it is already patched exactly as this patch would patch it (the wrapper patches on every launch)."""
+        it is already patched exactly as this patch would patch it (the wrapper patches on every launch).
+        The user's libraries are picked as the game's choice says, or as the directory has them with
+        `keep_libraries` (the wrapper's patch, as for the version: a new choice is the user's to apply); every
+        other library OptiScaler's menu offers goes in with them, as the device has them now."""
         if dll_name not in bundle.VALID_DLL_NAMES:
             return _error(f"Invalid proxy DLL name: {dll_name}")
         if _patched_by_upstream(directory):
@@ -118,7 +128,11 @@ class Patcher:
         family = library.FAMILIES[entry.family]
         source = self.library.version_dir(entry.id) / library.FILES_DIRNAME
         settings_appid = steam_game.appid if steam_game else settings_appid
-        if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name):
+        previous_details = files.read_json(marker_path)
+        had = library_choice.recorded_picks(previous_details.get("libraries")) if marker_path.exists() else None
+        to_place = self._libraries_to_place(settings_appid, had if keep_libraries else None, family)
+        placed = library_choice.placed(to_place)
+        if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name, placed):
             log.info(f"{directory} is already patched with OptiScaler {entry.id}, {dll_name}")
             if patch_record.placed_by(patch_record.parse(files.read_json(marker_path)), plan.INI_FILENAME):
                 self.apply_settings(directory, source, settings_appid)
@@ -142,13 +156,21 @@ class Patcher:
             driver = version_placement.driver_path(family)
             if os.path.lexists(directory / driver):
                 entries |= {driver}
-            request = version_placement.Request(dll_name, reset_ini, str(fsr4_driver) if fsr4_driver else None)
-            operations = version_placement.plan_patch(
-                entries, self.library.files_in(source), family, request
+            placement = self.placement(to_place, family)
+            request = version_placement.Request(
+                dll_name, reset_ini, str(fsr4_driver) if fsr4_driver else None, placement.copies
             )
-            log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}")
+            operations = version_placement.plan_patch(
+                entries, files.files_under(source), family, request
+            )
+            log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(placed)}")
             recorded = patch_record.record(
-                operations, entries, game_directory.bundle_hashes(source, operations), carried_over & entries
+                operations,
+                entries,
+                game_directory.bundle_hashes(source, operations),
+                carried_over & entries,
+                placement.settings_files,
+                placement.owned_dirs,
             )
             details = marker.build(
                 dll_name=dll_name,
@@ -158,6 +180,8 @@ class Patcher:
                 family=entry.family,
                 patched_at=datetime.now(timezone.utc).isoformat(),
                 steam_game=steam_game,
+                libraries=placement.recorded,
+                library_layer=placement.layer,
             )
             # The record lands before the first file does, so even an interrupted patch can be undone.
             files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
@@ -165,7 +189,11 @@ class Patcher:
             game_directory.execute(operations, directory, source)
             files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
             if patch_record.placed_by(recorded, plan.INI_FILENAME):
-                self.apply_settings(directory, source, settings_appid)
+                # Keys the previous patch's libraries set and these don't are written back once, in a kept ini; a
+                # fresh one holds none of them.
+                previous = marker.library_layer(previous_details) if carried_over else {}
+                released = library_placement.released(previous, placement.layer)
+                self.apply_settings(directory, source, settings_appid, released)
         except plan.PlanError as exc:
             return _error(str(exc))
         except PermissionError as exc:
@@ -180,26 +208,54 @@ class Patcher:
             "optiscaler_version": entry.id,
         }
 
-    def apply_settings(self, directory: Path, source: Path, appid: str | None) -> None:
+    def apply_settings(
+        self, directory: Path, source: Path, appid: str | None, released: frozenset[settings_layers.Key] = frozenset()
+    ) -> None:
         """Write the user's settings into a game's OptiScaler.ini: the global ones with the game's own over
-        them, as far as the version's own OptiScaler.ini (`source`) offers each key and value. Only an
-        ini the patch placed gets them: one the game had before is someone else's, and unpatching must
-        leave it as it was."""
+        them, as far as the version's own OptiScaler.ini (`source`) offers each key and value, and over both
+        what the game's libraries set, as its marker records. Only an ini the patch placed gets them: one the
+        game had before is someone else's, and unpatching must leave it as it was."""
         try:
             schema = ini_schema.parse(files.read_text(source / plan.INI_FILENAME))
         except OSError as exc:
             log.warning(f"Reading the version's OptiScaler.ini failed, settings left as they are: {exc}")
             return
         game = self.settings.game_layer(appid) if appid else {}
-        values = settings_layers.to_write(schema, self.settings.global_layer(), game)
+        libraries = marker.library_layer(files.read_json(directory / bundle.MARKER_FILENAME))
+        values = settings_layers.to_write(schema, self.settings.global_layer(), game, libraries, released)
         game_directory.edit_ini(directory / plan.INI_FILENAME, lambda text: ini.set_values(text, values), "the user's settings")
 
-    def _patched_as(self, directory: Path, version_id: str, dll_name: str) -> bool:
+    # ── the user's libraries ─────────────────────────────────────────────────
+
+    def _libraries_to_place(
+        self, appid: str | None, recorded: tuple[library_choice.Pick, ...] | None, family: library.Family
+    ) -> library_choice.ToPlace:
+        installed = self.user_libraries.installed()
+        chosen = library_choice.to_patch_with(self.library_choices.read(), appid, recorded, installed)
+        return library_choice.to_place(chosen, installed, family)
+
+    def placement(self, to_place: library_choice.ToPlace, family: library.Family) -> library_placement.Placement:
+        """How a game's libraries go into a game of `family`, from their files on the device."""
+        libraries = [item for _, item in to_place.picked] + list(to_place.offered)
+        files_dirs = {item.id: str(self.user_libraries.files_dir(item.id)) for item in libraries}
+        return library_placement.place(to_place, family.main_dir, files_dirs)
+
+    def chosen_layer(self, chosen: dict[str, str], family: library.Family) -> settings_layers.LibraryLayer:
+        """The ini keys the libraries of a choice would set in a game patched with a version of `family`."""
+        return self.placement(library_choice.to_place(chosen, self.user_libraries.installed(), family), family).layer
+
+    def library_users(self, library_id: str) -> list[str]:
+        """The patched games whose patch placed a library, picked or offered."""
+        return library_choice.users(library_id, [(name, details.get("libraries")) for _, name, details in self.patched_markers()])
+
+    def _patched_as(
+        self, directory: Path, version_id: str, dll_name: str, placed: tuple[library_choice.Placed, ...]
+    ) -> bool:
         details = files.read_json(directory / bundle.MARKER_FILENAME)
         recorded = patch_record.parse(details)
         return (
             recorded is not None
-            and marker.describes(details, version_id, dll_name)
+            and marker.describes(details, version_id, dll_name, placed)
             and patch_record.intact(recorded, game_directory.current_state(directory, recorded))
         )
 
@@ -289,6 +345,7 @@ class Patcher:
                 "patched_at": details.get("patched_at"),
                 "record": patch_record.state(details),
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
+                "libraries": details.get("libraries") or [],
             })
         return {"status": "success", "games": sorted(games, key=lambda game: game["name"].lower())}
 
@@ -340,11 +397,17 @@ class Patcher:
         return RESET
 
     def path_defaults(self) -> dict:
-        """Starting points for the manual directory picker: home, and the games of the first Steam library
-        found (native or Flatpak), else where native Steam would keep them."""
+        """Starting points for the pickers: home; the games of the first Steam library found (native or Flatpak),
+        else where native Steam would keep them; and Downloads, where Desktop Mode puts what the user brings, or
+        home when there is none."""
         libraries = [library for library in steam_library.library_paths(self.home) if (library / "steamapps").is_dir()]
         steam_root = libraries[0] if libraries else steam.steam_root_candidates(self.home)[0]
-        return {"home": str(self.home), "steam_common": str(steam_root / "steamapps" / "common")}
+        downloads = self.home / "Downloads"
+        return {
+            "home": str(self.home),
+            "steam_common": str(steam_root / "steamapps" / "common"),
+            "downloads": str(downloads if downloads.is_dir() else self.home),
+        }
 
     # ── Steam games ──────────────────────────────────────────────────────────
 
@@ -358,6 +421,12 @@ class Patcher:
             log.error(str(exc))
             return _error(str(exc))
         return {"status": "success", "games": games}
+
+    @staticmethod
+    def is_running(directory: Path) -> bool:
+        """Whether a game in `directory` runs: one of its executables is in a process's command line."""
+        executables = [exe for exe in directory.glob("*.exe") if exe.is_file()]
+        return bool(executables) and exe_target.running_executable(executables, processes.command_lines()) is not None
 
     def _running_executable(self, candidates: list[Path]) -> Path | None:
         if not candidates:
@@ -457,6 +526,7 @@ class Patcher:
             "optiscaler_version": version,
             "newer_version": library.newer_in_channel(self.library.installed(), version),
             "fsr4": unpatched["fsr4"],
+            "libraries": metadata.get("libraries") or [],
             "message": message,
         }
 

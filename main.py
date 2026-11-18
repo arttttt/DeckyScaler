@@ -14,7 +14,8 @@ from deckyscaler.application.library import Library
 from deckyscaler.application.patcher import Patcher
 from deckyscaler.application.proton_builds import ProtonBuilds, builds_json
 from deckyscaler.application.settings import Settings
-from deckyscaler.domain import bundle, launch_options
+from deckyscaler.application.user_libraries import UserLibraries
+from deckyscaler.domain import bundle, launch_options, user_libraries
 from deckyscaler.infrastructure import archive, core_install, github_releases
 
 
@@ -35,6 +36,11 @@ def _ignore(*_args) -> None:
 class Plugin:
     async def _main(self):
         decky.logger.info("DeckyScaler loaded")
+        # The launch wrappers run the copy in ~/deckyscaler: an updated plugin brings its own before any game starts.
+        try:
+            await asyncio.to_thread(self._refresh_core)
+        except OSError as exc:
+            decky.logger.error(f"Updating the core and launch scripts in ~/deckyscaler failed: {exc}")
 
     async def _unload(self):
         decky.logger.info("DeckyScaler unloaded.")
@@ -44,6 +50,9 @@ class Plugin:
 
     def _patcher(self) -> Patcher:
         return Patcher(self._home_path())
+
+    def _refresh_core(self) -> None:
+        core_install.refresh_core(self._home_path() / bundle.HOME_DIRNAME, Path(decky.DECKY_PLUGIN_DIR) / "assets")
 
     def _updates(self, report: Report = _ignore) -> PluginUpdates:
         return PluginUpdates(
@@ -130,7 +139,7 @@ class Plugin:
             github_releases.list_releases,
             github_releases.download,
             report,
-            lambda: core_install.refresh_core(self._home_path() / bundle.HOME_DIRNAME, Path(decky.DECKY_PLUGIN_DIR) / "assets"),
+            self._refresh_core,
             patcher.games_using,
         )
 
@@ -157,6 +166,46 @@ class Plugin:
     async def library_remove(self, version_id: str) -> dict:
         # Deleting an unpacked version (hundreds of MB) takes a moment on handheld storage.
         return await asyncio.to_thread(self._library().remove, version_id)
+
+    # ── The user's libraries ──────────────────────────────────────────────────
+
+    # Sizing libraries, reading GitHub, unpacking and patching games again take a while: off Decky's event loop.
+    # A download's progress goes to the frontend as "user_library_download" events.
+
+    def _user_libraries(self, report=_ignore) -> UserLibraries:
+        return UserLibraries(self._home_path(), github_releases.list_releases, github_releases.download, report)
+
+    async def user_library_sources(self) -> list:
+        return user_libraries.sources_json()
+
+    async def user_libraries_installed(self) -> dict:
+        return await asyncio.to_thread(self._user_libraries().installed)
+
+    async def user_library_game_choice(self, appid: str) -> dict:
+        return await asyncio.to_thread(self._user_libraries().game_choice, appid)
+
+    async def user_library_versions(self, source: str) -> dict:
+        return await asyncio.to_thread(self._user_libraries().versions, source)
+
+    async def user_library_install(self, source: str, release_id: str) -> dict:
+        libraries = self._user_libraries(_decky_events("user_library_download"))
+        return await asyncio.to_thread(libraries.install, source, release_id)
+
+    async def user_library_add(self, path: str) -> dict:
+        return await asyncio.to_thread(self._user_libraries().add, path)
+
+    async def user_library_removal(self, library_id: str) -> dict:
+        return await asyncio.to_thread(self._user_libraries().removal, library_id)
+
+    async def user_library_remove(self, library_id: str) -> dict:
+        return await asyncio.to_thread(self._user_libraries().remove, library_id)
+
+    async def user_library_choose(self, scope: str, slot: str, value: str | None) -> dict:
+        """`scope` is "global" or a game's appid; `value` a library id, "none", or None (a game follows the global)."""
+        return await asyncio.to_thread(self._user_libraries().choose, scope, slot, value)
+
+    async def user_libraries_apply(self) -> dict:
+        return await asyncio.to_thread(self._user_libraries().apply)
 
     # ── Proton builds ─────────────────────────────────────────────────────────
 

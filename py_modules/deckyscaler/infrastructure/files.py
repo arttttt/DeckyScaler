@@ -5,6 +5,7 @@ from __future__ import annotations
 import filecmp
 import hashlib
 import json
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -23,6 +24,18 @@ def files_match(file_a: Path, file_b: Path) -> bool:
         return file_a.exists() and file_b.exists() and filecmp.cmp(file_a, file_b, shallow=False)
     except OSError:
         return False
+
+
+def files_under(directory: Path) -> frozenset[str]:
+    """Every file under `directory`, as paths relative to it with '/'."""
+    return frozenset(path.relative_to(directory).as_posix() for path in directory.rglob("*") if path.is_file())
+
+
+def copy_files(source: Path, paths: tuple[str, ...], destination: Path) -> None:
+    """Copy files, by their paths relative to `source`, to the same paths under `destination`."""
+    for path in paths:
+        (destination / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source / path, destination / path)
 
 
 def read_json(path: Path) -> dict:

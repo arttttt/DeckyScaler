@@ -25,6 +25,11 @@ export function GamePatchCard({ patch }: { patch: GamePatch }) {
           <Field label="FSR 4" description={view.fsr4Line} />
         </PanelSectionRow>
       )}
+      {view.librariesLine && (
+        <PanelSectionRow>
+          <Field label="Libraries" description={view.librariesLine} />
+        </PanelSectionRow>
+      )}
       <PanelSectionRow>
         <ButtonItem layout="below" disabled={!view.patch.enabled} onClick={() => void patch.onPatch()}>
           {view.patch.label}

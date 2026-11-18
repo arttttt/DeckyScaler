@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
 from conftest import STABLE, game_file, make_game_dir, run, snapshot, write
 from deckyscaler.domain import patch_record
-from deckyscaler.domain.patch_plan import Copy, DeleteFile, Move
+from deckyscaler.domain.patch_plan import Copy, DeleteFile, Move, RemoveTree
 from deckyscaler.domain.patch_record import Backup, PatchRecord, Placed, RemoveDirIfEmpty
 from deckyscaler.infrastructure import game_directory
 
@@ -59,6 +60,28 @@ def test_the_record_round_trips_through_the_marker_and_old_markers_have_none():
     assert patch_record.parse({"dll_name": "dxgi.dll", "backed_up_files": []}) is None
     assert patch_record.parse({"format": 2, "placed": "garbage"}) is None
     assert patch_record.parse({**marker, "format": 1}) is None
+    owning = PatchRecord(recorded.placed, (), ("OptiScaler/custom/A", "OptiScaler/custom"), ("OptiScaler/custom/A",))
+    assert patch_record.parse(patch_record.to_json(owning, complete=True)) == owning
+    assert patch_record.parse({k: v for k, v in marker.items() if k != "owned_dirs"}).owned_dirs == ()
+
+
+def test_files_a_program_rewrites_are_ours_whatever_they_hold_and_only_folders_the_patch_creates_are_owned_whole():
+    provider = "OptiScaler/custom/ANR"
+    operations = (
+        Copy("/lib/anr/dlssg/nvngx_dlssg.dll", f"{provider}/dlssg/nvngx_dlssg.dll"),
+        Copy("/lib/anr/dlssg/nr_fg.ini", f"{provider}/dlssg/nr_fg.ini"),
+        Copy("/lib/x/x.dll", "Mods/custom/X/ffx/x.dll"),
+    )
+    hashes = {"/lib/anr/dlssg/nvngx_dlssg.dll": "1" * 64, "/lib/anr/dlssg/nr_fg.ini": "2" * 64, "/lib/x/x.dll": "3" * 64}
+
+    recorded = patch_record.record(
+        operations, frozenset({"Game.exe", "Mods"}), hashes,
+        rewritten=frozenset({f"{provider}/dlssg/nr_fg.ini"}), owned_dirs=(provider, "Mods/custom/X"),
+    )
+
+    assert recorded.placed[1] == Placed(f"{provider}/dlssg/nr_fg.ini", None)
+    assert recorded.placed[0].sha256 == "1" * 64
+    assert recorded.owned_dirs == (provider,)  # Mods/ was the game's: nothing under it is the patch's to remove whole
 
 
 # ── unit: undoing a record ───────────────────────────────────────────────────
@@ -82,6 +105,20 @@ def test_undoing_removes_what_was_placed_restores_backups_and_drops_the_marker_l
         DeleteFile("D3D12_Optiscaler/D3D12Core.dll"),
         Move("libxess.dll.b", "libxess.dll"),
         RemoveDirIfEmpty("D3D12_Optiscaler"),
+        DeleteFile("DECKYSCALER_PATCH"),
+    )
+
+
+def test_a_folder_the_patch_owns_goes_whole_before_the_empty_ones():
+    owning = PatchRecord((Placed("OptiScaler/custom/A/dlssg/a.dll", "1" * 64),), (), ("OptiScaler/custom/A/dlssg", "OptiScaler/custom/A"), ("OptiScaler/custom/A",))
+
+    operations = patch_record.plan_unpatch(owning, {"OptiScaler/custom/A/dlssg/a.dll": "1" * 64})
+
+    assert operations == (
+        DeleteFile("OptiScaler/custom/A/dlssg/a.dll"),
+        RemoveTree("OptiScaler/custom/A"),
+        RemoveDirIfEmpty("OptiScaler/custom/A/dlssg"),
+        RemoveDirIfEmpty("OptiScaler/custom/A"),
         DeleteFile("DECKYSCALER_PATCH"),
     )
 
@@ -249,6 +286,13 @@ def test_a_patch_is_intact_while_everything_it_placed_is_there_as_placed():
     assert not patch_record.intact(RECORD, {k: v for k, v in whole.items() if k != "OptiScaler.ini"})
 
 
+def test_a_file_a_program_rewrites_that_is_gone_breaks_the_patch():
+    provider = PatchRecord((Placed("OptiScaler/custom/A/dlssg/a.ini", None),), (), (), ())
+
+    assert patch_record.intact(provider, {"OptiScaler/custom/A/dlssg/a.ini": "whatever the provider wrote"})
+    assert not patch_record.intact(provider, {})
+
+
 def test_a_marker_describes_a_finished_patch_of_this_version_under_this_name():
     from deckyscaler.domain import marker
 
@@ -258,6 +302,27 @@ def test_a_marker_describes_a_finished_patch_of_this_version_under_this_name():
     assert not marker.describes({**details, "complete": False}, "nightly-1", "dxgi.dll")
     assert not marker.describes(details, "nightly-2", "dxgi.dll")
     assert not marker.describes(details, "nightly-1", "winmm.dll")
+
+
+def test_a_marker_describes_a_patch_with_the_libraries_it_placed_and_keeps_the_keys_they_own():
+    from deckyscaler.domain import marker
+    from deckyscaler.domain.settings_layers import Owned
+
+    layer = {("FrameGen", "FGInput"): Owned("nvngxfg", "ANR")}
+    details = {
+        **marker.build(
+            dll_name="dxgi.dll", target_dir=Path("/g"), backed_up_files=[], optiscaler_version="nightly-1", family="10",
+            patched_at="t", libraries=({"slot": "frame-generation", "id": "anr", "label": "ANR"},), library_layer=layer,
+        ),
+        "complete": True,
+    }
+    details = json.loads(json.dumps(details))
+
+    assert marker.describes(details, "nightly-1", "dxgi.dll", (("frame-generation", "anr"),))
+    assert not marker.describes(details, "nightly-1", "dxgi.dll")
+    assert marker.library_layer(details) == layer
+    assert marker.describes({**details, "libraries": None}, "nightly-1", "dxgi.dll")  # before libraries: none placed
+    assert marker.library_layer({}) == {}
 
 
 def test_a_patch_placed_only_what_its_record_lists():

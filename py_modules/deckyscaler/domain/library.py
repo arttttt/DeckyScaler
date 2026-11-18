@@ -69,6 +69,9 @@ class Family:
     main_dir: str
     """Where OptiScaler looks for its own files, such as AMD's FSR 4 driver DLL, relative to the game's
     directory: its OptiScaler/ subfolder when there is one, else the directory itself (dllmain.cpp, MainDllPath)."""
+    libraries: bool
+    """Whether it takes the user's libraries (domain/user_libraries): custom providers, and [Libraries] paths
+    relative to the game's directory, came with OptiScaler 10."""
 
 
 FAMILIES = {
@@ -76,11 +79,13 @@ FAMILIES = {
         "0.9",
         frozenset({"OptiScaler.dll", "OptiScaler.ini", "amd_fidelityfx_upscaler_dx12.dll"}),
         "",
+        libraries=False,
     ),
     "10": Family(
         "10",
         frozenset({"OptiScaler.dll", "OptiScaler.ini", "OptiScaler/amd_fidelityfx_upscaler_dx12.dll"}),
         "OptiScaler",
+        libraries=True,
     ),
 }
 
@@ -242,6 +247,7 @@ def choice_json(installed: Installed, size: int) -> dict:
         "channel": installed.channel,
         "date": installed.date,
         "size": size,
+        "libraries": FAMILIES[installed.family].libraries,
     }
 
 
@@ -255,22 +261,11 @@ def newer_in_channel(installed: list[Installed], version_id: str | None) -> str 
     return newest_first(newer)[0].id if newer else None
 
 
-INSTALLED = "installed"
-AVAILABLE = "available"
-UNSUPPORTED = "unsupported"
-
-
 @dataclass(frozen=True)
-class Row:
-    """One version of a channel as the download dialog lists it."""
+class Row(release_assets.Row):
+    """One version of a channel as the download dialog lists it, with its layout family."""
 
-    id: str
-    version: str
-    date: str
     family: str | None
-    state: str
-    reason: str | None
-    size: int
 
 
 def catalog(installed: list[Installed], published: list[Available], sizes: dict[str, int]) -> list[Row]:
@@ -278,13 +273,13 @@ def catalog(installed: list[Installed], published: list[Available], sizes: dict[
     as installed, then what upstream publishes, downloadable or not. `sizes` holds installed sizes."""
     installed_ids = {entry.id for entry in installed}
     rows = [
-        Row(entry.id, entry.version, entry.date, entry.family, INSTALLED, None, sizes.get(entry.id, 0))
+        Row(entry.id, entry.version, entry.date, release_assets.INSTALLED, None, sizes.get(entry.id, 0), entry.family)
         for entry in installed
     ]
     rows += [
         Row(
-            version.id, version.version, version.date, version.family,
-            UNSUPPORTED if version.unsupported else AVAILABLE, version.unsupported, version.size,
+            version.id, version.version, version.date,
+            release_assets.row_state(False, version.unsupported), version.unsupported, version.size, version.family,
         )
         for version in published
         if version.id not in installed_ids

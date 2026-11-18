@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileSelectionType, openFilePicker } from "@decky/api";
 import { getPathDefaults, runManualPatch } from "../api";
-import { ManualPatchResult, PathDefaults, manualPatchView, pickerStartPaths } from "../presentation/manualPatch";
+import { FileSelectionType, pickPath } from "../api/filePicker";
+import { ManualPatchResult, PathDefaults, manualPatchView, pickerStart } from "../presentation/manualPatch";
 import { useUnpatch } from "./useUnpatch";
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -25,22 +25,11 @@ export const useManualPatch = ({ ready, dllName, patchWith }: { ready: boolean; 
   }, []);
 
   const onPick = useCallback(async () => {
-    let lastError: string | null = null;
-    for (const start of pickerStartPaths(selectedPath, defaults)) {
-      try {
-        const picked = await openFilePicker(FileSelectionType.FOLDER, start, true, true, undefined, undefined, true);
-        if (picked?.path) {
-          setSelectedPath(picked.path);
-          setPickerError(null);
-          setResult(null);
-          return;
-        }
-      } catch (err) {
-        console.error("useManualPatch -> openFilePicker", err);
-        lastError = errorText(err);
-      }
-    }
-    setPickerError(lastError);
+    const picked = await pickPath(FileSelectionType.FOLDER, pickerStart(selectedPath, defaults));
+    setPickerError(picked.error);
+    if (!picked.path) return;
+    setSelectedPath(picked.path);
+    setResult(null);
   }, [defaults, selectedPath]);
 
   const unpatch = useUnpatch(selectedPath ? { kind: "directory", path: selectedPath } : null, () => setResult(null));

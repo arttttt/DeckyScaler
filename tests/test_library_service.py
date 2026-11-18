@@ -13,7 +13,7 @@ import pytest
 import main
 from conftest import FakeDownload, FAKE_7Z, REPO_ROOT, install_tools, run, sha256, write
 from deckyscaler.application.library import Library
-from deckyscaler.domain import library
+from deckyscaler.domain import library, release_assets
 from deckyscaler.infrastructure import archive, github_releases
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -33,10 +33,10 @@ def test_installed_versions_stay_listed_even_when_upstream_no_longer_publishes_t
 
     rows = library.catalog([current, pruned], published, {NEWEST: 100, "nightly-20260807": 50})
 
-    assert rows[0] == library.Row(NEWEST, "10.0.0-pre1", "20261023", "10", library.INSTALLED, None, 100)
+    assert rows[0] == library.Row(NEWEST, "10.0.0-pre1", "20261023", release_assets.INSTALLED, None, 100, "10")
     assert [row.id for row in rows].count(NEWEST) == 1
-    assert rows[-1].id == "nightly-20260807" and rows[-1].state == library.INSTALLED
-    assert {row.state for row in rows[1:-1]} == {library.AVAILABLE}
+    assert rows[-1].id == "nightly-20260807" and rows[-1].state == release_assets.INSTALLED
+    assert {row.state for row in rows[1:-1]} == {release_assets.AVAILABLE}
 
 
 @pytest.mark.parametrize(
@@ -83,8 +83,9 @@ def test_patching_offers_installed_versions_newest_first():
     offered = [library.choice_json(entry, 5) for entry in library.newest_first([stable, nightly])]
 
     assert offered == [
-        {"id": NEWEST, "version": "10.0.0-pre1", "channel": "nightly", "date": "20261023", "size": 5},
-        {"id": "stable-0.9.4", "version": "0.9.4", "channel": "stable", "date": "20260718", "size": 5},
+        # Whether a version takes the user's libraries is its family's: 10 does, 0.9 doesn't.
+        {"id": NEWEST, "version": "10.0.0-pre1", "channel": "nightly", "date": "20261023", "size": 5, "libraries": True},
+        {"id": "stable-0.9.4", "version": "0.9.4", "channel": "stable", "date": "20260718", "size": 5, "libraries": False},
     ]
 
 

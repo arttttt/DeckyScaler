@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from conftest import NIGHTLY, STABLE, run
-from deckyscaler.application import settings as settings_module
+from deckyscaler.application import patcher as patcher_module
 from deckyscaler.domain import settings_layers
 
 
@@ -65,7 +65,7 @@ def test_a_value_the_version_doesnt_take_is_refused(plugin, plugin_home, steam_l
 def test_a_game_running_isnt_written(plugin, plugin_home, steam_library, monkeypatch):
     root = steam_library.add_game("1", "Game")
     run(plugin.patch_game("1", "dxgi.dll", "", NIGHTLY))
-    monkeypatch.setattr(settings_module.processes, "command_lines", lambda: [f"wine {root / 'Game.exe'}"])
+    monkeypatch.setattr(patcher_module.processes, "command_lines", lambda: [f"wine {root / 'Game.exe'}"])
 
     refused = run(plugin.set_setting("1", "FSR", "Fsr4Model", "1"))
     skipped = run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))
@@ -102,7 +102,7 @@ def test_a_game_skipped_while_running_gets_the_change_once_it_closes(plugin, plu
     root = steam_library.add_game("1", "Game")
     run(plugin.patch_game("1", "dxgi.dll", "", NIGHTLY))
     running = [f"wine {root / 'Game.exe'}"]
-    monkeypatch.setattr(settings_module.processes, "command_lines", lambda: running)
+    monkeypatch.setattr(patcher_module.processes, "command_lines", lambda: running)
     run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))
     assert run(plugin.game_closed("1")) == {"status": "success", "applied": False}  # still running
     assert "Fsr4Model=auto" in (root / "OptiScaler.ini").read_text()

@@ -28,6 +28,8 @@ class Request:
     fsr4_driver: str | None = None
     """Where the game's Proton puts AMD's FSR 4 driver DLL (an absolute path; it may not be there yet).
     OptiScaler loads that DLL only from its own directory, never by name, so a patch links it there."""
+    libraries: tuple[Copy, ...] = ()
+    """The copies of the user's libraries picked for the game (domain/library_placement)."""
 
 
 def is_for_the_game(path: str) -> bool:
@@ -70,6 +72,7 @@ def plan_patch(entries: frozenset[str], files: frozenset[str], family: Family, r
     # A DLL already there is the user's own choice of FSR 4: it stays, and nothing is linked over it.
     if request.fsr4_driver and driver not in entries:
         operations.append(Link(request.fsr4_driver, driver))
+    operations += request.libraries
     return preserving_existing(tuple(operations), entries)
 
 

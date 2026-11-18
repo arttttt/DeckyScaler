@@ -119,8 +119,6 @@ DECKY_INSTALL_UPDATE = 2
 """decky-loader's install type for a plugin that is already installed
 (frontend/src/plugin.ts `InstallType.UPDATE`, v3.3.0); it only words the confirm dialog."""
 
-INSTALLED = "installed"
-AVAILABLE = "available"
 
 
 
@@ -177,7 +175,7 @@ def _channel_order(channel: str) -> tuple[int, int]:
 def state(current: BuildInfo, release: DevRelease) -> str:
     """`installed` when the release is the build running now, `available` otherwise."""
     same = (release.info.channel, release.info.commit) == (current.channel, current.commit)
-    return INSTALLED if same else AVAILABLE
+    return release_assets.INSTALLED if same else release_assets.AVAILABLE
 
 
 def dev_label(release: DevRelease) -> str:

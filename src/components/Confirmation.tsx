@@ -2,7 +2,7 @@ import { ConfirmModal, showModal } from "@decky/ui";
 import { useEffect } from "react";
 
 /** A question a view model asks before an action: its lines, and an alert has only OK. */
-export type ConfirmationView = { title: string; lines: string[]; okLabel: string; alert?: boolean };
+export type ConfirmationView = { title: string; lines: string[]; okLabel: string; cancelLabel?: string; alert?: boolean };
 
 /** Shows the confirmation while there is one; renders nothing in the page itself. */
 export function Confirmation({
@@ -27,6 +27,7 @@ export function Confirmation({
           </>
         }
         strOKButtonText={confirmation.okLabel}
+        strCancelButtonText={confirmation.cancelLabel}
         bAlertDialog={confirmation.alert}
         onOK={onConfirm}
         onCancel={onCancel}

@@ -20,6 +20,7 @@ This plugin uses OptiScaler to replace DLSS calls with FSR3/FSR3.1, giving you:
 - **Game Patching**: Easy copy-paste launch commands for enabling/disabling the mod per game
 - **Games**: **DeckyScaler → Games** lists every game the plugin patched, with its OptiScaler version, proxy DLL and anything wrong with the patch; a Steam game opens its page, a directory patched by path is unpatched right there.
 - **Proton builds**: **DeckyScaler → Proton** installs GE-Proton and Proton-CachyOS into Steam and removes them (see [Proton builds](#proton-builds)).
+- **Libraries**: **DeckyScaler → OptiScaler → Libraries** puts upscalers and frame generation of your choice into games beside OptiScaler 10: ANR downloaded from its releases, or a provider or a DLL you bring (see [Libraries](#libraries)).
 - **Updates**: **DeckyScaler → Updates** checks this repository's releases (on opening, and by a button) and installs a newer one through Decky; the Quick Access panel says when one is out. **Developer mode** there adds development builds, at your own risk.
 - **OptiScaler Wiki**: Direct access to OptiScaler documentation and settings via a webpage launch button right inside the plugin.
 
@@ -97,6 +98,16 @@ On Linux FSR 4 also needs AMD's driver DLL (`amdxcffx64.dll`), which neither Opt
 - Steam lists builds when it starts: the page has a *Restart Steam* button (and says when a restart is due), and the download dialog offers it right after an install. It asks first: a running game closes with Steam.
 - A game's Proton is chosen in Steam: the game's Properties → Compatibility.
 - To update a build, download the newer release: it is installed next to the old one, which stays for going back until you remove it. Once Steam has restarted, the page offers to move the games set to use an older build of the same kind to the new one in one tap (or to keep them where they are).
+
+### Libraries
+OptiScaler 10 takes libraries beside its own: providers, folders it selects by name (ANR's frame generation is one), and newer copies of the DLLs it loads itself (`libxess.dll`, `amd_fidelityfx_upscaler_dx12.dll`, `libxess_fg.dll`, `nvngx_dlss.dll`…). **DeckyScaler → OptiScaler → Libraries** puts them into games:
+
+- *Download libraries…* lists what can be downloaded under its button (now ANR's frame generation): pick the library, then one of its versions. It comes from the project's releases on GitHub, checked against the checksum GitHub publishes; the plugin never ships it.
+- *Add from file…* adds what you brought onto the device (in Desktop Mode it is in Downloads; a USB drive is under `/run/media`): a provider's zip or folder, a DLL, or a zip of several DLLs such as Intel's XeSS SDK.
+- Every provider on the device goes into every game patched with OptiScaler 10, picked or not, so OptiScaler's own overlay offers it. OptiScaler lists a frame generation provider such as ANR only while *FG Input* is *DLSSG via Nvngx*: set it, then pick *Apex Neural Rendering FG* in the *FG Nvngx* list that takes *FG Output*'s place, save, and restart the game. Two versions of one provider share its folder name: a game gets the picked one, else the one added last. A DLL goes in only when picked: OptiScaler finds it through the ini key the pick sets, and its overlay has no such choice.
+- Pick a library for every game per slot, **Upscaler** and **Frame generation**, and a game's own on its page (or *None*). Picking it is what turns it on: the patch copies it into the game (a provider into OptiScaler's `custom/`, a DLL into `OptiScaler/user-libraries/`, never over OptiScaler's own copy) and sets the ini keys that select and find it, ANR's own settings included. Those keys show as *Set by …* in the settings and change with the library. A frame generation DLL is only pointed at: turn frame generation on in OptiScaler's settings (`FGInput`, `FGOutput`). ANR needs a game with DLSS frame generation turned on.
+- A pick reaches a patched game only when it is patched again, so picking one asks to patch the games it reaches right away (*Patch again now*; running games are skipped). *Later* leaves a note under the picks with *Apply to them*; the launch wrapper keeps a game's picks until then. A library downloaded, added or removed reaches Steam games at their next launch (the launch wrapper patches them again) and other patched games once patched again. Unpatching removes what a library put into the game, its logs included.
+- OptiScaler 0.9.x takes no libraries. In a game, OptiScaler's overlay names the upscaler and frame generation running (XeSS with its version); its log lists where each DLL was loaded from.
 
 ## Technical Details
 

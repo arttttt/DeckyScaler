@@ -20,6 +20,7 @@ from .patch_plan import (
     Link,
     Move,
     Operation,
+    RemoveTree,
 )
 
 LINK_PREFIX = "link:"
@@ -34,8 +35,8 @@ FORMAT = 2
 class Placed:
     path: str
     sha256: str | None
-    """The content placed (a link's is its target, see LINK_PREFIX); None for a file OptiScaler itself rewrites
-    (its ini), which is ours whatever it holds."""
+    """The content placed (a link's is its target, see LINK_PREFIX); None for a file a program rewrites
+    (OptiScaler's ini, a library's settings), which is ours whatever it holds."""
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,9 @@ class PatchRecord:
     placed: tuple[Placed, ...]
     backups: tuple[Backup, ...]
     created_dirs: tuple[str, ...]
+    owned_dirs: tuple[str, ...] = ()
+    """Directories the patch created whose every file is the patch's, whoever wrote it (a library provider's
+    folder, its logs too): unpatching removes them whole."""
 
 
 @dataclass(frozen=True)
@@ -61,12 +65,16 @@ def record(
     entries: frozenset[str],
     bundle_hashes: dict[str, str],
     carried_over: frozenset[str] = frozenset(),
+    rewritten: frozenset[str] = frozenset(),
+    owned_dirs: tuple[str, ...] = (),
 ) -> PatchRecord:
     """The record of a patch plan, made before it runs.
 
     `entries` is the game directory before the patch; `bundle_hashes` maps every bundle file the
     plan copies to its sha256. `carried_over` names files a
     previous patch placed that this one keeps as they are (the user's OptiScaler.ini settings).
+    `rewritten` names placed files a program rewrites besides OptiScaler.ini, and `owned_dirs` directories
+    whose every file is the patch's: only those the patch creates are recorded as its own.
     """
     placed: dict[str, Placed] = {path: Placed(path, None) for path in sorted(carried_over)}
     backups: list[Backup] = []
@@ -75,7 +83,7 @@ def record(
             case Move(source, destination) if destination == source + BACKUP_SUFFIX:
                 backups.append(Backup(source, destination))
             case Copy(source, destination) | Link(source, destination):
-                sha = None if destination == INI_FILENAME else bundle_hashes[source]
+                sha = None if destination == INI_FILENAME or destination in rewritten else bundle_hashes[source]
                 placed[destination] = Placed(destination, sha)
     created = sorted(
         {
@@ -86,7 +94,8 @@ def record(
         },
         key=lambda path: (-path.count("/"), path),
     )
-    return PatchRecord(tuple(placed.values()), tuple(backups), tuple(created))
+    owned = tuple(directory for directory in owned_dirs if directory in created)
+    return PatchRecord(tuple(placed.values()), tuple(backups), tuple(created), owned)
 
 
 def to_json(patch: PatchRecord, complete: bool) -> dict:
@@ -96,6 +105,7 @@ def to_json(patch: PatchRecord, complete: bool) -> dict:
         "placed": [{"path": p.path, "sha256": p.sha256} for p in patch.placed],
         "backups": [{"original": b.original, "backup": b.backup} for b in patch.backups],
         "created_dirs": list(patch.created_dirs),
+        "owned_dirs": list(patch.owned_dirs),
     }
 
 
@@ -108,6 +118,8 @@ def parse(marker: dict) -> PatchRecord | None:
             tuple(Placed(str(p["path"]), None if p["sha256"] is None else str(p["sha256"])) for p in marker["placed"]),
             tuple(Backup(str(b["original"]), str(b["backup"])) for b in marker["backups"]),
             tuple(str(d) for d in marker["created_dirs"]),
+            # Records from before libraries own no directory whole.
+            tuple(str(d) for d in marker.get("owned_dirs", [])),
         )
     except (KeyError, TypeError):
         return None
@@ -144,6 +156,7 @@ def plan_unpatch(
     patch: PatchRecord, current: dict[str, str | None], keep: frozenset[str] = frozenset()
 ) -> tuple[Operation | RemoveDirIfEmpty, ...]:
     """Undo a recorded patch. `current` maps every placed path and backup still present to its sha256 now.
+    Directories the patch owns go whole, with what their programs wrote into them since.
 
     A placed file someone replaced since stays when nothing was backed up for it. When something was,
     the backup comes back over it: Unpatch returns the directory to how it was before the patch, and
@@ -162,6 +175,7 @@ def plan_unpatch(
     for backup in patch.backups:
         if backup.backup in current:
             operations.append(Move(backup.backup, backup.original))
+    operations += [RemoveTree(path) for path in patch.owned_dirs]
     operations += [RemoveDirIfEmpty(path) for path in patch.created_dirs]
     operations.append(DeleteFile(bundle.MARKER_FILENAME))
     return tuple(operations)

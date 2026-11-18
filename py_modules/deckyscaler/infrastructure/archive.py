@@ -1,5 +1,5 @@
 """Unpacking archives: OptiScaler's .7z with the 7-Zip build the plugin ships (tools/7zzs), Proton's tarballs
-with Python's own tarfile."""
+and the user's libraries' zips with Python's own tarfile and zipfile."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import os
 import stat
 import subprocess
 import tarfile
+import zipfile
 from pathlib import Path
 
 SEVEN_ZIP = Path("tools") / "7zzs"
@@ -43,4 +44,27 @@ def extract_tar(archive_path: Path, output_dir: Path) -> None:
         with tarfile.open(archive_path, "r:*") as tar:
             tar.extractall(output_dir, filter="data")
     except (tarfile.TarError, OSError) as exc:
+        raise RuntimeError(f"Failed to unpack {archive_path.name}: {exc}") from exc
+
+
+def zip_members(archive_path: Path) -> frozenset[str]:
+    """The files a zip holds, as paths with '/'; raises RuntimeError when it isn't a zip it can read."""
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            return frozenset(info.filename for info in archive.infolist() if not info.is_dir())
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise RuntimeError(f"Failed to read {archive_path.name}: {exc}") from exc
+
+
+def extract_zip(archive_path: Path, members: tuple[str, ...], output_dir: Path, max_bytes: int) -> None:
+    """Unpack the named members of a zip into `output_dir`, refusing to when they would unpack to more than
+    `max_bytes`; raises RuntimeError on failure. zipfile keeps every member inside `output_dir`, whatever its name."""
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            infos = {info.filename: info for info in archive.infolist()}
+            if sum(infos[name].file_size for name in members) > max_bytes:
+                raise RuntimeError(f"{archive_path.name} unpacks to more than {max_bytes // 1_000_000} MB.")
+            for name in members:
+                archive.extract(infos[name], output_dir)
+    except (zipfile.BadZipFile, KeyError, OSError) as exc:
         raise RuntimeError(f"Failed to unpack {archive_path.name}: {exc}") from exc

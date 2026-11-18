@@ -17,6 +17,7 @@ const setting = (overrides: Partial<SettingInfo>): SettingInfo => ({
   help: "",
   default: null,
   choices: [],
+  library: null,
   minimum: null,
   maximum: null,
   integer: false,
@@ -117,6 +118,17 @@ describe("a setting's text field", () => {
     expect(rowOf(GLOBAL_SCOPE, { ...SHARPNESS, maximum: null }).description).toContain("0 or more.");
     expect(rowOf(GLOBAL_SCOPE, { ...SHARPNESS, minimum: null, maximum: null, integer: true }).description).toContain("A whole number.");
     expect(rowOf(GLOBAL_SCOPE, setting({ kind: "text" })).description).toBe("What it does.\nEmpty: auto.");
+  });
+});
+
+describe("a setting a library in the game sets", () => {
+  it("is locked, saying its value and the library", () => {
+    const owned = { ...MODEL, value: "1", source: "library" as const, library: "XeSS SDK 3.0.2" };
+
+    expect(rowOf("1", owned)).toMatchObject({ control: { kind: "locked" }, description: "INT8 · Set by XeSS SDK 3.0.2\nWhat it does." });
+    expect(rowOf(GLOBAL_SCOPE, { ...SHARPNESS, value: "0.5", source: "library", library: "X" }).description).toBe(
+      "0.5 · Set by X\nWhat it does.\nFrom 0 to 1.3.",
+    );
   });
 });
 

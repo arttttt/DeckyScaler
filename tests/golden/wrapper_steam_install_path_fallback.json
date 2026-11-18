@@ -23,8 +23,11 @@
         "family": "10",
         "format": 2,
         "game_name": "",
+        "libraries": [],
+        "library_settings": {},
         "optiscaler_version": "nightly-20261023",
         "original_launch_options": "",
+        "owned_dirs": [],
         "placed": [
           {
             "path": "dxgi.dll",

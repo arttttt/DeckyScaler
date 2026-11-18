@@ -5,8 +5,8 @@ import { gamesPageView } from "./games";
 const LIBRARY: InstalledLibrary = {
   installed_bytes: 0,
   versions: [
-    { id: "nightly-20261024", version: "10.0.0-pre1", channel: "nightly", date: "20261024", size: 1 },
-    { id: "nightly-20261023", version: "10.0.0-pre1", channel: "nightly", date: "20261023", size: 1 },
+    { id: "nightly-20261024", version: "10.0.0-pre1", channel: "nightly", date: "20261024", size: 1, libraries: true },
+    { id: "nightly-20261023", version: "10.0.0-pre1", channel: "nightly", date: "20261023", size: 1, libraries: true },
   ],
 };
 

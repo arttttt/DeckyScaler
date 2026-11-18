@@ -125,3 +125,13 @@ def test_without_a_driver_to_fetch_nothing_is_linked_for_it():
     operations = plan_patch(frozenset(), V10, library.FAMILIES["10"], Request("dxgi.dll"))
 
     assert not any(str(getattr(op, "destination", "")).endswith("amdxcffx64.dll") for op in operations)
+
+
+def test_the_users_libraries_are_copied_in_after_the_version_and_whatever_they_replace_is_backed_up():
+    copy = Copy("/libraries/anr/files/ANR/dlssg/a.dll", "OptiScaler/custom/ANR/dlssg/a.dll")
+
+    operations = plan_patch(
+        frozenset({"Game.exe", "OptiScaler/custom/ANR/dlssg/a.dll"}), V10, library.FAMILIES["10"], Request("dxgi.dll", libraries=(copy,))
+    )
+
+    assert operations[-2:] == (Move(copy.destination, f"{copy.destination}.b"), copy)
