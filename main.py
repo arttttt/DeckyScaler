@@ -36,6 +36,11 @@ def _ignore(*_args) -> None:
 class Plugin:
     async def _main(self):
         decky.logger.info("DeckyScaler loaded")
+        # The launch wrappers run the copy in ~/deckyscaler: an updated plugin brings its own before any game starts.
+        try:
+            await asyncio.to_thread(self._refresh_core)
+        except OSError as exc:
+            decky.logger.error(f"Updating the core and launch scripts in ~/deckyscaler failed: {exc}")
 
     async def _unload(self):
         decky.logger.info("DeckyScaler unloaded.")
@@ -45,6 +50,9 @@ class Plugin:
 
     def _patcher(self) -> Patcher:
         return Patcher(self._home_path())
+
+    def _refresh_core(self) -> None:
+        core_install.refresh_core(self._home_path() / bundle.HOME_DIRNAME, Path(decky.DECKY_PLUGIN_DIR) / "assets")
 
     def _updates(self, report: Report = _ignore) -> PluginUpdates:
         return PluginUpdates(
@@ -131,7 +139,7 @@ class Plugin:
             github_releases.list_releases,
             github_releases.download,
             report,
-            lambda: core_install.refresh_core(self._home_path() / bundle.HOME_DIRNAME, Path(decky.DECKY_PLUGIN_DIR) / "assets"),
+            self._refresh_core,
             patcher.games_using,
         )
 
