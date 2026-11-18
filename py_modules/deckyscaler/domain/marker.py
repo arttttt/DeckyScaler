@@ -35,8 +35,8 @@ def build(
     """The marker's details; every patch writes one, a Steam patch also records the game.
 
     `optiscaler_version` is the library version's id (stable-0.9.4, nightly-20261023). `libraries` is what the
-    patch placed of the user's libraries (domain/library_placement), and `library_layer` the ini keys they own:
-    the game's later settings writes read them from here, whatever the device holds by then.
+    patch placed of the user's libraries, picked or offered (domain/library_placement), and `library_layer` the
+    ini keys they own: the game's later settings writes read them from here, whatever the device holds by then.
     """
     return {
         "appid": steam_game.appid if steam_game else "",
@@ -53,14 +53,14 @@ def build(
     }
 
 
-def describes(details: dict, version_id: str, dll_name: str, picks: tuple[library_choice.Pick, ...] = ()) -> bool:
+def describes(details: dict, version_id: str, dll_name: str, placed: tuple[library_choice.Placed, ...] = ()) -> bool:
     """Whether a marker records a finished patch with this version under this proxy name and these libraries:
     patching again would place the same."""
     return (
         details.get("complete") is True
         and details.get("optiscaler_version") == version_id
         and details.get("dll_name") == dll_name
-        and library_choice.recorded_picks(details.get("libraries")) == picks
+        and library_choice.recorded_placed(details.get("libraries")) == placed
     )
 
 

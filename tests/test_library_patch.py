@@ -1,5 +1,5 @@
-"""The user's libraries in a patch: placed as the game's choice says, selected in its ini, kept by the launch
-wrapper, undone whole (integration)."""
+"""The user's libraries in a patch: picked as the game's choice says and selected in its ini, the others there for
+OptiScaler's menu, kept by the launch wrapper, undone whole (integration)."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ def test_optiscaler_0_9_gets_no_library(plugin, plugin_home, tmp_path):
     assert not (game / "custom").exists() and marker_of(game)["libraries"] == []
 
 
-def test_a_games_own_choice_wins_and_none_means_none(plugin, plugin_home, steam_library):
+def test_a_games_own_choice_wins_and_none_selects_none(plugin, plugin_home, steam_library):
     anr(plugin_home)
     choose(plugin_home, library_choice.GLOBAL, FG, "anr")
     choose(plugin_home, "1234", FG, library_choice.NONE)
@@ -101,8 +101,42 @@ def test_a_games_own_choice_wins_and_none_means_none(plugin, plugin_home, steam_
 
     run(plugin.patch_game("1234", "dxgi.dll", "", NIGHTLY))
 
-    assert marker_of(root)["libraries"] == []
-    assert run(plugin.get_game_status("1234"))["libraries"] == []
+    offered = [{"slot": None, "id": "anr", "label": "ANR 1"}]
+    assert marker_of(root)["libraries"] == offered
+    assert run(plugin.get_game_status("1234"))["libraries"] == offered
+    assert "FGNvngxReplacement=Apex" not in ini_of(root)
+
+
+def test_a_library_nobody_picked_goes_in_for_optiscalers_menu_and_selects_nothing(plugin, plugin_home, tmp_path):
+    anr(plugin_home)
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))["status"] == "success"
+
+    assert (game / "OptiScaler" / "custom" / ANR / "dlssg" / "nvngx_dlssg.dll").read_bytes() == b"anr dll"
+    lines = set(ini_of(game).splitlines())
+    assert not {"FGInput=nvngxfg", f"FGNvngxReplacement={ANR}", "DisableHudless=false"} & lines
+    assert marker_of(game)["libraries"] == [{"slot": None, "id": "anr", "label": "ANR 1"}]
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before
+
+
+def test_the_wrapper_brings_a_library_that_came_and_takes_one_that_left_without_picking_it(plugin, plugin_home, home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    library = anr(plugin_home)
+
+    wrapper_patch(home, game)  # ANR came onto the device: the game starts with it in OptiScaler's menu
+
+    assert marker_of(game)["libraries"] == [{"slot": None, "id": "anr", "label": "ANR 1"}]
+    assert (game / "OptiScaler" / "custom" / ANR / "dlssg" / "nvngx_dlssg.dll").exists()
+    assert "FGInput=nvngxfg" not in ini_of(game)
+    UserLibraryStore(plugin_home / "libraries").remove(library.id)
+
+    wrapper_patch(home, game)
+
+    assert marker_of(game)["libraries"] == [] and not (game / "OptiScaler" / "custom").exists()
 
 
 def test_a_games_status_and_the_patched_games_say_what_libraries_it_has(plugin, plugin_home, steam_library):

@@ -71,7 +71,7 @@ def test_a_download_keeps_the_provider_alone_and_lists_it(home, plugin_home):
 
     result = libraries.install(ul.ANR, "anr-v-b19")
 
-    assert result == {"status": "success", "id": "anr-v-b19", "message": "Apex Neural Rendering FG V.B19 is downloaded."}
+    assert result == {"status": "success", "id": "anr-v-b19", "in_menu": True, "message": "Apex Neural Rendering FG V.B19 is downloaded."}
     files = libraries.store.files_dir("anr-v-b19")
     assert sorted(p.relative_to(files).as_posix() for p in files.rglob("*") if p.is_file()) == [
         f"{ANR}/dlssg/nr_fg.ini", f"{ANR}/dlssg/nvngx_dlssg.dll",
@@ -116,7 +116,9 @@ def test_a_zip_a_folder_or_a_dll_the_user_picked_is_added_once(home, plugin_home
 
     assert libraries.add(str(sdk))["id"] == "xess-sdk-3-0-2"
     assert libraries.add(str(folder))["id"] == "uniscaler"
-    assert libraries.add(str(dll)) == {"status": "success", "id": "libxess-dll-2-0-2-68", "message": "libxess.dll 2.0.2.68 is added."}
+    assert libraries.add(str(dll)) == {
+        "status": "success", "id": "libxess-dll-2-0-2-68", "in_menu": False, "message": "libxess.dll 2.0.2.68 is added.",
+    }
     assert libraries.add(str(sdk)) == {"status": "error", "reason": ul.ALREADY_ADDED}
     assert sorted(p.name for p in libraries.store.files_dir("xess-sdk-3-0-2").rglob("*") if p.is_file()) == ["libxess.dll", "libxess_fg.dll"]
 
@@ -162,6 +164,21 @@ def test_a_new_choice_is_applied_to_patched_games_and_a_running_one_is_left_alon
     assert result["skipped"] == [str(running)] and result["failed"] == []
     assert json.loads((game / "DECKYSCALER_PATCH").read_text())["libraries"][0]["id"] == "anr-v-b19"
     assert run(plugin.user_libraries_installed())["to_apply"] == [str(running)]
+
+
+def test_a_library_downloaded_after_a_patch_reaches_the_patched_games_unpicked(plugin, home, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+
+    owner(home).install(ul.ANR, "anr-v-b19")
+
+    assert run(plugin.user_libraries_installed())["to_apply"] == [str(game)]
+    assert run(plugin.user_libraries_apply())["applied"][0]["name"] == str(game)
+    assert json.loads((game / "DECKYSCALER_PATCH").read_text())["libraries"] == [
+        {"slot": None, "id": "anr-v-b19", "label": "Apex Neural Rendering FG V.B19"},
+    ]
+    listed = run(plugin.user_libraries_installed())
+    assert listed["to_apply"] == [] and listed["libraries"][0]["games"] == [str(game)]
 
 
 def test_removing_a_library_says_who_has_it_and_they_keep_their_copy(plugin, home, plugin_home, tmp_path):

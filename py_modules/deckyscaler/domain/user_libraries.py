@@ -7,7 +7,8 @@ OptiScaler loads itself (libxess.dll, amd_fidelityfx_upscaler_dx12.dll…), poin
 [Libraries] section. The tables below are the only place that names either: a new file or kind is a row.
 
 A library serves slots: the upscaler, frame generation. Picked for a slot, its files go into the game and the
-ini keys that select and find them are set (domain/library_placement).
+ini keys that select and find them are set (domain/library_placement); a provider goes into every game anyway, for
+OptiScaler's own menu to offer.
 """
 
 from __future__ import annotations
@@ -233,6 +234,13 @@ class Library:
         return _slots(self.providers, self.dlls)
 
     @property
+    def in_menu(self) -> bool:
+        """Whether it goes into every game a patch gives libraries, picked or not, for OptiScaler's own menu to
+        offer: a provider is listed there by its folder's name. A DLL is found only through the [Libraries] key a
+        pick sets, so it goes in only when picked."""
+        return bool(self.providers)
+
+    @property
     def turns_on(self) -> tuple[str, ...]:
         """The slots picking it switches on by itself: a provider is selected by name, a DLL picked as the upscaler
         selects its upscaler. A frame generation DLL is only pointed at: OptiScaler's FG settings turn it on."""
@@ -243,13 +251,14 @@ class Library:
 
 
 def library_json(library: Library, size: int, games: list[str]) -> dict:
-    """A library as the plugin's pages list it: `size` its bytes on the device, `games` those whose patch placed it."""
+    """A library as the plugin's pages list it: `size` its bytes on the device, `games` those that have it."""
     return {
         "id": library.id,
         "label": library.label,
         "origin": library.origin,
         "slots": list(library.slots),
         "turns_on": list(library.turns_on),
+        "in_menu": library.in_menu,
         "size": size,
         "games": games,
     }

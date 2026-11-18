@@ -55,7 +55,7 @@ class UserLibraries:
 
     def game_choice(self, appid: str) -> dict:
         """A game's own choice per slot (a library, none, or absent: the global choice), what it comes to, and
-        whether the game, patched, has other libraries than that ("patch again")."""
+        whether the game, patched, has other libraries than a patch now would give it ("patch again")."""
         choices, installed = self.choices.read(), self.store.installed()
         patched = [entry for entry in self.patcher.patched_markers() if str(entry[2].get("appid") or "") == appid]
         return {
@@ -132,7 +132,7 @@ class UserLibraries:
             return _error(f"Installing {release.version} failed: {exc}")
         finally:
             self.store.clear_partial()
-        return {"status": "success", "id": added.id, "message": f"{added.label} is downloaded."}
+        return {"status": "success", "id": added.id, "in_menu": added.in_menu, "message": f"{added.label} is downloaded."}
 
     # ── adding the user's own ────────────────────────────────────────────────
 
@@ -172,7 +172,7 @@ class UserLibraries:
             return _error(f"Adding {path.name} failed: {exc}")
         finally:
             self.store.clear_partial()
-        return {"status": "success", "id": added.id, "message": f"{added.label} is added."}
+        return {"status": "success", "id": added.id, "in_menu": added.in_menu, "message": f"{added.label} is added."}
 
     # ── removing ─────────────────────────────────────────────────────────────
 

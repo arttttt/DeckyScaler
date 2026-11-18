@@ -1,4 +1,4 @@
-"""How the libraries picked for a game go into it: what is copied where, and the ini keys that select and find them.
+"""How a game's libraries go into it: what is copied where, and the ini keys that select and find the picked ones.
 
 Every file is a copy, never a link: a game keeps the library it was patched with when the library leaves the device,
 and a provider writes into its own folder (its settings, its logs) for this game alone. A provider's folder goes into
@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePosixPath, PureWindowsPath
 
+from .library_choice import ToPlace
 from .patch_plan import Copy
 from .settings_layers import Key, LibraryLayer, Owned
 from .user_libraries import LIBRARIES, UPSCALER, Library, kind, known_dll
@@ -31,7 +32,7 @@ class Placement:
     owned_dirs: tuple[str, ...]
     """Provider folders: everything in them is the library's, its logs too."""
     recorded: tuple[dict, ...]
-    """What the game's marker records of the libraries: slot, id and label."""
+    """What the game's marker records of the libraries: slot (None for one only offered), id and label."""
 
 
 def _dll_serves(slot: str, dll_name: str) -> bool:
@@ -40,28 +41,23 @@ def _dll_serves(slot: str, dll_name: str) -> bool:
     return slot in slots or not slots
 
 
-def place(picked: tuple[tuple[str, Library], ...], main_dir: str, files_dirs: dict[str, str]) -> Placement:
-    """Where the libraries picked for a game's slots go, from their files on the device (`files_dirs`: library id →
-    its files' absolute directory), into a game whose OptiScaler files are in `main_dir`.
+def place(to_place: ToPlace, main_dir: str, files_dirs: dict[str, str]) -> Placement:
+    """Where a game's libraries go, from their files on the device (`files_dirs`: library id → its files' absolute
+    directory), into a game whose OptiScaler files are in `main_dir`.
 
-    For each slot, in order: the library's providers of a kind serving it, set by name in the keys their kind
-    selects, and its DLLs serving it, each pointed at by its key; picked as the upscaler, the first DLL selecting
-    an API's upscaler (in the table's order) selects it. What an earlier slot placed or set stays: the upscaler's
+    Every provider of every library placed goes into `custom/`, for OptiScaler's menu to offer. For each pick, in
+    slot order: its providers of a kind serving the slot are set by name in the keys their kind selects, its DLLs
+    serving the slot go in, each pointed at by its key, and picked as the upscaler, the first DLL selecting an
+    API's upscaler (in the table's order) selects it. What an earlier slot placed or set stays: the upscaler's
     library wins a file or key both slots' libraries have."""
     copies: dict[str, Copy] = {}
     layer: LibraryLayer = {}
     settings_files: set[str] = set()
     owned: list[str] = []
-    for slot, library in picked:
+
+    def put_providers(library: Library) -> None:
         files = files_dirs[library.id]
-
-        def own(key: Key, value: str) -> None:
-            layer.setdefault(key, Owned(value, library.label))
-
         for provider in library.providers:
-            kinds = [k for name in provider.kinds if (k := kind(name)) is not None and k.slot == slot]
-            if not kinds:
-                continue
             folder = f"{main_dir}/{CUSTOM_DIRNAME}/{provider.name}"
             for path in library.files:
                 if not path.startswith(f"{provider.folder}/"):
@@ -72,7 +68,16 @@ def place(picked: tuple[tuple[str, Library], ...], main_dir: str, files_dirs: di
                     settings_files.add(destination)
             if folder not in owned:
                 owned.append(folder)
-            for k in kinds:
+
+    for slot, library in to_place.picked:
+        files = files_dirs[library.id]
+
+        def own(key: Key, value: str) -> None:
+            layer.setdefault(key, Owned(value, library.label))
+
+        put_providers(library)
+        for provider in library.providers:
+            for k in (k for name in provider.kinds if (k := kind(name)) is not None and k.slot == slot):
                 for key in k.selects:
                     own(key, provider.name)
                 for key, value in k.sets:
@@ -89,12 +94,15 @@ def place(picked: tuple[tuple[str, Library], ...], main_dir: str, files_dirs: di
                     own(key, value)
         for key, value in library.settings:
             own(key, value)
+    for library in to_place.offered:
+        put_providers(library)
     return Placement(
         tuple(copies.values()),
         layer,
         frozenset(settings_files),
         tuple(owned),
-        tuple({"slot": slot, "id": library.id, "label": library.label} for slot, library in picked),
+        tuple({"slot": slot, "id": library.id, "label": library.label} for slot, library in to_place.picked)
+        + tuple({"slot": None, "id": library.id, "label": library.label} for library in to_place.offered),
     )
 
 

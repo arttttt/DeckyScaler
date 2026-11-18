@@ -1,9 +1,10 @@
-"""How the libraries picked for a game go into it: copies, and the ini keys that select and find them."""
+"""How a game's libraries go into it: copies, and the ini keys that select and find the picked ones."""
 
 from __future__ import annotations
 
 from deckyscaler.domain import library_placement as lp
 from deckyscaler.domain import user_libraries as ul
+from deckyscaler.domain.library_choice import ToPlace
 from deckyscaler.domain.patch_plan import Copy
 from deckyscaler.domain.settings_layers import Owned
 
@@ -24,11 +25,17 @@ ANR = _library(
     settings=((("FrameGen", "DisableHudless"), "false"),),
 )
 XESS = _library("xess", "bin/libxess.dll", "bin/libxess_dx11.dll", "bin/libxess_fg.dll", "bin/libxell.dll")
+
+
+def picked(*picks) -> ToPlace:
+    return ToPlace(tuple(picks), ())
+
+
 FILES = {"anr": "/lib/anr/files", "xess": "/lib/xess/files", "a": "/lib/a/files", "b": "/lib/b/files", "u": "/lib/u/files"}
 
 
 def test_a_frame_generation_provider_is_copied_into_custom_and_selected_with_what_its_kind_and_source_need():
-    placement = lp.place(((FG, ANR),), "OptiScaler", FILES)
+    placement = lp.place(picked((FG, ANR)), "OptiScaler", FILES)
 
     folder = f"OptiScaler/custom/{ANR_NAME}"
     assert set(placement.copies) == {
@@ -47,7 +54,7 @@ def test_a_frame_generation_provider_is_copied_into_custom_and_selected_with_wha
 
 
 def test_dlls_picked_as_the_upscaler_go_beside_optiscaler_and_select_their_upscaler_per_api():
-    placement = lp.place(((UP, XESS),), "OptiScaler", FILES)
+    placement = lp.place(picked((UP, XESS)), "OptiScaler", FILES)
 
     assert placement.copies == (
         Copy("/lib/xess/files/bin/libxess.dll", "OptiScaler/user-libraries/libxess.dll"),
@@ -65,7 +72,7 @@ def test_dlls_picked_as_the_upscaler_go_beside_optiscaler_and_select_their_upsca
 
 
 def test_dlls_picked_for_frame_generation_are_only_pointed_at():
-    placement = lp.place(((FG, XESS),), "OptiScaler", FILES)
+    placement = lp.place(picked((FG, XESS)), "OptiScaler", FILES)
 
     assert [copy.destination for copy in placement.copies] == [
         "OptiScaler/user-libraries/libxess_fg.dll", "OptiScaler/user-libraries/libxell.dll",
@@ -74,7 +81,7 @@ def test_dlls_picked_for_frame_generation_are_only_pointed_at():
 
 
 def test_one_library_in_both_slots_is_placed_once_with_both_slots_keys():
-    placement = lp.place(((UP, XESS), (FG, XESS)), "OptiScaler", FILES)
+    placement = lp.place(picked((UP, XESS), (FG, XESS)), "OptiScaler", FILES)
 
     assert len(placement.copies) == 4
     assert ("Libraries", "XeFGPath") in placement.layer and ("Upscalers", "Dx12Upscaler") in placement.layer
@@ -85,7 +92,7 @@ def test_a_file_both_slots_libraries_have_is_the_upscalers():
     upscaler = _library("a", "amd_fidelityfx_dx12.dll")
     frame_generation = _library("b", "amd_fidelityfx_dx12.dll")
 
-    placement = lp.place(((UP, upscaler), (FG, frame_generation)), "OptiScaler", FILES)
+    placement = lp.place(picked((UP, upscaler), (FG, frame_generation)), "OptiScaler", FILES)
 
     assert placement.copies == (Copy("/lib/a/files/amd_fidelityfx_dx12.dll", "OptiScaler/user-libraries/amd_fidelityfx_dx12.dll"),)
     assert placement.layer[("Libraries", "FfxDx12Path")].library == "A 1"
@@ -94,7 +101,7 @@ def test_a_file_both_slots_libraries_have_is_the_upscalers():
 def test_a_file_serving_no_slot_comes_along_with_its_library():
     library = _library("a", "amd_fidelityfx_upscaler_dx12.dll", "amd_fidelityfx_denoiser_dx12.dll")
 
-    placement = lp.place(((UP, library),), "OptiScaler", FILES)
+    placement = lp.place(picked((UP, library)), "OptiScaler", FILES)
 
     assert ("Libraries", "FfxDx12RRPath") in placement.layer
 
@@ -102,15 +109,36 @@ def test_a_file_serving_no_slot_comes_along_with_its_library():
 def test_a_providers_kinds_for_another_slot_select_nothing():
     library = _library("u", "Uniscaler/ffx/u.dll", "Uniscaler/dlssg/u.dll")
 
-    placement = lp.place(((UP, library),), "OptiScaler", FILES)
+    placement = lp.place(picked((UP, library)), "OptiScaler", FILES)
 
     assert placement.layer[("Upscalers", "Dx12Upscaler")] == Owned("Uniscaler", "U 1")
     assert ("FrameGen", "FGNvngxReplacement") not in placement.layer
     assert len(placement.copies) == 2 and placement.owned_dirs == ("OptiScaler/custom/Uniscaler",)
 
 
+def test_a_picked_librarys_provider_for_another_slot_goes_in_too_selected_by_nothing():
+    library = _library("u", "Upscaling/ffx/u.dll", "Generating/dlssg/g.dll")
+
+    placement = lp.place(picked((UP, library)), "OptiScaler", FILES)
+
+    assert placement.owned_dirs == ("OptiScaler/custom/Generating", "OptiScaler/custom/Upscaling")
+    assert ("FrameGen", "FGNvngxReplacement") not in placement.layer
+
+
+def test_an_offered_library_goes_in_for_optiscalers_menu_and_sets_nothing():
+    placement = lp.place(ToPlace(((UP, XESS),), (ANR,)), "OptiScaler", FILES)
+
+    folder = f"OptiScaler/custom/{ANR_NAME}"
+    assert Copy(f"/lib/anr/files/{ANR_NAME}/dlssg/nvngx_dlssg.dll", f"{folder}/dlssg/nvngx_dlssg.dll") in placement.copies
+    assert placement.owned_dirs == (folder,) and placement.settings_files == {f"{folder}/dlssg/nr_fg.ini"}
+    assert placement.layer == lp.place(picked((UP, XESS)), "OptiScaler", FILES).layer  # nor DisableHudless, its source's
+    assert placement.recorded == (
+        {"slot": UP, "id": "xess", "label": "XESS 1"}, {"slot": None, "id": "anr", "label": "ANR 1"},
+    )
+
+
 def test_nothing_picked_places_nothing():
-    assert lp.place((), "OptiScaler", FILES) == lp.Placement((), {}, frozenset(), (), ())
+    assert lp.place(picked(), "OptiScaler", FILES) == lp.Placement((), {}, frozenset(), (), ())
 
 
 def test_keys_the_games_libraries_no_longer_set_are_released():
@@ -122,7 +150,7 @@ def test_keys_the_games_libraries_no_longer_set_are_released():
 def test_a_providers_folder_holds_its_own_files_and_the_librarys_dlls_go_beside_optiscaler():
     library = _library("u", "Uniscaler/ffx/u.dll", "libxess.dll")
 
-    placement = lp.place(((UP, library),), "OptiScaler", FILES)
+    placement = lp.place(picked((UP, library)), "OptiScaler", FILES)
 
     assert [copy.destination for copy in placement.copies] == [
         "OptiScaler/custom/Uniscaler/ffx/u.dll", "OptiScaler/user-libraries/libxess.dll",
@@ -132,13 +160,13 @@ def test_a_providers_folder_holds_its_own_files_and_the_librarys_dlls_go_beside_
 def test_a_provider_serving_both_slots_is_one_folder_of_the_game():
     library = _library("u", "Uniscaler/ffx/u.dll", "Uniscaler/dlssg/u.dll")
 
-    placement = lp.place(((UP, library), (FG, library)), "OptiScaler", FILES)
+    placement = lp.place(picked((UP, library), (FG, library)), "OptiScaler", FILES)
 
     assert placement.owned_dirs == ("OptiScaler/custom/Uniscaler",)
     assert placement.layer[("FrameGen", "FGNvngxReplacement")] == Owned("Uniscaler", "U 1")
 
 
 def test_a_file_picked_for_frame_generation_never_selects_the_upscaler():
-    placement = lp.place(((FG, _library("a", "amd_fidelityfx_dx12.dll")),), "OptiScaler", FILES)
+    placement = lp.place(picked((FG, _library("a", "amd_fidelityfx_dx12.dll"))), "OptiScaler", FILES)
 
     assert set(placement.layer) == {("Libraries", "FfxDx12Path")}

@@ -2,9 +2,12 @@
 places by it.
 
 The global choice names a library per slot, or none. A game's own choice is either absent (the game follows the
-global one), NONE, or a library. A patch from the plugin's pages places what the game's choice resolves to; the
-launch wrapper's patch keeps what the game's patch placed, as it keeps the game's OptiScaler version, so a new
+global one), NONE, or a library. A patch from the plugin's pages picks what the game's choice resolves to; the
+launch wrapper's patch keeps what the game's patch picked, as it keeps the game's OptiScaler version, so a new
 global choice reaches patched games only when the user applies it.
+
+A pick selects a library; every other library OptiScaler's own menu can offer goes in beside it, selected by
+nothing, whatever the choice: a library on the device is there to pick in the game too.
 """
 
 from __future__ import annotations
@@ -20,6 +23,9 @@ NONE = "none"
 
 Pick = tuple[str, str]
 """(slot, library id): a library placed for a slot."""
+
+Placed = tuple[str | None, str]
+"""(slot, library id) for a library placed for a slot, (None, library id) for one only offered in OptiScaler's menu."""
 
 
 @dataclass(frozen=True)
@@ -90,32 +96,61 @@ def resolved(choices: Choices, appid: str | None) -> dict[str, str]:
     return {slot: value for slot, value in picked.items() if value != NONE}
 
 
-def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -> tuple[tuple[str, Library], ...]:
-    """The libraries a patch with a version of `family` places, in slot order: each chosen one still on the device
-    that serves its slot; none for a family that takes no libraries."""
+@dataclass(frozen=True)
+class ToPlace:
+    picked: tuple[tuple[str, Library], ...]
+    """(slot, library), in slot order: selected for the slot."""
+    offered: tuple[Library, ...]
+    """The other libraries OptiScaler's menu offers (Library.in_menu), by label: in the game, selected by nothing."""
+
+
+def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -> ToPlace:
+    """The libraries a patch with a version of `family` places: each chosen one still on the device that serves its
+    slot, and every other one OptiScaler's menu offers; none for a family that takes no libraries.
+
+    A provider is found by its folder's name, so one name is one library's in a game: the picked one's, else the
+    one added last's (two versions of one project share it). A library goes in whole or not at all."""
     if not family.libraries:
-        return ()
+        return ToPlace((), ())
     by_id = {library.id: library for library in installed}
-    return tuple(
+    picked = tuple(
         (slot, library)
         for slot in SLOTS
         if (library := by_id.get(chosen.get(slot, ""))) is not None and slot in library.slots
     )
+    # A picked library's providers take their names first: it isn't offered again, nor one sharing a name with it.
+    taken = {provider.name.lower() for _, library in picked for provider in library.providers}
+    offered: list[Library] = []
+    for library in sorted(installed, key=lambda item: (item.added_at, item.id), reverse=True):
+        names = {provider.name.lower() for provider in library.providers}
+        if not library.in_menu or names & taken:
+            continue
+        taken |= names
+        offered.append(library)
+    return ToPlace(picked, tuple(sorted(offered, key=lambda item: (item.label.lower(), item.id))))
 
 
-def picks(placed: tuple[tuple[str, Library], ...]) -> tuple[Pick, ...]:
-    return tuple((slot, library.id) for slot, library in placed)
+def placed(to_place: ToPlace) -> tuple[Placed, ...]:
+    return tuple((slot, library.id) for slot, library in to_place.picked) + tuple(
+        (None, library.id) for library in to_place.offered
+    )
 
 
-def recorded_picks(recorded: object) -> tuple[Pick, ...]:
-    """The picks a game's marker recorded; a marker from before libraries, or anything else, records none."""
+def recorded_placed(recorded: object) -> tuple[Placed, ...]:
+    """What a game's marker records of the libraries its patch placed; a marker from before libraries, or anything
+    else, records none."""
     if not isinstance(recorded, list):
         return ()
     return tuple(
-        (str(item["slot"]), str(item["id"]))
+        (None if item.get("slot") is None else str(item["slot"]), str(item["id"]))
         for item in recorded
-        if isinstance(item, dict) and item.get("slot") in SLOTS and item.get("id")
+        if isinstance(item, dict) and (item.get("slot") is None or item.get("slot") in SLOTS) and item.get("id")
     )
+
+
+def recorded_picks(recorded: object) -> tuple[Pick, ...]:
+    """The picks a game's marker records."""
+    return tuple((slot, library_id) for slot, library_id in recorded_placed(recorded) if slot is not None)
 
 
 def kept(recorded: tuple[Pick, ...], installed: list[Library]) -> dict[str, str]:
@@ -133,12 +168,12 @@ def to_patch_with(
 
 
 def needs_applying(recorded: object, chosen: dict[str, str], installed: list[Library], family: Family) -> bool:
-    """Whether patching a game again would place other libraries than its marker records: its choice changed, or
-    a library it has left the device."""
-    return recorded_picks(recorded) != picks(to_place(chosen, installed, family))
+    """Whether patching a game again would place other libraries than its marker records: its choice changed, or a
+    library came onto the device or left it."""
+    return recorded_placed(recorded) != placed(to_place(chosen, installed, family))
 
 
 def users(library_id: str, patched: list[tuple[str, object]]) -> list[str]:
-    """The games, by name, whose patch placed a library: `patched` pairs each game's name with what its marker
-    recorded."""
-    return sorted(name for name, recorded in patched if any(pick[1] == library_id for pick in recorded_picks(recorded)))
+    """The games, by name, whose patch placed a library, picked or offered: `patched` pairs each game's name with
+    what its marker recorded."""
+    return sorted(name for name, recorded in patched if any(item[1] == library_id for item in recorded_placed(recorded)))

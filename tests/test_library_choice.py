@@ -7,15 +7,17 @@ import pytest
 from deckyscaler.domain import library_choice as lc
 from deckyscaler.domain.library import FAMILIES
 from deckyscaler.domain import user_libraries as ul
-from deckyscaler.domain.library_choice import GLOBAL, NONE, Choices
+from deckyscaler.domain.library_choice import GLOBAL, NONE, Choices, ToPlace
 
 FG, UP = ul.FRAME_GENERATION, ul.UPSCALER
 V10, V09 = FAMILIES["10"], FAMILIES["0.9"]
 
 
-def _library(library_id: str, *files: str) -> ul.Library:
+def _library(library_id: str, *files: str, added_at: str = "") -> ul.Library:
     contents = ul.recognize(frozenset(files))
-    return ul.Library(library_id, library_id, None, ul.YOUR_FILE, None, contents.providers, contents.dlls, contents.files, (), "")
+    return ul.Library(
+        library_id, library_id, None, ul.YOUR_FILE, None, contents.providers, contents.dlls, contents.files, (), added_at
+    )
 
 
 ANR = _library("anr", "ANR/dlssg/nvngx_dlssg.dll")
@@ -63,24 +65,47 @@ def test_a_game_follows_the_global_choice_unless_it_has_its_own():
     assert lc.resolved(choices, None) == {UP: "xess", FG: "anr"}
 
 
-def test_a_patch_places_the_chosen_libraries_still_on_the_device_that_serve_their_slot():
+def test_a_patch_picks_the_chosen_libraries_still_on_the_device_that_serve_their_slot():
     chosen = {FG: "anr", UP: "xess"}
 
-    assert lc.to_place(chosen, [ANR, XESS, FSR], V10) == ((UP, XESS), (FG, ANR))
-    assert lc.to_place(chosen, [XESS], V10) == ((UP, XESS),)
-    assert lc.to_place({UP: "anr", FG: "fsr"}, [ANR, FSR], V10) == ()  # neither serves the slot it was picked for
+    assert lc.to_place(chosen, [ANR, XESS, FSR], V10) == ToPlace(((UP, XESS), (FG, ANR)), ())
+    assert lc.to_place(chosen, [XESS], V10) == ToPlace(((UP, XESS),), ())
+    assert lc.to_place({UP: "anr", FG: "fsr"}, [ANR, FSR], V10).picked == ()  # neither serves the slot it was picked for
+
+
+def test_every_other_library_optiscalers_menu_offers_goes_in_unpicked_and_a_dll_alone_doesnt():
+    uniscaler = _library("uniscaler", "Uniscaler/ffx/u.dll")
+
+    assert lc.to_place({}, [XESS, uniscaler, ANR, FSR], V10) == ToPlace((), (ANR, uniscaler))  # by label
+    assert lc.to_place({FG: NONE}, [ANR], V10).offered == (ANR,)  # a game's "none" picks nothing; ANR is still there
+    assert lc.to_place({UP: "xess"}, [XESS, ANR], V10) == ToPlace(((UP, XESS),), (ANR,))
+
+
+def test_one_provider_name_is_one_librarys_the_picked_one_else_the_one_added_last():
+    older = _library("anr-b18", "ANR/dlssg/nvngx_dlssg.dll", added_at="2026-11-01")
+    newer = _library("anr-b19", "anr/dlssg/nvngx_dlssg.dll", added_at="2026-11-17")  # names match whatever the case
+    both = _library("both", "ANR/dlssg/a.dll", "Other/ffx/b.dll", added_at="2026-11-18")
+
+    assert lc.to_place({}, [older, newer], V10).offered == (newer,)
+    assert lc.to_place({FG: "anr-b18"}, [older, newer], V10) == ToPlace(((FG, older),), ())
+    assert lc.to_place({}, [older, both], V10).offered == (both,)  # a library goes in whole, or not at all
+    assert lc.to_place({FG: "anr-b18"}, [older, both], V10).offered == ()
 
 
 def test_optiscaler_0_9_takes_no_libraries():
-    assert lc.to_place({FG: "anr", UP: "xess"}, [ANR, XESS], V09) == ()
+    assert lc.to_place({FG: "anr", UP: "xess"}, [ANR, XESS], V09) == ToPlace((), ())
 
 
-def test_a_marker_records_picks_and_anything_else_records_none():
-    recorded = [{"slot": UP, "id": "xess", "label": "xess"}, {"slot": "x", "id": "y"}, {"slot": FG}, "z"]
+def test_a_marker_records_what_was_placed_picked_or_offered_and_anything_else_records_none():
+    recorded = [
+        {"slot": UP, "id": "xess", "label": "xess"}, {"slot": None, "id": "anr", "label": "anr"},
+        {"slot": "x", "id": "y"}, {"slot": FG}, {"id": "u"}, "z",
+    ]
 
-    assert lc.picks(((UP, XESS), (FG, ANR))) == ((UP, "xess"), (FG, "anr"))
+    assert lc.placed(ToPlace(((UP, XESS),), (ANR,))) == ((UP, "xess"), (None, "anr"))
+    assert lc.recorded_placed(recorded) == ((UP, "xess"), (None, "anr"), (None, "u"))
     assert lc.recorded_picks(recorded) == ((UP, "xess"),)
-    assert lc.recorded_picks(None) == ()
+    assert lc.recorded_placed(None) == () and lc.recorded_picks(None) == ()
 
 
 def test_the_wrapper_keeps_what_a_game_has_while_it_is_on_the_device():
@@ -88,7 +113,7 @@ def test_the_wrapper_keeps_what_a_game_has_while_it_is_on_the_device():
 
 
 def test_a_librarys_users_are_the_games_whose_patch_placed_it():
-    patched = [("Hades II", [{"slot": FG, "id": "anr"}]), ("Cyberpunk 2077", [{"slot": FG, "id": "anr"}]), ("Elden Ring", [])]
+    patched = [("Hades II", [{"slot": FG, "id": "anr"}]), ("Cyberpunk 2077", [{"slot": None, "id": "anr"}]), ("Elden Ring", [])]
 
     assert lc.users("anr", patched) == ["Cyberpunk 2077", "Hades II"]
     assert lc.users("xess", patched) == []
@@ -108,6 +133,8 @@ def test_a_game_needs_its_choice_applied_while_a_patch_would_place_other_librari
     assert not lc.needs_applying(recorded, {UP: "xess"}, [XESS], V10)
     assert lc.needs_applying(recorded, {UP: "fsr"}, [XESS, FSR], V10)
     assert lc.needs_applying(recorded, {UP: "xess"}, [], V10)  # the library left the device
+    assert lc.needs_applying(recorded, {UP: "xess"}, [XESS, ANR], V10)  # one came: OptiScaler's menu offers it
+    assert not lc.needs_applying([*recorded, {"slot": None, "id": "anr"}], {UP: "xess"}, [XESS, ANR], V10)
     assert not lc.needs_applying([], {UP: "xess"}, [XESS], V09)  # 0.9 takes none
 
 
