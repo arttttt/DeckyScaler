@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { manualPatchView, pickerStart } from "./manualPatch";
 
 describe("the directory picker", () => {
-  it("opens at the directory picked last, else the Steam library, else home", () => {
-    const defaults = { home: "/home/deck", steam_common: "/home/deck/.local/share/Steam/steamapps/common" };
+  it("opens at the directory picked last, else the Steam library", () => {
+    const defaults = {
+      home: "/home/deck",
+      steam_common: "/home/deck/.local/share/Steam/steamapps/common",
+      downloads: "/home/deck/Downloads",
+    };
     expect(pickerStart("/games/Foo", defaults)).toBe("/games/Foo");
     expect(pickerStart(null, defaults)).toBe(defaults.steam_common);
-    expect(pickerStart(null, { home: "/home/deck" })).toBe("/home/deck");
   });
 
   it("opens at the root while nothing is known yet", () => {

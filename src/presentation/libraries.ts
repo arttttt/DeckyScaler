@@ -4,6 +4,7 @@ import type {
   LibrarySlot,
   LibrarySource,
   LibrariesApplied,
+  PathDefaults,
   PlacedLibrary,
   UserLibraries,
   UserLibrary,
@@ -260,8 +261,7 @@ export const addOutcome = (answer: UserLibraryResult | null): string => {
 
 /** Where the picker opens: the Downloads folder files from Desktop Mode land in (home when there is none, as the
  *  backend says); the root while that isn't known yet. */
-export const pickerStart = (defaults: { home: string; downloads?: string } | null): string =>
-  defaults?.downloads ?? defaults?.home ?? "/";
+export const pickerStart = (defaults: PathDefaults | null): string => defaults?.downloads ?? "/";
 
 // ── Manage dialog ────────────────────────────────────────────────────────────
 

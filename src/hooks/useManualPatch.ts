@@ -1,28 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
-import { getPathDefaults, runManualPatch } from "../api";
+import { useCallback, useState } from "react";
+import { runManualPatch } from "../api";
 import { FileSelectionType, pickPath } from "../api/filePicker";
-import { ManualPatchResult, PathDefaults, manualPatchView, pickerStart } from "../presentation/manualPatch";
+import { ManualPatchResult, manualPatchView, pickerStart } from "../presentation/manualPatch";
+import { usePathDefaults } from "./usePathDefaults";
 import { useUnpatch } from "./useUnpatch";
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** Patching a directory picked by hand: picking it, and patching and unpatching it. */
 export const useManualPatch = ({ ready, dllName, patchWith }: { ready: boolean; dllName: string; patchWith: string }) => {
-  const [defaults, setDefaults] = useState<PathDefaults | null>(null);
+  const defaults = usePathDefaults();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [patching, setPatching] = useState(false);
   const [result, setResult] = useState<ManualPatchResult | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getPathDefaults()
-      .then((answer) => !cancelled && setDefaults(answer))
-      .catch((err) => console.error("useManualPatch -> getPathDefaults", err));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const onPick = useCallback(async () => {
     const picked = await pickPath(FileSelectionType.FOLDER, pickerStart(selectedPath, defaults));

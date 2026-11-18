@@ -1,12 +1,10 @@
+import type { PathDefaults } from "../api";
 import { patchButton } from "./patching";
 
-/** Where the backend says the directory picker may start: home, and the first Steam library's games. */
-export type PathDefaults = { home: string; steam_common?: string; downloads?: string };
-
-/** Where the directory picker opens: the directory picked last, else the Steam library's games, else home; the
- *  root while none is known yet. */
+/** Where the directory picker opens: the directory picked last, else the Steam library's games; the root while
+ *  neither is known yet. */
 export const pickerStart = (selected: string | null, defaults: PathDefaults | null): string =>
-  selected ?? defaults?.steam_common ?? defaults?.home ?? "/";
+  selected ?? defaults?.steam_common ?? "/";
 
 /** The last patch of a picked directory, as the backend answered it. */
 export type ManualPatchResult = { status: string; message?: string; output?: string };
