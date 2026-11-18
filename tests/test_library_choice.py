@@ -99,6 +99,10 @@ def test_a_pick_naming_a_provider_an_earlier_slots_library_has_is_left_out():
     assert lc.to_place({UP: "x-v1", FG: "x-v2"}, [bundle, newer], V10) == ToPlace(((UP, bundle),), ())
     assert lc.to_place({UP: "x-v1", FG: "x-v1"}, [bundle], V10).picked == ((UP, bundle), (FG, bundle))  # one library
     assert lc.to_place({FG: "x-v2"}, [bundle, newer], V10).picked == ((FG, newer),)
+    assert lc.left_out({UP: "x-v1", FG: "x-v2"}, [bundle, newer]) == (FG,)  # the pickers say so
+    assert lc.left_out({UP: "x-v1", FG: "x-v1"}, [bundle]) == ()
+    assert lc.left_out({UP: "x-v1", FG: "gone"}, [bundle]) == ()  # not on the device: nothing to say here
+    assert lc.left_out({UP: "anr", FG: "x-v2"}, [ANR, newer]) == ()  # ANR serves no upscaling: it takes no name
 
 
 def test_optiscaler_0_9_takes_no_libraries():

@@ -209,6 +209,8 @@ export type UserLibraries = {
   slots: LibrarySlot[];
   /** The library picked for every game, per slot. */
   global: Partial<Record<LibrarySlot, string>>;
+  /** The slots whose global pick can't go into games: an earlier slot's library names one of its providers. */
+  left_out: LibrarySlot[];
   /** The patched games a patch now would give other libraries. */
   to_apply: string[];
   installed_bytes: number;
@@ -250,6 +252,8 @@ export type GameLibraryChoice = {
   status: "success";
   own: Partial<Record<LibrarySlot, string>>;
   resolved: Partial<Record<LibrarySlot, string>>;
+  /** The slots whose resolved pick can't go into the game: an earlier slot's library names one of its providers. */
+  left_out: LibrarySlot[];
   pending: boolean;
 };
 

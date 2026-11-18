@@ -36,8 +36,9 @@ class UserLibraries:
     # ── what is on the device ────────────────────────────────────────────────
 
     def installed(self) -> dict:
-        """The libraries, by name, with what they serve and take and the games that have them; the slots and the
-        global choice; and the patched games a patch now would give other libraries ("Apply to them")."""
+        """The libraries, by name, with what they serve and take and the games that have them; the slots, the
+        global choice and its slots that can't go in; and the patched games a patch now would give other libraries
+        ("Apply to them")."""
         libraries = sorted(self.store.installed(), key=lambda item: item.label.lower())
         sizes = {item.id: self.store.size(item.id) for item in libraries}
         patched = self.patcher.patched_markers()
@@ -49,19 +50,23 @@ class UserLibraries:
             ],
             "slots": list(user_libraries.SLOTS),
             "global": choices.global_choice,
+            "left_out": list(library_choice.left_out(choices.global_choice, libraries)),
             "to_apply": [name for _, name, details in self._to_apply(patched, choices, libraries)],
             "installed_bytes": sum(sizes.values()),
         }
 
     def game_choice(self, appid: str) -> dict:
-        """A game's own choice per slot (a library, none, or absent: the global choice), what it comes to, and
-        whether the game, patched, has other libraries than a patch now would give it ("patch again")."""
+        """A game's own choice per slot (a library, none, or absent: the global choice), what it comes to and its
+        slots that can't go in, and whether the game, patched, has other libraries than a patch now would give it
+        ("patch again")."""
         choices, installed = self.choices.read(), self.store.installed()
         patched = [entry for entry in self.patcher.patched_markers() if str(entry[2].get("appid") or "") == appid]
+        resolved = library_choice.resolved(choices, appid)
         return {
             "status": "success",
             "own": choices.games.get(appid, {}),
-            "resolved": library_choice.resolved(choices, appid),
+            "resolved": resolved,
+            "left_out": list(library_choice.left_out(resolved, installed)),
             "pending": bool(self._to_apply(patched, choices, installed)),
         }
 

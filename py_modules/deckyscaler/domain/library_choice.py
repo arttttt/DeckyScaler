@@ -104,16 +104,10 @@ class ToPlace:
     """The other libraries OptiScaler's menu offers (Library.in_menu), by label: in the game, selected by nothing."""
 
 
-def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -> ToPlace:
-    """The libraries a patch with a version of `family` places: each chosen one still on the device that serves its
-    slot, and every other one OptiScaler's menu offers; none for a family that takes no libraries.
-
-    A provider is found by its folder's name, so one name is one library's in a game (two versions of one project
-    share it): the first pick's in slot order, the upscaler's, else the one added last's. A pick whose provider an
-    earlier slot's library already names is left out, as the game wouldn't run it. A library goes in whole or not
-    at all."""
-    if not family.libraries:
-        return ToPlace((), ())
+def _picked(chosen: dict[str, str], installed: list[Library]) -> tuple[tuple[str, Library], ...]:
+    """Each chosen library still on the device that serves its slot, in slot order, but one naming a provider an
+    earlier slot's library already has: a provider is found by its folder's name, so the game would run the earlier
+    library's under it."""
     by_id = {library.id: library for library in installed}
     picked: list[tuple[str, Library]] = []
     owners: dict[str, str] = {}  # a provider's name, lowercase → the picked library placing it
@@ -126,8 +120,21 @@ def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -
             continue
         owners.update(dict.fromkeys(names, library.id))
         picked.append((slot, library))
+    return tuple(picked)
+
+
+def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -> ToPlace:
+    """The libraries a patch with a version of `family` places: the picked ones (`_picked`) and every other one
+    OptiScaler's menu offers; none for a family that takes no libraries.
+
+    A provider is found by its folder's name, so one name is one library's in a game (two versions of one project
+    share it): the first pick's in slot order, the upscaler's, else the one added last's. A library goes in whole
+    or not at all."""
+    if not family.libraries:
+        return ToPlace((), ())
+    picked = _picked(chosen, installed)
     # The picked libraries' providers take their names first: none is offered again, nor one sharing a name.
-    taken = set(owners)
+    taken = {provider.name.lower() for _, library in picked for provider in library.providers}
     offered: list[Library] = []
     for library in sorted(installed, key=lambda item: (item.added_at, item.id), reverse=True):
         names = {provider.name.lower() for provider in library.providers}
@@ -135,7 +142,19 @@ def to_place(chosen: dict[str, str], installed: list[Library], family: Family) -
             continue
         taken |= names
         offered.append(library)
-    return ToPlace(tuple(picked), tuple(sorted(offered, key=lambda item: (item.label.lower(), item.id))))
+    return ToPlace(picked, tuple(sorted(offered, key=lambda item: (item.label.lower(), item.id))))
+
+
+def left_out(chosen: dict[str, str], installed: list[Library]) -> tuple[str, ...]:
+    """The slots whose chosen library serves them and is on the device, yet can't go into a game: an earlier slot's
+    library names one of its providers."""
+    by_id = {library.id: library for library in installed}
+    picked = {slot for slot, _ in _picked(chosen, installed)}
+    return tuple(
+        slot
+        for slot in SLOTS
+        if slot not in picked and (library := by_id.get(chosen.get(slot, ""))) is not None and slot in library.slots
+    )
 
 
 def placed(to_place: ToPlace) -> tuple[Placed, ...]:

@@ -40,7 +40,7 @@ const ANR_SOURCE: LibrarySource = {
 };
 const INSTALLED: UserLibraries = {
   libraries: [ANR, SDK], slots: ["upscaler", "frame-generation"], global: { "frame-generation": "anr-v-b19" },
-  to_apply: [], installed_bytes: 46_700_000,
+  left_out: [], to_apply: [], installed_bytes: 46_700_000,
 };
 
 describe("the block on the OptiScaler page", () => {
@@ -70,6 +70,14 @@ describe("the block on the OptiScaler page", () => {
     const view = librariesBlockView({ installed: { ...INSTALLED, global: { "frame-generation": SDK.id } }, sources: null, busy: false, message: null });
 
     expect(view.pickers[1].hint).toBe("Uses its files. Frame generation itself is turned on in OptiScaler settings: FGInput and FGOutput.");
+  });
+
+  it("says when a pick can't go in, as the backend says, before anything else about it", () => {
+    const installed = { ...INSTALLED, global: { "frame-generation": SDK.id }, left_out: ["frame-generation" as const] };
+    const view = librariesBlockView({ installed, sources: null, busy: false, message: null });
+
+    expect(view.pickers[0].hint).toBeNull();
+    expect(view.pickers[1].hint).toBe("Can't go in: one of its providers has the same name as one of the library picked above.");
   });
 
   it("offers to apply the choice to the patched games that don't have it, and holds everything meanwhile", () => {
@@ -266,7 +274,9 @@ describe("the manage dialog", () => {
 });
 
 describe("a game's page", () => {
-  const choice: GameLibraryChoice = { status: "success", own: { upscaler: NONE }, resolved: { "frame-generation": SDK.id }, pending: false };
+  const choice: GameLibraryChoice = {
+    status: "success", own: { upscaler: NONE }, resolved: { "frame-generation": SDK.id }, left_out: [], pending: false,
+  };
 
   it("offers following the global pick, none, or a library serving the slot", () => {
     const { pickers, note } = gameLibraryPickers(INSTALLED, choice, true);
@@ -276,6 +286,13 @@ describe("a game's page", () => {
     expect([pickers[0].selected, pickers[1].selected]).toEqual([NONE, FOLLOW]);
     expect(pickers[1].hint).toContain("FGInput and FGOutput");
     expect(note).toBeNull();
+  });
+
+  it("says when the game's pick can't go in", () => {
+    const { pickers } = gameLibraryPickers(INSTALLED, { ...choice, left_out: ["frame-generation"] }, true);
+
+    expect(pickers[1].hint).toMatch(/^Can't go in/);
+    expect(pickers[0].hint).toBeNull();
   });
 
   it("says to patch again while the game has other libraries than its choice", () => {

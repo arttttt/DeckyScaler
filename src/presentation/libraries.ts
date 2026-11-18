@@ -47,7 +47,11 @@ const ONLY_POINTED: Partial<Record<LibrarySlot, string>> = {
   "frame-generation": "Uses its files. Frame generation itself is turned on in OptiScaler settings: FGInput and FGOutput.",
 };
 
-const hintFor = (libraries: UserLibrary[], slot: LibrarySlot, id: string | undefined): string | null => {
+/** Why a pick doesn't go in: the backend says which slots' picks can't (`leftOut`). */
+const LEFT_OUT = "Can't go in: one of its providers has the same name as one of the library picked above.";
+
+const hintFor = (libraries: UserLibrary[], slot: LibrarySlot, id: string | undefined, leftOut: LibrarySlot[]): string | null => {
+  if (leftOut.includes(slot)) return LEFT_OUT;
   const library = libraries.find((item) => item.id === id);
   return library && !library.turns_on.includes(slot) ? ONLY_POINTED[slot] ?? null : null;
 };
@@ -102,7 +106,7 @@ export const librariesBlockView = (state: LibrariesBlockState): LibrariesBlockVi
       options: [{ data: NONE, label: NOT_SET }, ...serving(libraries, slot)],
       selected: installed?.global[slot] ?? NONE,
       enabled: !busy,
-      hint: hintFor(libraries, slot, installed?.global[slot]),
+      hint: hintFor(libraries, slot, installed?.global[slot], installed?.left_out ?? []),
     })),
     apply: pending.length
       ? {
@@ -342,7 +346,7 @@ export const gameLibraryPickers = (
       : [{ data: FOLLOW, label: "Libraries need OptiScaler 10" }],
     selected: takesLibraries ? choice.own[slot] ?? FOLLOW : FOLLOW,
     enabled: takesLibraries,
-    hint: takesLibraries ? hintFor(libraries, slot, choice.resolved[slot]) : null,
+    hint: takesLibraries ? hintFor(libraries, slot, choice.resolved[slot], choice.left_out) : null,
   }));
   return { pickers, note: takesLibraries && choice.pending ? "Patch again to give it the current libraries." : null };
 };

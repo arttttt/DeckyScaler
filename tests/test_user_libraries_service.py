@@ -142,9 +142,28 @@ def test_a_slot_takes_only_a_library_that_serves_it(plugin, home, plugin_home):
     assert run(plugin.user_library_choose("global", UP, "anr-v-b19"))["status"] == "error"
     assert run(plugin.user_library_choose("not-a-game", FG, None))["status"] == "error"
     assert run(plugin.user_library_choose("620", FG, "none")) == {"status": "success", "to_apply": []}
-    assert run(plugin.user_library_game_choice("620")) == {"status": "success", "own": {FG: "none"}, "resolved": {}, "pending": False}
+    assert run(plugin.user_library_game_choice("620")) == {
+        "status": "success", "own": {FG: "none"}, "resolved": {}, "left_out": [], "pending": False,
+    }
     assert run(plugin.user_library_game_choice("570"))["resolved"] == {FG: "anr-v-b19"}
     assert run(plugin.user_libraries_installed())["global"] == {FG: "anr-v-b19"}
+    assert run(plugin.user_libraries_installed())["left_out"] == []
+
+
+def test_a_pick_whose_provider_an_earlier_slots_library_names_is_said_to_be_left_out(plugin, home, plugin_home, tmp_path):
+    libraries = owner(home)
+    write(tmp_path / "bundle" / "X" / "ffx" / "a.dll", b"a")
+    write(tmp_path / "bundle" / "Y" / "dlssg" / "b.dll", b"b")
+    write(tmp_path / "other" / "X" / "dlssg" / "c.dll", b"c")
+    assert libraries.add(str(tmp_path / "bundle"))["id"] == "bundle"
+    assert libraries.add(str(tmp_path / "other"))["id"] == "x"
+    run(plugin.user_library_choose("global", UP, "bundle"))
+    run(plugin.user_library_choose("global", FG, "x"))
+
+    assert run(plugin.user_libraries_installed())["left_out"] == [FG]
+    assert run(plugin.user_library_game_choice("620"))["left_out"] == [FG]
+    assert run(plugin.user_library_choose("620", UP, "none"))["status"] == "success"
+    assert run(plugin.user_library_game_choice("620"))["left_out"] == []
 
 
 def test_a_new_choice_is_applied_to_patched_games_and_a_running_one_is_left_alone(plugin, home, plugin_home, tmp_path, monkeypatch):
