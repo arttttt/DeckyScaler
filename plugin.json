@@ -4,8 +4,8 @@
   "flags": [],
   "api_version": 1,
   "publish": {
-    "tags": ["DLSS", "Framegen","upscaling","FSR"],
-    "description": "This plugin installs and manages OptiScaler, a tool that enhances upscaling and enables frame generation in a range of DirectX 12 games.",
+    "tags": ["OptiScaler", "upscaling", "frame generation", "FSR", "XeSS", "DLSS", "Proton"],
+    "description": "Patches games with any OptiScaler version, stable or nightly, straight from OptiScaler's releases; adds upscaler and frame generation libraries such as ANR or your own FSR and XeSS files; installs GE-Proton and Proton-CachyOS. Per game, from Game Mode, undone in one press.",
     "image": "https://raw.githubusercontent.com/arttttt/DeckyScaler/refs/heads/main/assets/optiscaler_final.png"
   }
 }
