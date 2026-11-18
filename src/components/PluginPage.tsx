@@ -28,10 +28,9 @@ function AdvancedPage() {
       <ManualPatchControls
         ready={picked.patchWith.ready}
         dllName={picked.patchWith.dllName}
-        launchOptions={picked.launch.launchOptions}
         patchWith={picked.patchWith.versionId}
       />
-      <ClipboardCommands launch={picked.launch} manualModeEnabled />
+      <ClipboardCommands launch={picked.launch} />
       <OptiScalerWiki />
     </PanelSection>
   );

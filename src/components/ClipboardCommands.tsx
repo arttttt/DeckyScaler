@@ -1,23 +1,12 @@
 import { SmartClipboardButton } from "./SmartClipboardButton";
 import { ProxyDllView, WRAPPER_PATCH_CONFIRMATION } from "../presentation/launch";
 
-interface ClipboardCommandsProps {
-  launch: ProxyDllView;
-  manualModeEnabled?: boolean;
-  showLaunchOptions?: boolean;
-}
-
-export function ClipboardCommands({
-  launch,
-  manualModeEnabled = false,
-  showLaunchOptions = true,
-}: ClipboardCommandsProps) {
+/** What a game set up by hand takes: its launch options, or the launch wrapper's commands. */
+export function ClipboardCommands({ launch }: { launch: ProxyDllView }) {
   return (
     <>
-      {showLaunchOptions && launch.launchOptions ? (
-        <SmartClipboardButton command={launch.launchOptions} buttonText="Copy launch options" />
-      ) : null}
-      {manualModeEnabled && launch.wrapper ? (
+      {launch.launchOptions && <SmartClipboardButton command={launch.launchOptions} buttonText="Copy launch options" />}
+      {launch.wrapper && (
         <>
           <SmartClipboardButton
             command={launch.wrapper.patch}
@@ -26,7 +15,7 @@ export function ClipboardCommands({
           />
           <SmartClipboardButton command={launch.wrapper.unpatch} buttonText="Copy Unpatch Command" />
         </>
-      ) : null}
+      )}
     </>
   );
 }

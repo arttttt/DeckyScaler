@@ -1,13 +1,10 @@
 import { ButtonItem, Field, PanelSectionRow } from "@decky/ui";
 import { useManualPatch } from "../hooks/useManualPatch";
-import { SmartClipboardButton } from "./SmartClipboardButton";
 import { Confirmation } from "./Confirmation";
 
 interface ManualPatchControlsProps {
   ready: boolean;
   dllName: string;
-  /** What to copy as the game's launch options; built by the backend. */
-  launchOptions: string | null;
   patchWith: string;
 }
 
@@ -24,11 +21,10 @@ const PATH_STYLE = {
 } as const;
 
 /** Patch a directory picked by hand: a game outside Steam, or one the Steam section can't find. */
-export const ManualPatchControls = ({ ready, dllName, launchOptions, patchWith }: ManualPatchControlsProps) => {
+export const ManualPatchControls = ({ ready, dllName, patchWith }: ManualPatchControlsProps) => {
   const { view, selectedPath, pickerError, onPick, onPatch, unpatch } = useManualPatch({ ready, dllName, patchWith });
   return (
     <>
-      {launchOptions && <SmartClipboardButton command={launchOptions} buttonText="Manual launch cmd" />}
       <PanelSectionRow>
         <ButtonItem
           layout="below"
