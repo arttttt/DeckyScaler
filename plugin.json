@@ -5,7 +5,7 @@
   "api_version": 1,
   "publish": {
     "tags": ["OptiScaler", "upscaling", "frame generation", "FSR", "XeSS", "DLSS", "Proton"],
-    "description": "Patches games with any OptiScaler version, stable or nightly, straight from OptiScaler's releases; adds upscaler and frame generation libraries such as ANR or your own FSR and XeSS files; installs GE-Proton and Proton-CachyOS. Per game, from Game Mode, undone in one press.",
+    "description": "Sets up OptiScaler in your games right from Game Mode, and takes it back out just as cleanly.",
     "image": "https://raw.githubusercontent.com/arttttt/DeckyScaler/refs/heads/main/assets/optiscaler_final.png"
   }
 }
