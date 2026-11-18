@@ -50,7 +50,7 @@ Attach screenshots to help illustrate the issue.
 - **DeckyScaler Version**: [e.g., 2026.11.18]
 - **Decky Loader Version**: [e.g., v3.3.0]
 - **OptiScaler Version and Proxy DLL**: [e.g., nightly-20261116, dxgi.dll]
-- **Proton**: [e.g., GE-Proton10-25]
+- **Proton**: [e.g., GE-Proton11-11]
 
 ## **Additional Context**
 Provide any **additional details** that may help in diagnosing the issue.
