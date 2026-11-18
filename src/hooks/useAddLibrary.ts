@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { getPathDefaults, userLibraryAdd } from "../api";
+import { useState } from "react";
+import { userLibraryAdd } from "../api";
 import { FileSelectionType, pickPath } from "../api/filePicker";
 import { addOutcome, pickerStart } from "../presentation/libraries";
-import type { PathDefaults } from "../presentation/manualPatch";
 import { safeAsyncOperation } from "../utils";
+import { usePathDefaults } from "./usePathDefaults";
 
 /** What the user picks to add as a library: a zip or a DLL (a file), or a folder. */
 export type AddPick = "file" | "folder";
@@ -12,13 +12,9 @@ const SELECTION: Record<AddPick, FileSelectionType> = { file: FileSelectionType.
 
 /** Picking a library on the device and adding it; `onChanged` runs after one is added. */
 export const useAddLibrary = (onChanged: () => void) => {
-  const [defaults, setDefaults] = useState<PathDefaults | null>(null);
+  const defaults = usePathDefaults();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    void safeAsyncOperation(getPathDefaults, "AddLibrary -> getPathDefaults").then((answer) => setDefaults(answer ?? null));
-  }, []);
 
   const onPick = async (kind: AddPick) => {
     const picked = await pickPath(SELECTION[kind], pickerStart(defaults));

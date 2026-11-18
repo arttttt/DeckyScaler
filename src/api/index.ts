@@ -7,10 +7,11 @@ export const listInstalledGames = callable<
 
 export const logError = callable<[string], void>("log_error");
 
-export const getPathDefaults = callable<
-  [],
-  { home: string; steam_common?: string }
->("get_path_defaults");
+/** Where the pickers start (Patcher.path_defaults): home; the first Steam library's games; Downloads, or home
+ *  when there is none. The backend always answers all three. */
+export type PathDefaults = { home: string; steam_common: string; downloads: string };
+
+export const getPathDefaults = callable<[], PathDefaults>("get_path_defaults");
 
 export const runManualPatch = callable<
   [directory: string, dll_name: string, version_id: string],

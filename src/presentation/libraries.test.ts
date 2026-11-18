@@ -224,8 +224,8 @@ describe("adding the user's own", () => {
   });
 
   it("opens the picker where Desktop Mode downloads land, and says so", () => {
-    expect(pickerStart({ home: "/home/deck", downloads: "/home/deck/Downloads" })).toBe("/home/deck/Downloads");
-    expect(pickerStart({ home: "/home/deck" })).toBe("/home/deck");
+    const defaults = { home: "/home/deck", steam_common: "/home/deck/Games", downloads: "/home/deck/Downloads" };
+    expect(pickerStart(defaults)).toBe("/home/deck/Downloads");
     expect(pickerStart(null)).toBe("/");
     expect(ADD_HINT).toContain("Downloads");
   });
