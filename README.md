@@ -138,7 +138,7 @@ How to build, test, and try a work-in-progress build on a device: see [CONTRIBUT
 - **[Kurt Himebauch (xXJSONDeruloXx)](https://github.com/xXJSONDeruloXx/Decky-Framegen)** - Decky Framegen, the plugin DeckyScaler continues
 - **[Cdozdil/OptiScaler Team](https://github.com/optiscaler/OptiScaler)** - OptiScaler, which everything this plugin puts into a game is for
 - **[Nukem9](https://github.com/Nukem9/dlssg-to-fsr3)** - dlssg-to-fsr3, the frame generation provider OptiScaler ships and uses by default
-- **[FakeMichau](https://github.com/FakeMichau/fakenvapi)** - fakenvapi, shipped with OptiScaler 0.9.x for AMD and Intel GPUs
+- **[FakeMichau](https://github.com/optiscaler/fakenvapi)** - fakenvapi, shipped with OptiScaler 0.9.x for AMD and Intel GPUs
 - **[Apex Compute](https://github.com/apex-compute/ANR)** - ANR, the frame generation the Libraries page downloads
 - **[GloriousEggroll](https://github.com/GloriousEggroll/proton-ge-custom)** and **[CachyOS](https://github.com/CachyOS/proton-cachyos)** - GE-Proton and Proton-CachyOS, which the Proton page installs
 - **[7-Zip](https://www.7-zip.org/)** by Igor Pavlov - the plugin ships its static Linux build (`tools/7zzs`, GNU LGPL; license in `tools/7zzs-License.txt`) to unpack OptiScaler archives
