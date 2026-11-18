@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LaunchSetup } from "../api";
-import { clipboardButtonView, patchReady, proxyDllView } from "./launch";
+import { WRAPPER_PATCH_CONFIRMATION, clipboardButtonView, patchReady, proxyDllView } from "./launch";
 
 const SETUP: LaunchSetup = {
   default: "dxgi.dll",
@@ -45,5 +45,18 @@ describe("a copy button", () => {
     expect(clipboardButtonView("idle", "Copy")).toEqual({ label: "Copy", icon: "clipboard", pulsing: false, color: null, enabled: true });
     expect(clipboardButtonView("copying", "Copy")).toEqual({ label: "Copying...", icon: "clipboard", pulsing: true, color: null, enabled: false });
     expect(clipboardButtonView("copied", "Copy")).toEqual({ label: "Copied to clipboard", icon: "check", pulsing: false, color: "#4CAF50", enabled: false });
+  });
+});
+
+describe("copying the wrapper's patch command", () => {
+  it("asks first, saying the game is patched on every launch until the unpatch command replaces it", () => {
+    expect(WRAPPER_PATCH_CONFIRMATION).toEqual({
+      title: "Patch Game with OptiScaler?",
+      lines: [
+        "While this command is in the game's launch options, the game is patched on every launch, even after DeckyScaler is uninstalled.",
+        "To take OptiScaler out, put the command Copy Unpatch Command copies there instead and start the game once.",
+      ],
+      okLabel: "Copy Patch Command",
+    });
   });
 });
