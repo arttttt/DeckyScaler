@@ -31,7 +31,8 @@ export type CopyConfirmation = { title: string; lines: string[]; okLabel: string
 export const WRAPPER_PATCH_CONFIRMATION: CopyConfirmation = {
   title: "Patch Game with OptiScaler?",
   lines: [
-    "WARNING: DeckyScaler does not unpatch games when uninstalled. Be sure to unpatch the game or run the OptiScaler uninstall script inside the game files if you choose to uninstall the plugin or the game has issues.",
+    "While this command is in the game's launch options, the game is patched on every launch, even after DeckyScaler is uninstalled.",
+    "To take OptiScaler out, put the command Copy Unpatch Command copies there instead and start the game once.",
   ],
   okLabel: "Copy Patch Command",
 };
