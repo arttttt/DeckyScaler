@@ -5,7 +5,7 @@
   "api_version": 1,
   "publish": {
     "tags": ["OptiScaler", "upscaling", "frame generation", "FSR", "XeSS", "DLSS", "Proton"],
-    "description": "Sets up OptiScaler in your games right from Game Mode, and takes it back out just as cleanly.",
+    "description": "Manages upscaling, frame generation and Proton for your games, right from Game Mode.",
     "image": "https://raw.githubusercontent.com/arttttt/DeckyScaler/refs/heads/main/assets/optiscaler_final.png"
   }
 }

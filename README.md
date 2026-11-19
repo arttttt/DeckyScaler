@@ -1,6 +1,6 @@
 # DeckyScaler
 
-DeckyScaler is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for the Steam Deck and other Linux handhelds. It puts [OptiScaler](https://github.com/optiscaler/OptiScaler) into a game straight from Game Mode, so you can try FSR 4, XeSS or frame generation without going to Desktop Mode, and Unpatch leaves the game as it was. It also brings what OptiScaler can use: any of its versions, libraries such as ANR, and newer Proton builds.
+DeckyScaler is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for the Steam Deck and other Linux handhelds that looks after the upscaling, frame generation and Proton side of your games. It keeps [OptiScaler](https://github.com/optiscaler/OptiScaler)'s versions, extra upscaling and frame generation libraries, and Proton builds in one place, and puts them to use in your games straight from Game Mode. Unpatch leaves a game as it was.
 
 > DeckyScaler (formerly Decky Framegen) is a continuation of [xXJSONDeruloXx/Decky-Framegen](https://github.com/xXJSONDeruloXx/Decky-Framegen). Its builds don't include OptiScaler: games are patched from versions in the plugin's OptiScaler library (`~/deckyscaler/library`), downloaded straight from OptiScaler's releases. Download a version under **OptiScaler versions** → *Download versions…* before patching a game. Report problems in [this repository's issues](https://github.com/arttttt/DeckyScaler/issues).
 
@@ -8,7 +8,7 @@ DeckyScaler is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loade
 
 OptiScaler takes the upscaling a game already has (DLSS, FSR 2 and newer, or XeSS) and runs the one you pick in its place: FSR 3.1 or FSR 4, XeSS, or DLSS on NVIDIA. It can add frame generation too.
 
-DeckyScaler downloads OptiScaler from its own releases, stable or nightly, and each game runs the version you pick for it. The settings come from that version's `OptiScaler.ini`, so a new OptiScaler brings its new settings without waiting for a plugin update. With OptiScaler 10 a game can also get libraries OptiScaler doesn't ship: ANR's frame generation, or FSR and XeSS files you bring. GE-Proton and Proton-CachyOS install from the plugin as well, and they fetch the driver file FSR 4 needs on Linux.
+DeckyScaler downloads OptiScaler from its own releases, stable or nightly, and each game runs the version you pick for it. The settings come from that version's `OptiScaler.ini`, so a new OptiScaler brings its new settings without waiting for a plugin update. With OptiScaler 10 a game can also get upscaling and frame generation libraries OptiScaler doesn't ship, downloaded from the plugin or brought by you. Proton builds install from the plugin as well, and the ones it offers fetch the driver file FSR 4 needs on Linux.
 
 Every patch is recorded, so Unpatch undoes exactly what it did, launch options included. A game the original Decky Framegen patched can be reset to its own files.
 
