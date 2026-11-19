@@ -264,6 +264,12 @@ def library_json(library: Library, size: int, games: list[str]) -> dict:
     }
 
 
+def damaged_json(name: str, entry: Library | None, size: int) -> dict:
+    """What is left of a library that isn't whole, as Manage libraries lists it to remove: by the name its entry
+    still gives, else by its folder's; `size` what it takes on the device."""
+    return {"id": name, "label": entry.label if entry is not None else name, "size": size}
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
