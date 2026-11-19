@@ -216,6 +216,8 @@ export type UserLibraries = {
   global: Partial<Record<LibrarySlot, string>>;
   /** The slots whose global pick can't go into games: an earlier slot's library names one of its providers. */
   left_out: LibrarySlot[];
+  /** The slots whose global pick names a library that isn't on the device (damaged, or gone): nothing goes in. */
+  missing: LibrarySlot[];
   /** The patched games a patch now would give other libraries. */
   to_apply: string[];
   /** What the libraries and the damaged ones take on the device. */
@@ -260,6 +262,8 @@ export type GameLibraryChoice = {
   resolved: Partial<Record<LibrarySlot, string>>;
   /** The slots whose resolved pick can't go into the game: an earlier slot's library names one of its providers. */
   left_out: LibrarySlot[];
+  /** The slots whose resolved pick names a library that isn't on the device (damaged, or gone): nothing goes in. */
+  missing: LibrarySlot[];
   pending: boolean;
 };
 

@@ -40,7 +40,7 @@ const ANR_SOURCE: LibrarySource = {
 };
 const INSTALLED: UserLibraries = {
   libraries: [ANR, SDK], damaged: [], slots: ["upscaler", "frame-generation"], global: { "frame-generation": "anr-v-b19" },
-  left_out: [], to_apply: [], installed_bytes: 46_700_000,
+  left_out: [], missing: [], to_apply: [], installed_bytes: 46_700_000,
 };
 
 describe("the block on the OptiScaler page", () => {
@@ -78,6 +78,30 @@ describe("the block on the OptiScaler page", () => {
 
     expect(view.pickers[0].hint).toBeNull();
     expect(view.pickers[1].hint).toBe("Can't go in: one of its providers has the same name as one of the library picked above.");
+  });
+
+  it("names a pick whose library is damaged or gone, so the dropdown shows it, and says why nothing goes in", () => {
+    const damaged = { id: "anr-v-b18", label: "Apex Neural Rendering FG V.B18", size: 3_100_000 };
+    const installed: UserLibraries = {
+      ...INSTALLED,
+      damaged: [damaged],
+      global: { upscaler: "gone", "frame-generation": "anr-v-b18" },
+      missing: ["upscaler", "frame-generation"],
+    };
+    const view = librariesBlockView({ installed, sources: null, busy: false, message: null });
+
+    expect(view.pickers[0].options.at(-1)).toEqual({ data: "gone", label: "gone (not on the device)" });
+    expect(view.pickers[1].options.at(-1)).toEqual({ data: "anr-v-b18", label: "Apex Neural Rendering FG V.B18 (damaged)" });
+    expect(view.pickers.map((picker) => picker.selected)).toEqual(["gone", "anr-v-b18"]);
+    expect(view.pickers[1].hint).toBe(
+      "Can't go in: this library is damaged or no longer on the device. Pick another, or download or add it again.",
+    );
+  });
+
+  it("adds no option of its own for a pick that is on the device", () => {
+    const view = librariesBlockView({ installed: INSTALLED, sources: null, busy: false, message: null });
+
+    expect(view.pickers[1].options.map((option) => option.data)).toEqual([NONE, "anr-v-b19", "xess-sdk-3-0-2"]);
   });
 
   it("offers to apply the choice to the patched games that don't have it, and holds everything meanwhile", () => {
@@ -303,7 +327,7 @@ describe("the manage dialog", () => {
 
 describe("a game's page", () => {
   const choice: GameLibraryChoice = {
-    status: "success", own: { upscaler: NONE }, resolved: { "frame-generation": SDK.id }, left_out: [], pending: false,
+    status: "success", own: { upscaler: NONE }, resolved: { "frame-generation": SDK.id }, left_out: [], missing: [], pending: false,
   };
 
   it("offers following the global pick, none, or a library serving the slot", () => {
@@ -321,6 +345,27 @@ describe("a game's page", () => {
 
     expect(pickers[1].hint).toMatch(/^Can't go in/);
     expect(pickers[0].hint).toBeNull();
+  });
+
+  it("names a global or own pick whose library is damaged or gone, and says why nothing goes in", () => {
+    const damaged = { id: "anr-v-b18", label: "Apex Neural Rendering FG V.B18", size: 3_100_000 };
+    const installed: UserLibraries = {
+      ...INSTALLED, damaged: [damaged], global: { "frame-generation": "anr-v-b18" }, missing: ["frame-generation"],
+    };
+    const following = gameLibraryPickers(installed, { ...choice, resolved: { "frame-generation": "anr-v-b18" }, missing: ["frame-generation"] }, true);
+    const own = gameLibraryPickers(
+      installed,
+      { ...choice, own: { upscaler: "gone" }, resolved: { upscaler: "gone", "frame-generation": "anr-v-b18" }, missing: ["upscaler", "frame-generation"] },
+      true,
+    );
+
+    expect(following.pickers[1].options[0].label).toBe("Same as global: Apex Neural Rendering FG V.B18 (damaged)");
+    // It follows the global pick: no option of its own to show.
+    expect(following.pickers[1].options.map((option) => option.data)).toEqual([FOLLOW, NONE, "anr-v-b19", "xess-sdk-3-0-2"]);
+    expect(following.pickers[1].hint).toMatch(/^Can't go in: this library is damaged or no longer on the device/);
+    expect(own.pickers[0].options.at(-1)).toEqual({ data: "gone", label: "gone (not on the device)" });
+    expect(own.pickers[0].selected).toBe("gone");
+    expect(own.pickers[0].hint).toMatch(/^Can't go in: this library is damaged/);
   });
 
   it("says to patch again while the game has other libraries than its choice", () => {
