@@ -285,7 +285,7 @@ const describeLibrary = (library: UserLibrary): string => {
 
 /** A damaged library: what happened to it, and what it still takes. */
 const describeDamaged = (damaged: DamagedLibrary): string =>
-  ["Damaged: some of its files are missing, so it no longer goes into games", byteSize(damaged.size)].join(" · ");
+  ["Damaged: it no longer goes into games", byteSize(damaged.size)].join(" · ");
 
 export const libraryManageView = (state: LibraryManageState): LibraryManageView => {
   const { installed, busy } = state;

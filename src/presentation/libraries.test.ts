@@ -264,7 +264,7 @@ describe("the manage dialog", () => {
     expect(view.rows[1]).toEqual({
       id: "anr-v-b18",
       label: "Apex Neural Rendering FG V.B18",
-      description: "Damaged: some of its files are missing, so it no longer goes into games · 3 MB",
+      description: "Damaged: it no longer goes into games · 3 MB",
       action: { label: "Remove", enabled: true },
     });
     expect(view.usage).toBe("Libraries take 9 MB.");
