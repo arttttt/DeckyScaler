@@ -231,6 +231,13 @@ def test_a_library_is_listed_with_what_it_serves_takes_and_which_games_have_it()
     assert ul.space_needed(3_418_118) == 4 * 3_418_118
 
 
+def test_whats_left_of_a_damaged_library_is_named_as_its_entry_names_it_else_by_its_folder():
+    library = ul.Library("x", "XeSS SDK", "3.0.2", ul.YOUR_FILE, None, (), (), (), (), "")
+
+    assert ul.damaged_json("x", library, 12) == {"id": "x", "label": "XeSS SDK 3.0.2", "size": 12}
+    assert ul.damaged_json("x", None, 0) == {"id": "x", "label": "x", "size": 0}
+
+
 def test_a_provider_and_an_upscaler_dll_switch_on_by_themselves_and_a_frame_generation_dll_doesnt():
     sdk = ul.added(ul.recognize(XESS_SDK), "sdk.zip", None, set(), "t")
     fg_only = ul.added(ul.recognize(frozenset({"libxess_fg.dll"})), "fg", None, set(), "t")

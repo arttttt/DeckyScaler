@@ -205,20 +205,27 @@ export type UserLibrary = {
   games: string[];
 };
 
+/** What is left of a library whose files or entry went missing: it no longer goes into games, and can only be removed. */
+export type DamagedLibrary = { id: string; label: string; size: number };
+
 export type UserLibraries = {
   libraries: UserLibrary[];
+  damaged: DamagedLibrary[];
   slots: LibrarySlot[];
   /** The library picked for every game, per slot. */
   global: Partial<Record<LibrarySlot, string>>;
   /** The slots whose global pick can't go into games: an earlier slot's library names one of its providers. */
   left_out: LibrarySlot[];
+  /** The slots whose global pick names a library that isn't on the device (damaged, or gone): nothing goes in. */
+  missing: LibrarySlot[];
   /** The patched games a patch now would give other libraries. */
   to_apply: string[];
+  /** What the libraries and the damaged ones take on the device. */
   installed_bytes: number;
 };
 
-/** A library a game's patch placed, as its status says. */
-/** A library a game's patch placed: picked for a slot, or (slot null) only there to pick in OptiScaler's menu. */
+/** A library a game's patch placed, as its status says: picked for a slot, or (slot null) only there to pick in
+ *  OptiScaler's menu. */
 export type PlacedLibrary = { slot: LibrarySlot | null; id: string; label: string };
 
 /** Where libraries are downloaded from: what its library serves, and the GitHub repository it comes from. */
@@ -255,6 +262,8 @@ export type GameLibraryChoice = {
   resolved: Partial<Record<LibrarySlot, string>>;
   /** The slots whose resolved pick can't go into the game: an earlier slot's library names one of its providers. */
   left_out: LibrarySlot[];
+  /** The slots whose resolved pick names a library that isn't on the device (damaged, or gone): nothing goes in. */
+  missing: LibrarySlot[];
   pending: boolean;
 };
 
@@ -267,8 +276,8 @@ export const userLibraryInstall = callable<[source: string, release_id: string],
 export const userLibraryAdd = callable<[path: string], UserLibraryResult>("user_library_add");
 export const userLibraryRemoval = callable<[library_id: string], UserLibraryRemoval>("user_library_removal");
 export const userLibraryRemove = callable<[library_id: string], { status: string; message?: string }>("user_library_remove");
-/** `scope` is "global" or a game's appid; `value` a library, "none", or null (a game follows the global choice). */
-/** A saved choice names the patched games it reaches that don't have their libraries yet. */
+/** `scope` is "global" or a game's appid; `value` a library, "none", or null (a game follows the global choice).
+ *  A saved choice names the patched games it reaches that don't have their libraries yet. */
 export const userLibraryChoose = callable<
   [scope: string, slot: LibrarySlot, value: string | null],
   { status: string; message?: string; to_apply?: string[] }

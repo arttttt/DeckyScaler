@@ -157,6 +157,26 @@ def test_only_a_directory_named_as_its_entry_is_a_library(tmp_path):
     assert store.installed() == []
 
 
+def test_what_isnt_a_whole_library_is_damaged_and_named_by_what_its_entry_still_says(tmp_path):
+    store = UserLibraryStore(tmp_path / "libraries")
+    for name in ("whole", "missing"):
+        stage = store.staging(name)
+        (stage / ul.FILES_DIRNAME).mkdir()
+        (stage / ul.FILES_DIRNAME / "libxess.dll").write_bytes(b"1")
+        store.commit(stage, _library(name))
+    (store.files_dir("missing") / "libxess.dll").unlink()
+    store.commit_entry(store.staging("moved"), "moved", ul.entry_json(_library("other")))
+    (store.items_dir / "unreadable").mkdir()
+    (store.items_dir / "unreadable" / ul.ENTRY_FILENAME).write_text("{not json")
+    (store.items_dir / "no-entry" / ul.FILES_DIRNAME).mkdir(parents=True)  # an interrupted removal took its entry
+
+    assert store.installed() == [_library("whole")]
+    assert store.damaged() == [
+        ("missing", _library("missing")), ("moved", _library("other")), ("no-entry", None), ("unreadable", None),
+    ]
+    assert store.listed() == {"whole", "missing", "moved", "no-entry", "unreadable"}
+
+
 def test_the_choices_are_kept_in_one_file(tmp_path):
     store = LibraryChoicesStore(tmp_path / "settings" / "libraries.json")
 

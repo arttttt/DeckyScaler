@@ -1,4 +1,5 @@
 import type {
+  DamagedLibrary,
   GameLibraryChoice,
   LibraryRefusal,
   LibrarySlot,
@@ -40,19 +41,38 @@ const NOT_SET = "From OptiScaler settings";
 const serving = (libraries: UserLibrary[], slot: LibrarySlot): { data: string; label: string }[] =>
   libraries.filter((library) => library.slots.includes(slot)).map((library) => ({ data: library.id, label: library.label }));
 
-const labelOf = (libraries: UserLibrary[], id: string | undefined): string =>
-  libraries.find((library) => library.id === id)?.label ?? NOT_SET;
+/** What the backend says of the slots whose pick can't go in: `left_out` a provider's name another pick already
+ *  has, `missing` a library that isn't on the device. */
+type CantGoIn = { left_out: LibrarySlot[]; missing: LibrarySlot[] };
+
+/** A pick naming a library that isn't on the device, as the pickers name it: by what is left of it, else its id. */
+const missingLabel = (installed: UserLibraries, id: string): string => {
+  const damaged = installed.damaged.find((item) => item.id === id);
+  return damaged ? `${damaged.label} (damaged)` : `${id} (not on the device)`;
+};
+
+/** What a slot's pick is called: its library, a library that isn't on the device, or OptiScaler's settings. */
+const pickLabel = (installed: UserLibraries, slot: LibrarySlot, id: string | undefined, cantGoIn: CantGoIn): string =>
+  id && cantGoIn.missing.includes(slot)
+    ? missingLabel(installed, id)
+    : installed.libraries.find((library) => library.id === id)?.label ?? NOT_SET;
+
+/** The option a pick naming a library that isn't on the device needs, so its dropdown shows what is picked. */
+const missingOption = (installed: UserLibraries, slot: LibrarySlot, id: string | undefined, cantGoIn: CantGoIn) =>
+  id && cantGoIn.missing.includes(slot) ? [{ data: id, label: missingLabel(installed, id) }] : [];
 
 /** What to know of a library picked for a slot it doesn't switch on by itself: OptiScaler's own settings do. */
 const ONLY_POINTED: Partial<Record<LibrarySlot, string>> = {
   "frame-generation": "Uses its files. Frame generation itself is turned on in OptiScaler settings: FGInput and FGOutput.",
 };
 
-/** Why a pick doesn't go in: the backend says which slots' picks can't (`leftOut`). */
+/** Why a pick doesn't go in, as the backend says which slots' picks can't (`CantGoIn`). */
 const LEFT_OUT = "Can't go in: one of its providers has the same name as one of the library picked above.";
+const MISSING = "Can't go in: this library is damaged or no longer on the device. Pick another, or download or add it again.";
 
-const hintFor = (libraries: UserLibrary[], slot: LibrarySlot, id: string | undefined, leftOut: LibrarySlot[]): string | null => {
-  if (leftOut.includes(slot)) return LEFT_OUT;
+const hintFor = (libraries: UserLibrary[], slot: LibrarySlot, id: string | undefined, cantGoIn: CantGoIn): string | null => {
+  if (cantGoIn.missing.includes(slot)) return MISSING;
+  if (cantGoIn.left_out.includes(slot)) return LEFT_OUT;
   const library = libraries.find((item) => item.id === id);
   return library && !library.turns_on.includes(slot) ? ONLY_POINTED[slot] ?? null : null;
 };
@@ -101,14 +121,20 @@ export const librariesBlockView = (state: LibrariesBlockState): LibrariesBlockVi
   return {
     summary: librariesSummary(installed),
     downloadNote: sourcesLine(state.sources),
-    pickers: (installed?.slots ?? []).map((slot) => ({
-      slot,
-      label: slotLabel(slot),
-      options: [{ data: NONE, label: NOT_SET }, ...serving(libraries, slot)],
-      selected: installed?.global[slot] ?? NONE,
-      enabled: !busy,
-      hint: hintFor(libraries, slot, installed?.global[slot], installed?.left_out ?? []),
-    })),
+    pickers: installed
+      ? installed.slots.map((slot) => ({
+          slot,
+          label: slotLabel(slot),
+          options: [
+            { data: NONE, label: NOT_SET },
+            ...serving(libraries, slot),
+            ...missingOption(installed, slot, installed.global[slot], installed),
+          ],
+          selected: installed.global[slot] ?? NONE,
+          enabled: !busy,
+          hint: hintFor(libraries, slot, installed.global[slot], installed),
+        }))
+      : [],
     apply: pending.length
       ? {
           text: `${count(pending.length, "patched game", "patched games")} ${plural(pending.length, "doesn't", "don't")} have the current libraries yet: ${pending.join(", ")}.`,
@@ -282,18 +308,26 @@ const describeLibrary = (library: UserLibrary): string => {
   return [serves, ORIGINS[library.origin] ?? library.origin, byteSize(library.size), used].join(" · ");
 };
 
+/** A damaged library: what happened to it, and what it still takes. */
+const describeDamaged = (damaged: DamagedLibrary): string =>
+  ["Damaged: it no longer goes into games", byteSize(damaged.size)].join(" · ");
+
 export const libraryManageView = (state: LibraryManageState): LibraryManageView => {
   const { installed, busy } = state;
-  const libraries = installed?.libraries ?? [];
+  const removable = (id: string, label: string, description: string): ReleaseRowView => ({
+    id,
+    label,
+    description: busy === id ? "Removing…" : description,
+    action: { label: "Remove", enabled: busy === null },
+  });
+  const rows = [
+    ...(installed?.libraries ?? []).map((library) => removable(library.id, library.label, describeLibrary(library))),
+    ...(installed?.damaged ?? []).map((damaged) => removable(damaged.id, damaged.label, describeDamaged(damaged))),
+  ];
   return {
-    rows: libraries.map((library) => ({
-      id: library.id,
-      label: library.label,
-      description: busy === library.id ? "Removing…" : describeLibrary(library),
-      action: { label: "Remove", enabled: busy === null },
-    })),
+    rows,
     usage: installed?.installed_bytes ? `Libraries take ${byteSize(installed.installed_bytes)}.` : null,
-    message: state.message ?? (installed && libraries.length === 0 ? "No library is added yet." : null),
+    message: state.message ?? (installed && rows.length === 0 ? "No library is added yet." : null),
   };
 };
 
@@ -339,14 +373,15 @@ export const gameLibraryPickers = (
     label: slotLabel(slot),
     options: takesLibraries
       ? [
-          { data: FOLLOW, label: `Same as global: ${labelOf(libraries, installed.global[slot])}` },
+          { data: FOLLOW, label: `Same as global: ${pickLabel(installed, slot, installed.global[slot], installed)}` },
           { data: NONE, label: "None" },
           ...serving(libraries, slot),
+          ...missingOption(installed, slot, choice.own[slot], choice),
         ]
       : [{ data: FOLLOW, label: "Libraries need OptiScaler 10" }],
     selected: takesLibraries ? choice.own[slot] ?? FOLLOW : FOLLOW,
     enabled: takesLibraries,
-    hint: takesLibraries ? hintFor(libraries, slot, choice.resolved[slot], choice.left_out) : null,
+    hint: takesLibraries ? hintFor(libraries, slot, choice.resolved[slot], choice) : null,
   }));
   return { pickers, note: takesLibraries && choice.pending ? "Patch again to give it the current libraries." : null };
 };

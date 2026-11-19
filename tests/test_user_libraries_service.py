@@ -143,7 +143,7 @@ def test_a_slot_takes_only_a_library_that_serves_it(plugin, home, plugin_home):
     assert run(plugin.user_library_choose("not-a-game", FG, None))["status"] == "error"
     assert run(plugin.user_library_choose("620", FG, "none")) == {"status": "success", "to_apply": []}
     assert run(plugin.user_library_game_choice("620")) == {
-        "status": "success", "own": {FG: "none"}, "resolved": {}, "left_out": [], "pending": False,
+        "status": "success", "own": {FG: "none"}, "resolved": {}, "left_out": [], "missing": [], "pending": False,
     }
     assert run(plugin.user_library_game_choice("570"))["resolved"] == {FG: "anr-v-b19"}
     assert run(plugin.user_libraries_installed())["global"] == {FG: "anr-v-b19"}
@@ -214,6 +214,38 @@ def test_removing_a_library_says_who_has_it_and_they_keep_their_copy(plugin, hom
     assert (game / "OptiScaler" / "custom" / ANR / "dlssg" / "nvngx_dlssg.dll").exists()
     assert listed["to_apply"] == [str(game)]  # patching it again would leave the library out
     assert run(plugin.user_library_remove("anr-v-b19"))["status"] == "error"
+
+
+def test_whats_left_of_a_damaged_library_is_listed_with_what_it_takes_and_can_be_removed(plugin, home, plugin_home):
+    libraries = owner(home)
+    libraries.install(ul.ANR, "anr-v-b19")
+    run(plugin.user_library_choose("global", FG, "anr-v-b19"))
+    (libraries.store.files_dir("anr-v-b19") / ANR / "dlssg" / "nvngx_dlssg.dll").unlink()
+    size = libraries.store.size("anr-v-b19")
+
+    listed = run(plugin.user_libraries_installed())
+    assert listed["libraries"] == []
+    assert listed["damaged"] == [{"id": "anr-v-b19", "label": "Apex Neural Rendering FG V.B19", "size": size}]
+    assert listed["installed_bytes"] == size > 0
+    assert listed["missing"] == [FG] and listed["left_out"] == []  # still picked, yet nothing goes in for it
+    assert run(plugin.user_library_game_choice("620"))["missing"] == [FG]
+    assert run(plugin.user_library_removal("anr-v-b19")) == {"status": "success", "games": [], "global": True}
+    assert run(plugin.user_library_remove("anr-v-b19")) == {"status": "success"}
+
+    listed = run(plugin.user_libraries_installed())
+    assert listed["damaged"] == [] and listed["global"] == {} and listed["installed_bytes"] == 0
+    assert listed["missing"] == [] and run(plugin.user_library_game_choice("620"))["missing"] == []
+    assert not libraries.store.item_dir("anr-v-b19").exists()
+
+
+def test_only_what_the_store_lists_can_be_removed(plugin, home, plugin_home):
+    libraries = owner(home)
+    libraries.install(ul.ANR, "anr-v-b19")
+
+    for outside in ("..", ".", "../entries", "nothing"):
+        assert run(plugin.user_library_removal(outside))["status"] == "error"
+        assert run(plugin.user_library_remove(outside))["status"] == "error"
+    assert [item["id"] for item in run(plugin.user_libraries_installed())["libraries"]] == ["anr-v-b19"]
 
 
 def test_what_would_take_more_than_a_library_may_is_refused(home, plugin_home, tmp_path, monkeypatch):

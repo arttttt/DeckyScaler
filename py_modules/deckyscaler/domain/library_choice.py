@@ -157,6 +157,13 @@ def left_out(chosen: dict[str, str], installed: list[Library]) -> tuple[str, ...
     )
 
 
+def missing(chosen: dict[str, str], installed: list[Library]) -> tuple[str, ...]:
+    """The slots whose chosen library isn't on the device: its files went missing, or it was taken away by hand.
+    Nothing goes in for them until it is downloaded or added again, or another is picked."""
+    on_device = {library.id for library in installed}
+    return tuple(slot for slot in SLOTS if slot in chosen and chosen[slot] not in on_device)
+
+
 def placed(to_place: ToPlace) -> tuple[Placed, ...]:
     return tuple((slot, library.id) for slot, library in to_place.picked) + tuple(
         (None, library.id) for library in to_place.offered
