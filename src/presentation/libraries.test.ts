@@ -39,7 +39,7 @@ const ANR_SOURCE: LibrarySource = {
   id: "anr", label: "Apex Neural Rendering FG", slots: ["frame-generation"], repository: "apex-compute/ANR",
 };
 const INSTALLED: UserLibraries = {
-  libraries: [ANR, SDK], slots: ["upscaler", "frame-generation"], global: { "frame-generation": "anr-v-b19" },
+  libraries: [ANR, SDK], damaged: [], slots: ["upscaler", "frame-generation"], global: { "frame-generation": "anr-v-b19" },
   left_out: [], to_apply: [], installed_bytes: 46_700_000,
 };
 
@@ -251,6 +251,34 @@ describe("the manage dialog", () => {
     expect(libraryManageView({ installed: { ...INSTALLED, libraries: [], installed_bytes: 0 }, busy: null, message: null })).toEqual({
       rows: [], usage: null, message: "No library is added yet.",
     });
+  });
+
+  it("lists what is left of a damaged library after the others, to remove, and counts what it takes", () => {
+    const damaged = { id: "anr-v-b18", label: "Apex Neural Rendering FG V.B18", size: 3_100_000 };
+    const view = libraryManageView({
+      installed: { ...INSTALLED, libraries: [ANR], damaged: [damaged], installed_bytes: 8_800_000 },
+      busy: null,
+      message: null,
+    });
+
+    expect(view.rows[1]).toEqual({
+      id: "anr-v-b18",
+      label: "Apex Neural Rendering FG V.B18",
+      description: "Damaged: some of its files are missing, so it no longer goes into games · 3 MB",
+      action: { label: "Remove", enabled: true },
+    });
+    expect(view.usage).toBe("Libraries take 9 MB.");
+  });
+
+  it("holds a damaged row during its removal and doesn't call the dialog empty while one is listed", () => {
+    const damaged = { id: "anr-v-b18", label: "Apex Neural Rendering FG V.B18", size: 3_100_000 };
+    const onlyDamaged = { ...INSTALLED, libraries: [], damaged: [damaged], installed_bytes: 3_100_000 };
+
+    expect(libraryManageView({ installed: onlyDamaged, busy: null, message: null }).message).toBeNull();
+    const busy = libraryManageView({ installed: onlyDamaged, busy: "anr-v-b18", message: null });
+    expect(busy.rows).toEqual([
+      { id: "anr-v-b18", label: "Apex Neural Rendering FG V.B18", description: "Removing…", action: { label: "Remove", enabled: false } },
+    ]);
   });
 
   it("asks before removing, naming who keeps a copy and whether every game had it picked", () => {

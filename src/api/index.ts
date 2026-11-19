@@ -205,8 +205,12 @@ export type UserLibrary = {
   games: string[];
 };
 
+/** What is left of a library whose files or entry went missing: it no longer goes into games, and can only be removed. */
+export type DamagedLibrary = { id: string; label: string; size: number };
+
 export type UserLibraries = {
   libraries: UserLibrary[];
+  damaged: DamagedLibrary[];
   slots: LibrarySlot[];
   /** The library picked for every game, per slot. */
   global: Partial<Record<LibrarySlot, string>>;
@@ -214,6 +218,7 @@ export type UserLibraries = {
   left_out: LibrarySlot[];
   /** The patched games a patch now would give other libraries. */
   to_apply: string[];
+  /** What the libraries and the damaged ones take on the device. */
   installed_bytes: number;
 };
 

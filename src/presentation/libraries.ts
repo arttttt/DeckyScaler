@@ -1,4 +1,5 @@
 import type {
+  DamagedLibrary,
   GameLibraryChoice,
   LibraryRefusal,
   LibrarySlot,
@@ -282,18 +283,26 @@ const describeLibrary = (library: UserLibrary): string => {
   return [serves, ORIGINS[library.origin] ?? library.origin, byteSize(library.size), used].join(" · ");
 };
 
+/** A damaged library: what happened to it, and what it still takes. */
+const describeDamaged = (damaged: DamagedLibrary): string =>
+  ["Damaged: some of its files are missing, so it no longer goes into games", byteSize(damaged.size)].join(" · ");
+
 export const libraryManageView = (state: LibraryManageState): LibraryManageView => {
   const { installed, busy } = state;
-  const libraries = installed?.libraries ?? [];
+  const removable = (id: string, label: string, description: string): ReleaseRowView => ({
+    id,
+    label,
+    description: busy === id ? "Removing…" : description,
+    action: { label: "Remove", enabled: busy === null },
+  });
+  const rows = [
+    ...(installed?.libraries ?? []).map((library) => removable(library.id, library.label, describeLibrary(library))),
+    ...(installed?.damaged ?? []).map((damaged) => removable(damaged.id, damaged.label, describeDamaged(damaged))),
+  ];
   return {
-    rows: libraries.map((library) => ({
-      id: library.id,
-      label: library.label,
-      description: busy === library.id ? "Removing…" : describeLibrary(library),
-      action: { label: "Remove", enabled: busy === null },
-    })),
+    rows,
     usage: installed?.installed_bytes ? `Libraries take ${byteSize(installed.installed_bytes)}.` : null,
-    message: state.message ?? (installed && libraries.length === 0 ? "No library is added yet." : null),
+    message: state.message ?? (installed && rows.length === 0 ? "No library is added yet." : null),
   };
 };
 
