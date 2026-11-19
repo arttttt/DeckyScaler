@@ -222,8 +222,8 @@ export type UserLibraries = {
   installed_bytes: number;
 };
 
-/** A library a game's patch placed, as its status says. */
-/** A library a game's patch placed: picked for a slot, or (slot null) only there to pick in OptiScaler's menu. */
+/** A library a game's patch placed, as its status says: picked for a slot, or (slot null) only there to pick in
+ *  OptiScaler's menu. */
 export type PlacedLibrary = { slot: LibrarySlot | null; id: string; label: string };
 
 /** Where libraries are downloaded from: what its library serves, and the GitHub repository it comes from. */
@@ -272,8 +272,8 @@ export const userLibraryInstall = callable<[source: string, release_id: string],
 export const userLibraryAdd = callable<[path: string], UserLibraryResult>("user_library_add");
 export const userLibraryRemoval = callable<[library_id: string], UserLibraryRemoval>("user_library_removal");
 export const userLibraryRemove = callable<[library_id: string], { status: string; message?: string }>("user_library_remove");
-/** `scope` is "global" or a game's appid; `value` a library, "none", or null (a game follows the global choice). */
-/** A saved choice names the patched games it reaches that don't have their libraries yet. */
+/** `scope` is "global" or a game's appid; `value` a library, "none", or null (a game follows the global choice).
+ *  A saved choice names the patched games it reaches that don't have their libraries yet. */
 export const userLibraryChoose = callable<
   [scope: string, slot: LibrarySlot, value: string | null],
   { status: string; message?: string; to_apply?: string[] }
