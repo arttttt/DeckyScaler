@@ -62,7 +62,7 @@ def test_every_backend_module_is_shipped(plugin_root):
 
 
 def test_defaults_are_installed_at_the_plugin_root(plugin_root):
-    # The backend reads its launcher scripts and licenses from <plugin>/assets.
+    # The backend reads its launcher scripts from <plugin>/assets.
     missing = {name for name in repo_files("defaults") if not (plugin_root / name).is_file()}
 
     assert not missing, f"defaults not at the plugin root: {sorted(missing)}"

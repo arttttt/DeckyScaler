@@ -215,7 +215,7 @@ def test_the_bundle_itself_is_never_reset(plugin, plugin_home, inside):
     result = run(plugin.manual_unpatch_directory(str(plugin_home / inside), True))
 
     assert preview["status"] == result["status"] == "error"
-    assert "OptiScaler bundle itself" in result["message"]
+    assert "DeckyScaler's own folder" in result["message"]
     assert snapshot(plugin_home) == before
 
 

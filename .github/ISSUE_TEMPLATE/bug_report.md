@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Report something DeckyScaler does wrong
 title: 'BUG: [DESCRIBE YOUR ISSUE HERE]'
 labels: ''
 assignees: ''
@@ -11,18 +11,18 @@ assignees: ''
 
 ### **Please Read Before Submitting**
 
-⚠️ **Unsupported Games**: Games with launchers are **NOT** supported (e.g., **RDR2, Baldur’s Gate 3, EA, Ubisoft titles**). Reports involving these will be **closed as "Not Planned."**  Additionally, we currently do not plan on adding patch/unpatch buttons to non steam games in the plugin. If you would like to add patch launch options manually, this may work, but we want to keep focus on standard Steam games for the present.
+⚠️ **The plugin or OptiScaler?** DeckyScaler puts OptiScaler, libraries and Proton builds in place and sets them up. What a game does once OptiScaler runs in it (which upscalers and frame generation it offers, how they look, crashes inside the game) is OptiScaler's: if the game's page in DeckyScaler shows it patched with nothing wrong, check [OptiScaler's wiki](https://github.com/optiscaler/OptiScaler/wiki) and [its issues](https://github.com/optiscaler/OptiScaler/issues) first.
 
-⚠️ **Game Patch Compatibility Requirements**: Games must have the following to be able to work with this mod: Run in DX12, Have at least DLSS 2 or higher upscaling available, and not have any anticheat. Reports involving games that do not meet these compatibility requirements will be closed as Not Planned.
-
+⚠️ **Anti-cheat**: games with anti-cheat can't be patched safely; reports about them will be closed as "Not Planned".
 
 ✅ **Required Information for Reporting**:
-- Logs from: `~/homebrew/logs/'DeckyScaler'/`
-- **DeckyScaler version**
-- **Decky Loader version**
-- **List of installed plugins + versions**
-- **Distro (SteamOS, Bazzite, etc.)**
-- **Steam Client build number**
+- Decky's log of the plugin: `~/homebrew/logs/DeckyScaler/`
+- If the game starts through the launch wrapper: `/tmp/deckyscaler-patch.log` or `/tmp/deckyscaler-unpatch.log`
+- `OptiScaler.log` from the game's directory, if there is one
+- **DeckyScaler version** (**DeckyScaler → Updates** shows it)
+- The game, and how it is started: Steam, the launch wrapper, Lutris, Heroic, another launcher
+- The game's **OptiScaler version**, **proxy DLL** and **libraries** (its page in DeckyScaler shows them), and its **Proton** build
+- **Device, distro (SteamOS, Bazzite, etc.) and Decky Loader version**
 
 ---
 
@@ -45,11 +45,12 @@ Describe **what actually happened.**
 Attach screenshots to help illustrate the issue.
 
 ## **System Information**
-- **OS/Distro**: [e.g., SteamOS, Bazzite]
-- **DeckyScaler Version**: [e.g., v1.2.3]
-- **Decky Loader Version**: [e.g., v2.0.1]
-- **List of Installed Plugins + Versions**: [e.g., PluginA v1.0, PluginB v2.3]
-- **Steam Client Build Number**: [e.g., 1700000000]
+- **Device**: [e.g., Steam Deck OLED, Legion Go]
+- **OS/Distro**: [e.g., SteamOS 3.7, Bazzite]
+- **DeckyScaler Version**: [e.g., 2026.11.18]
+- **Decky Loader Version**: [e.g., v3.3.0]
+- **OptiScaler Version and Proxy DLL**: [e.g., nightly-20261116, dxgi.dll]
+- **Proton**: [e.g., GE-Proton11-11]
 
 ## **Additional Context**
 Provide any **additional details** that may help in diagnosing the issue.

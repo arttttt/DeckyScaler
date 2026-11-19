@@ -1,11 +1,11 @@
 {
   "name": "DeckyScaler",
-  "author": "Kurt Himebauch",
+  "author": "arttttt",
   "flags": [],
   "api_version": 1,
   "publish": {
-    "tags": ["DLSS", "Framegen","upscaling","FSR"],
-    "description": "This plugin installs and manages OptiScaler, a tool that enhances upscaling and enables frame generation in a range of DirectX 12 games.",
+    "tags": ["OptiScaler", "upscaling", "frame generation", "FSR", "XeSS", "DLSS", "Proton"],
+    "description": "Sets up OptiScaler in your games right from Game Mode, and takes it back out just as cleanly.",
     "image": "https://raw.githubusercontent.com/arttttt/DeckyScaler/refs/heads/main/assets/optiscaler_final.png"
   }
 }

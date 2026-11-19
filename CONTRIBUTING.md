@@ -4,7 +4,7 @@
 
 - `main` is protected and always releasable. Work happens on a short-lived branch per change (`feat/…`, `fix/…`, `ci/…`, `docs/…`, `refactor/…`).
 - Every change lands through a pull request into `main`, merged with a merge commit once CI is green and review findings are resolved.
-- Releases are tags on `main` (`vX.Y`).
+- Releases are tags on `main`, named for the day they are made (a calendar version; see [Releasing](#releasing)).
 - Commits are atomic and say what changed and why; the pull request description says the same for the whole change and how it was tested.
 
 ## Gamepad focus
@@ -62,7 +62,7 @@ Without the plugin installed:
 
 1. In Decky: **Settings → General → Developer mode** on.
 2. **Settings → Developer → Install Plugin from URL**, paste the zip URL of the `dev` release (Releases page → `dev` → right-click the `DeckyScaler-<commit>.zip` asset → copy link).
-3. Confirm. The plugin appears with a **Developer** page showing `Running main @ <commit>`.
+3. Confirm. The plugin appears with a **Developer** page showing `Running Dev build · main @ <commit>`.
 
 ### Switching builds
 
