@@ -37,7 +37,8 @@ class UserLibraries:
 
     def installed(self) -> dict:
         """The libraries, by name, with what they serve and take and the games that have them; what is left of the
-        damaged ones, to remove; the slots, the global choice and its slots that can't go in; the patched games a
+        damaged ones, to remove; the slots, the global choice and its slots that can't go in (left out, or naming a
+        library that isn't on the device); the patched games a
         patch now would give other libraries ("Apply to them"); and what all of it takes on the device."""
         libraries = sorted(self.store.installed(), key=lambda item: item.label.lower())
         sizes = {item.id: self.store.size(item.id) for item in libraries}
@@ -53,13 +54,14 @@ class UserLibraries:
             "slots": list(user_libraries.SLOTS),
             "global": choices.global_choice,
             "left_out": list(library_choice.left_out(choices.global_choice, libraries)),
+            "missing": list(library_choice.missing(choices.global_choice, libraries)),
             "to_apply": [name for _, name, details in self._to_apply(patched, choices, libraries)],
             "installed_bytes": sum(sizes.values()) + sum(item["size"] for item in damaged),
         }
 
     def game_choice(self, appid: str) -> dict:
         """A game's own choice per slot (a library, none, or absent: the global choice), what it comes to and its
-        slots that can't go in, and whether the game, patched, has other libraries than a patch now would give it
+        slots that can't go in (left out, or naming a library that isn't on the device), and whether the game, patched, has other libraries than a patch now would give it
         ("patch again")."""
         choices, installed = self.choices.read(), self.store.installed()
         patched = [entry for entry in self.patcher.patched_markers() if str(entry[2].get("appid") or "") == appid]
@@ -69,6 +71,7 @@ class UserLibraries:
             "own": choices.games.get(appid, {}),
             "resolved": resolved,
             "left_out": list(library_choice.left_out(resolved, installed)),
+            "missing": list(library_choice.missing(resolved, installed)),
             "pending": bool(self._to_apply(patched, choices, installed)),
         }
 

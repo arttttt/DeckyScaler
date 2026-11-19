@@ -143,7 +143,7 @@ def test_a_slot_takes_only_a_library_that_serves_it(plugin, home, plugin_home):
     assert run(plugin.user_library_choose("not-a-game", FG, None))["status"] == "error"
     assert run(plugin.user_library_choose("620", FG, "none")) == {"status": "success", "to_apply": []}
     assert run(plugin.user_library_game_choice("620")) == {
-        "status": "success", "own": {FG: "none"}, "resolved": {}, "left_out": [], "pending": False,
+        "status": "success", "own": {FG: "none"}, "resolved": {}, "left_out": [], "missing": [], "pending": False,
     }
     assert run(plugin.user_library_game_choice("570"))["resolved"] == {FG: "anr-v-b19"}
     assert run(plugin.user_libraries_installed())["global"] == {FG: "anr-v-b19"}
@@ -227,11 +227,14 @@ def test_whats_left_of_a_damaged_library_is_listed_with_what_it_takes_and_can_be
     assert listed["libraries"] == []
     assert listed["damaged"] == [{"id": "anr-v-b19", "label": "Apex Neural Rendering FG V.B19", "size": size}]
     assert listed["installed_bytes"] == size > 0
+    assert listed["missing"] == [FG] and listed["left_out"] == []  # still picked, yet nothing goes in for it
+    assert run(plugin.user_library_game_choice("620"))["missing"] == [FG]
     assert run(plugin.user_library_removal("anr-v-b19")) == {"status": "success", "games": [], "global": True}
     assert run(plugin.user_library_remove("anr-v-b19")) == {"status": "success"}
 
     listed = run(plugin.user_libraries_installed())
     assert listed["damaged"] == [] and listed["global"] == {} and listed["installed_bytes"] == 0
+    assert listed["missing"] == [] and run(plugin.user_library_game_choice("620"))["missing"] == []
     assert not libraries.store.item_dir("anr-v-b19").exists()
 
 
