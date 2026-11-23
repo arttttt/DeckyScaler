@@ -114,13 +114,16 @@ def test_what_is_mounted_where_is_read_from_the_kernels_list():
         "44 22 0:51 / /run/media/deck/odd rw -\n"
         "broken line\n"
         "45 22 - cut\n"
+        "46 41 179:2 / /run/media/deck/SD rw - ext4 /dev/mmcblk0p2 rw\n"  # stacked on the first: the one seen there
+        "47 22 7:0 / /run/media/deck/Image rw - squashfs /home/deck/My\\040Image.sqfs ro\n"
     )
 
     assert drives.mounts(mountinfo) == {
         Path("/"): "/dev/nvme0n1p8",
-        Path("/run/media/deck/SD"): "/dev/mmcblk0p1",
+        Path("/run/media/deck/SD"): "/dev/mmcblk0p2",
         Path("/run/media/deck/My Games"): "/dev/sda1",
         Path("/run/media/deck/Sub"): "/dev/sdb1",
         Path("/run/media/deck/odd"): None,  # no source listed
+        Path("/run/media/deck/Image"): "/home/deck/My Image.sqfs",
     }
     assert drives.mounts("") == {}
