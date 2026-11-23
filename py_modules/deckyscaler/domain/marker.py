@@ -16,6 +16,8 @@ class SteamGame:
     appid: str
     name: str
     original_launch_options: str
+    launch_options: str = ""
+    """The launch options this patch has Steam set: what the next patch tells its own from."""
 
 
 
@@ -44,6 +46,7 @@ def build(
         "dll_name": dll_name,
         "target_dir": str(target_dir),
         "original_launch_options": steam_game.original_launch_options if steam_game else "",
+        **({"launch_options": steam_game.launch_options} if steam_game else {}),
         "backed_up_files": backed_up_files,
         "optiscaler_version": optiscaler_version,
         "family": family,
@@ -98,3 +101,13 @@ def launch_options_after_unpatch(current: str | None, stored: str | None, patche
     if current is None or not is_managed(current, patched_with):
         return None
     return stored if stored and not is_managed(stored, patched_with) else ""
+
+
+def launch_options_after_patch(written: str | None, needed: str, current: str | None) -> str | None:
+    """What a Steam game's launch options are set to as it is patched, or None to leave them: options Steam didn't say
+    (every patched game patched again at once doesn't read them) stay as they are while the plugin's would be what
+    its last patch set (`written`, None for a marker from before it was kept): they are that, or the user's edit since.
+    Otherwise they are the plugin's (`needed`)."""
+    if current is None and written == needed:
+        return None
+    return needed

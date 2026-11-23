@@ -70,13 +70,23 @@ def test_a_first_patch_without_the_games_launch_options_is_refused_and_changes_n
 
 def test_a_repatch_without_the_games_launch_options_keeps_the_stored_ones(plugin, plugin_home, steam_library):
     steam_library.add_game("1234", "Test Game")
-    asyncio.run(plugin.patch_game("1234", "dxgi.dll", "mangohud %command%", STABLE))
+    patched = asyncio.run(plugin.patch_game("1234", "dxgi.dll", "mangohud %command%", STABLE))
 
     repatched = asyncio.run(plugin.patch_game("1234", "dxgi.dll", None, STABLE))
-    unpatched = asyncio.run(plugin.unpatch_game("1234", repatched["launch_options"]))
+    unpatched = asyncio.run(plugin.unpatch_game("1234", patched["launch_options"]))  # what Steam still holds
 
     assert repatched["original_launch_options"] == "mangohud %command%"
+    assert repatched["launch_options"] is None  # unknown, and the plugin's are what the last patch set: left
     assert unpatched["launch_options"] == "mangohud %command%"
+
+
+def test_a_repatch_without_the_options_sets_them_when_the_plugins_change(plugin, plugin_home, steam_library):
+    steam_library.add_game("1234", "Test Game")
+    asyncio.run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))
+
+    switched = asyncio.run(plugin.patch_game("1234", "winmm.dll", None, STABLE))
+
+    assert switched["launch_options"] == "WINEDLLOVERRIDES=winmm=n,b SteamDeck=0 %command%"
 
 
 def test_unpatching_leaves_launch_options_the_user_changed_since_the_patch_or_steam_didnt_say(plugin, plugin_home, steam_library):

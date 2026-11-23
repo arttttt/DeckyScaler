@@ -700,25 +700,26 @@ class Patcher:
                 return moved
         log.info(f"[DeckyScaler] patch_game: appid={appid} dll={dll_name} target={target_dir} exe={target_exe}")
         fsr4_driver = self._fsr4(game)[1]
+        managed_options = launch_options.managed(dll_name, fsr4_driver is not None)
         result = self.patch_directory(
             target_dir,
             dll_name,
             version_id=version_id,
-            steam_game=marker.SteamGame(str(appid), game.name, original_options),
+            steam_game=marker.SteamGame(str(appid), game.name, original_options, managed_options),
             fsr4_driver=fsr4_driver,
         )
         if result["status"] != "success":
             return result
 
-        managed_options = launch_options.managed(dll_name, fsr4_driver is not None)
-        log.info(f"[DeckyScaler] patch_game success: appid={appid} launch_options={managed_options}")
+        options = marker.launch_options_after_patch(existing.get("launch_options"), managed_options, current_launch_options)
+        log.info(f"[DeckyScaler] patch_game success: appid={appid} launch_options={options}")
         return {
             "status": "success",
             "appid": str(appid),
             "name": game.name,
             "dll_name": dll_name,
             "target_dir": str(target_dir),
-            "launch_options": managed_options,
+            "launch_options": options,
             "original_launch_options": original_options,
             "optiscaler_version": result.get("optiscaler_version"),
             "message": f"Patched {game.name} with OptiScaler {result.get('optiscaler_version')} using {dll_name}.",

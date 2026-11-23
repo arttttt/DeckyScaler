@@ -67,7 +67,8 @@ export const patchGame = callable<
     name?: string;
     dll_name?: string;
     target_dir?: string;
-    launch_options?: string;
+    /** What Steam is to set; null to leave them as they are. */
+    launch_options?: string | null;
     original_launch_options?: string;
     optiscaler_version?: string | null;
   }

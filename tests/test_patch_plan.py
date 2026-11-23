@@ -135,3 +135,14 @@ def test_unknown_current_options_keep_the_stored_ones_and_are_never_taken_for_no
     assert marker.original_launch_options(None, ours, "dxgi.dll") == ""
     # A first patch can't know them: unknown, so the patch is refused rather than losing them.
     assert marker.original_launch_options(None, None, "dxgi.dll") is None
+
+
+def test_a_patch_leaves_unknown_options_while_the_plugins_are_what_its_last_patch_set():
+    ours = "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
+    winmm = "WINEDLLOVERRIDES=winmm=n,b SteamDeck=0 %command%"
+
+    assert marker.launch_options_after_patch(ours, ours, None) is None  # ours, or the user's edit since: left
+    assert marker.launch_options_after_patch(ours, winmm, None) == winmm  # another proxy: they must change
+    assert marker.launch_options_after_patch(None, ours, None) == ours  # a marker from before it was kept
+    assert marker.launch_options_after_patch(ours, ours, "gamemoderun %command%") == ours  # read: the patch sets its own
+    assert marker.launch_options_after_patch(None, ours, "") == ours  # a first patch
