@@ -44,6 +44,62 @@ def test_a_newer_build_of_the_games_channel_is_named(plugin, plugin_home, tmp_pa
     assert run(plugin.patched_games())["games"][0]["newer_version"] == "nightly-20261024"
 
 
+def test_a_game_patched_while_its_version_lacked_a_file_says_so_once_the_file_is_back(plugin, plugin_home, steam_library, tmp_path):
+    kept = plugin_home / "library" / "versions" / STABLE / "files" / "libxess.dll"
+    aside = tmp_path / "libxess.dll"
+    steam_library.add_game("1234", "Test Game")
+    directory = make_game_dir(tmp_path / "games" / "By Path")
+    kept.replace(aside)  # the version lost a file it doesn't need to patch
+    run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))
+    run(plugin.manual_patch_directory(str(directory), "dxgi.dll", STABLE))
+    lacking = lambda: {game["name"]: game["lacks_version_files"] for game in run(plugin.patched_games())["games"]}
+    assert lacking() == {str(directory): False, "Test Game": False}  # nothing the version holds is missing
+
+    aside.replace(kept)  # Download again brought it back
+    assert lacking() == {str(directory): True, "Test Game": True}
+    assert run(plugin.get_game_status("1234"))["lacks_version_files"] is True
+
+    run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))
+    assert run(plugin.get_game_status("1234"))["lacks_version_files"] is False
+    assert lacking() == {str(directory): True, "Test Game": False}
+
+    marker = directory / "DECKYSCALER_PATCH"
+    marker.write_text(json.dumps({key: value for key, value in json.loads(marker.read_text()).items() if key != "format"}))
+    assert lacking() == {str(directory): False, "Test Game": False}  # a marker without a record: nothing to compare
+
+
+def test_a_game_whose_version_lost_a_file_says_its_version_is_incomplete(plugin, plugin_home, steam_library, tmp_path):
+    version = plugin_home / "library" / "versions" / STABLE
+    entry = json.loads((version / "entry.json").read_text())
+    entry["files"] = sorted(p.relative_to(version / "files").as_posix() for p in (version / "files").rglob("*") if p.is_file())
+    (version / "entry.json").write_text(json.dumps(entry))  # a version downloaded since the list is kept
+    steam_library.add_game("1234", "Test Game")
+    run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))
+    assert run(plugin.get_game_status("1234"))["version_incomplete"] is False
+
+    (version / "files" / "libxess.dll").unlink()
+
+    assert run(plugin.get_game_status("1234"))["version_incomplete"] is True
+    assert run(plugin.patched_games())["games"][0]["version_incomplete"] is True
+
+
+def test_a_listing_reads_each_versions_files_once_and_a_status_once(plugin, plugin_home, steam_library, tmp_path, monkeypatch):
+    from deckyscaler.infrastructure.library_store import LibraryStore
+
+    steam_library.add_game("1234", "Test Game")
+    run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))
+    run(plugin.manual_patch_directory(str(make_game_dir(tmp_path / "games" / "By Path")), "dxgi.dll", STABLE))
+    run(plugin.manual_patch_directory(str(make_game_dir(tmp_path / "games" / "Other")), "dxgi.dll", NIGHTLY))
+    read, real = [], LibraryStore.files_of
+    monkeypatch.setattr(LibraryStore, "files_of", lambda self, version_id: read.append(version_id) or real(self, version_id))
+
+    run(plugin.patched_games())
+    assert sorted(read) == [NIGHTLY, STABLE]
+    read.clear()
+    run(plugin.get_game_status("1234"))
+    assert read == [STABLE]
+
+
 def test_a_missing_proxy_and_an_unfinished_patch_are_told(plugin, plugin_home, tmp_path, monkeypatch):
     broken = make_game_dir(tmp_path / "games" / "Broken")
     run(plugin.manual_patch_directory(str(broken), "dxgi.dll", STABLE))

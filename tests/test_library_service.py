@@ -63,6 +63,23 @@ def test_a_patch_naming_no_version_keeps_the_games_else_takes_the_newest():
     assert library.version_to_patch_with([], None) is None
 
 
+def test_a_version_keeps_the_files_it_was_unpacked_with():
+    listed = library.Installed(**{**installed_entry().__dict__, "files": ("OptiScaler.dll", "OptiScaler/libxess.dll")})
+    data = library.entry_json(listed)
+
+    assert data["files"] == ["OptiScaler.dll", "OptiScaler/libxess.dll"] and library.parse_entry(data) == listed
+    old = {key: value for key, value in data.items() if key != "files"}  # installed before the list was kept
+    assert library.parse_entry(old) == installed_entry()
+    assert library.parse_entry({**data, "files": "not a list"}).files is None
+
+
+def test_a_version_without_a_list_lacks_one_and_gets_one_of_what_it_holds():
+    listed = library.with_file_list(installed_entry(), frozenset({"libxess.dll", "OptiScaler.dll"}))
+
+    assert library.lacks_file_list(installed_entry())
+    assert listed.files == ("OptiScaler.dll", "libxess.dll") and not library.lacks_file_list(listed)
+
+
 def test_whats_left_of_a_damaged_version_is_listed_by_its_directory_and_size():
     assert library.damaged_json("stable-0.9.4", 12) == {"id": "stable-0.9.4", "size": 12}
 
@@ -84,12 +101,14 @@ def test_patching_offers_installed_versions_newest_first():
     stable = library.Installed("stable-0.9.4", library.STABLE, "0.9.4", "20260718", "0.9", "u", "0" * 64, "t")
     nightly = installed_entry()
 
-    offered = [library.choice_json(entry, 5) for entry in library.newest_first([stable, nightly])]
+    offered = [library.choice_json(entry, 5, entry is stable) for entry in library.newest_first([stable, nightly])]
 
     assert offered == [
         # Whether a version takes the user's libraries is its family's: 10 does, 0.9 doesn't.
-        {"id": NEWEST, "version": "10.0.0-pre1", "channel": "nightly", "date": "20261023", "size": 5, "libraries": True},
-        {"id": "stable-0.9.4", "version": "0.9.4", "channel": "stable", "date": "20260718", "size": 5, "libraries": False},
+        {"id": NEWEST, "version": "10.0.0-pre1", "channel": "nightly", "date": "20261023", "size": 5, "libraries": True,
+         "incomplete": False},
+        {"id": "stable-0.9.4", "version": "0.9.4", "channel": "stable", "date": "20260718", "size": 5, "libraries": False,
+         "incomplete": True},
     ]
 
 
@@ -282,6 +301,41 @@ def test_whats_left_of_a_damaged_version_is_listed_and_removed_unless_games_are_
     for outside in ("..", ".", f".{NEWEST}.old", "nothing"):
         assert world.library().remove(outside)["status"] == "error"
     assert [version["id"] for version in world.library().installed()["versions"]] == [NEWEST]
+
+
+def test_a_version_that_lost_a_file_is_listed_as_incomplete_until_downloaded_again(world):
+    world.library().install(library.NIGHTLY, NEWEST)
+    files = world.plugin_home / "library" / "versions" / NEWEST / "files"
+    entry = json.loads((world.plugin_home / "library" / "versions" / NEWEST / "entry.json").read_text())
+    assert entry["files"] == sorted(V10_FILES)
+    assert world.library().installed()["versions"][0]["incomplete"] is False
+
+    (files / "OptiScaler" / "amd_fidelityfx_upscaler_dx12.dll").unlink()
+    assert world.library().installed()["versions"][0]["incomplete"] is True  # still offered: games keep running
+
+    assert world.library().reinstall(NEWEST)["status"] == "success"
+    assert world.library().installed()["versions"][0]["incomplete"] is False
+
+
+def test_loading_gives_a_version_from_before_file_lists_one_and_a_file_it_loses_later_is_seen(plugin, plugin_home, monkeypatch):
+    from conftest import STABLE
+    from deckyscaler.infrastructure.library_store import LibraryStore
+
+    version = plugin_home / "library" / "versions" / STABLE
+    assert json.loads((version / "entry.json").read_text()).get("files") is None  # no list, as before lists were kept
+
+    run(plugin._main())
+
+    assert json.loads((version / "entry.json").read_text())["files"] == sorted(
+        p.relative_to(version / "files").as_posix() for p in (version / "files").rglob("*") if p.is_file()
+    )
+    (version / "files" / "libxess.dll").unlink()
+    assert {v["id"]: v["incomplete"] for v in run(plugin.library_installed())["versions"]}[STABLE] is True
+
+    read, real = [], LibraryStore.files_of
+    monkeypatch.setattr(LibraryStore, "files_of", lambda self, version_id: read.append(version_id) or real(self, version_id))
+    run(plugin._main())
+    assert read == []  # every version has its list now: loading again reads none of them
 
 
 def test_github_failing_still_lists_what_is_installed(world, github_api):

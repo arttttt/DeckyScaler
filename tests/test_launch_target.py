@@ -202,6 +202,21 @@ def test_the_wrapper_leaves_a_game_already_patched_the_same_way_untouched(plugin
     assert (marker_path.stat().st_mtime_ns, marker_path.read_text(), os.readlink(game / "dxgi.dll")) == first
 
 
+def test_the_wrapper_brings_in_a_file_its_version_got_back_after_the_game_was_patched(plugin_home, home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Mended Game")
+    command = [str(game / "Game.exe")]
+    kept = plugin_home / "library" / "versions" / STABLE / "files" / "libxess.dll"
+    aside = tmp_path / "libxess.dll"
+    kept.replace(aside)  # the version lost a file it doesn't need to patch
+    LaunchWrapper(home, {}).patch(command, "dxgi.dll", STABLE)
+    assert not (game / "libxess.dll").exists()
+
+    aside.replace(kept)  # Download again brought it back
+    LaunchWrapper(home, {}).patch(command, "dxgi.dll")
+
+    assert os.readlink(game / "libxess.dll") == str(kept)
+
+
 def test_the_wrapper_patches_again_when_anything_differs(plugin_home, home, tmp_path):
     from deckyscaler.application.launch_wrapper import LaunchWrapper
 

@@ -32,8 +32,8 @@ const LIBRARY: InstalledLibrary = {
   damaged: [],
   installed_bytes: 512_000_000,
   versions: [
-    { id: "nightly-20261023", version: "10.0.0-pre1", channel: "nightly", date: "20261023", size: 312_000_000, libraries: true },
-    { id: "stable-0.9.4", version: "0.9.4", channel: "stable", date: "20260718", size: 200_000_000, libraries: false },
+    { id: "nightly-20261023", version: "10.0.0-pre1", channel: "nightly", date: "20261023", size: 312_000_000, libraries: true, incomplete: false },
+    { id: "stable-0.9.4", version: "0.9.4", channel: "stable", date: "20260718", size: 200_000_000, libraries: false, incomplete: false },
   ],
 };
 
@@ -128,6 +128,14 @@ describe("manage dialog", () => {
     ]);
     expect(view.usage).toBe("Downloaded versions take 512 MB.");
     expect(view.message).toBeNull();
+  });
+
+  it("says on its row when a version lost files, and how to get them back", () => {
+    const incomplete = { ...LIBRARY, versions: [{ ...LIBRARY.versions[0], incomplete: true }] };
+
+    expect(manageView(manageState({ library: incomplete })).rows[0].description).toBe(
+      "Nightly · 312 MB · incomplete: some of its files are gone, download it again",
+    );
   });
 
   it("shows what is happening to a version on its row and holds the others", () => {

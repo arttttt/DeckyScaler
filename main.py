@@ -41,6 +41,10 @@ class Plugin:
             await asyncio.to_thread(self._refresh_core)
         except OSError as exc:
             decky.logger.error(f"Updating the core and launch scripts in ~/deckyscaler failed: {exc}")
+        try:
+            await asyncio.to_thread(self._library().keep_file_lists)
+        except OSError as exc:
+            decky.logger.error(f"Keeping the OptiScaler versions' file lists failed: {exc}")
 
     async def _unload(self):
         decky.logger.info("DeckyScaler unloaded.")

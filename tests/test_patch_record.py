@@ -94,6 +94,14 @@ RECORD = PatchRecord(
 )
 
 
+def test_a_record_covers_the_paths_it_placed_and_no_others():
+    placed = PatchRecord((Placed("dxgi.dll", "l"), Placed("libxess.dll", "l"), Placed("OptiScaler.ini", None)), (), ())
+
+    assert patch_record.covers(placed, frozenset({"libxess.dll"}))
+    assert patch_record.covers(placed, frozenset())
+    assert not patch_record.covers(placed, frozenset({"libxess.dll", "libxess_dx11.dll"}))  # came back since
+
+
 def test_undoing_removes_what_was_placed_restores_backups_and_drops_the_marker_last():
     current = {"dxgi.dll": "a" * 64, "libxess.dll": "c" * 64, "OptiScaler.ini": "f" * 64,
                "D3D12_Optiscaler/D3D12Core.dll": "e" * 64, "libxess.dll.b": "9" * 64}
