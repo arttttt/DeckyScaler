@@ -36,14 +36,24 @@ def _modified(directory: Path) -> float:
         return 0.0
 
 
-def _scan(directory: Path, system: bool) -> list[Tool]:
-    if not directory.is_dir():
+def _folders(directory: Path) -> list[Path]:
+    """The folders in a compatibilitytools.d, by name, linked ones too (Steam follows a link, as to a build kept on
+    an SD card); none named with a dot (the plugin's own staging), and none when the directory can't be read."""
+    try:
+        return sorted(path for path in directory.iterdir() if path.is_dir() and not path.name.startswith("."))
+    except OSError:
         return []
-    return [
-        Tool(manifest.parent.name, _declared(manifest), system, _modified(manifest.parent))
-        for manifest in sorted(directory.glob(f"*/{MANIFEST}"))
-        if not manifest.parent.name.startswith(".")
-    ]
+
+
+def _tool(folder: Path, system: bool) -> Tool | None:
+    """The tool a folder is, as Steam finds one: a compatibilitytool.vdf that declares a tool. Anything else, a
+    missing, unreadable or empty manifest included, is no tool Steam would list."""
+    names = _declared(folder / MANIFEST)
+    return Tool(folder.name, names, system, _modified(folder)) if names else None
+
+
+def _scan(directory: Path, system: bool) -> list[Tool]:
+    return [tool for folder in _folders(directory) if (tool := _tool(folder, system)) is not None]
 
 
 class CompatToolsStore:
@@ -57,17 +67,15 @@ class CompatToolsStore:
         """Every tool Steam would find, whoever put it there: this install's own, then the system's."""
         return _scan(self.tools_dir, system=False) + (_scan(self.system_dir, system=True) if self.system_dir else [])
 
-    def others(self) -> list[str]:
-        """The device's own folders in compatibilitytools.d that aren't tools Steam would find, because they have
-        no compatibilitytool.vdf: what a broken install or a folder copied by hand leaves. They are listed so that
-        they can be removed. A dot-folder (the plugin's own staging) or a link never counts."""
-        if not self.tools_dir.is_dir():
-            return []
-        return sorted(
-            path.name
-            for path in self.tools_dir.iterdir()
-            if path.is_dir() and not path.is_symlink() and not path.name.startswith(".") and not (path / MANIFEST).exists()
-        )
+    def others(self) -> list[Tool]:
+        """The device's own folders in compatibilitytools.d that aren't tools Steam would find (`_tool`): what a
+        broken install or a folder copied by hand leaves. They are listed so that they can be removed, as tools that
+        declare no names. A link never counts: it isn't removed here."""
+        return [
+            Tool(folder.name, frozenset(), modified=_modified(folder))
+            for folder in _folders(self.tools_dir)
+            if not folder.is_symlink() and _tool(folder, system=False) is None
+        ]
 
     def _own(self, folder: str) -> Path:
         """A tool's directory in compatibilitytools.d; anything that would point elsewhere is refused."""

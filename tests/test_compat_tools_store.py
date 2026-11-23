@@ -137,19 +137,36 @@ def test_every_tool_steam_would_find_is_listed_whoever_installed_it(tmp_path):
     assert CompatToolsStore(tmp_path / "missing").installed() == []
 
 
-def test_a_folder_that_isnt_a_tool_steam_would_find_is_listed_apart_but_never_a_link_a_file_or_ours(tmp_path):
+def test_a_folder_steam_would_list_no_tool_for_is_listed_apart_but_never_a_link_a_file_ours_or_the_systems(tmp_path):
+    tools, system, elsewhere = tools_dir(tmp_path), tmp_path / "system", tmp_path / "elsewhere"
+    build_tree(tools)
+    write(tools / "not-a-tool" / "readme.txt", b"")
+    write(tools / "empty-manifest" / "compatibilitytool.vdf", b"")  # declares no tool: Steam lists none
+    (tools / "dangling-manifest").mkdir()
+    (tools / "dangling-manifest" / "compatibilitytool.vdf").symlink_to(tmp_path / "gone.vdf")
+    write(tools / "stray.tar.gz", b"")
+    (tools / "linked").symlink_to(elsewhere, target_is_directory=True)
+    elsewhere.mkdir()
+    build_tree(tools / PARTIAL_DIRNAME / "GE-Proton11-13-x86_64")
+    write(system / "system-leftover" / "readme.txt", b"")  # never this device's own to remove
+
+    store = CompatToolsStore(tools, system)
+    assert [tool.folder for tool in store.others()] == ["dangling-manifest", "empty-manifest", "not-a-tool"]
+    assert all(tool.names == frozenset() and not tool.system for tool in store.others())
+    assert [tool.folder for tool in store.installed()] == [TOOL]  # each folder is one or the other, never both
+    assert CompatToolsStore(tmp_path / "missing").others() == []
+
+
+def test_an_unreadable_compatibilitytools_d_lists_nothing(tmp_path):
     tools = tools_dir(tmp_path)
     build_tree(tools)
     write(tools / "not-a-tool" / "readme.txt", b"")
-    write(tools / "stray.tar.gz", b"")
-    (tools / "linked").symlink_to(tmp_path / "elsewhere", target_is_directory=True)
-    (tmp_path / "elsewhere").mkdir()
-    build_tree(tools / PARTIAL_DIRNAME / "GE-Proton11-13-x86_64")
-
-    store = CompatToolsStore(tools)
-    assert store.others() == ["not-a-tool"]
-    assert [tool.folder for tool in store.installed()] == [TOOL]
-    assert CompatToolsStore(tmp_path / "missing").others() == []
+    tools.chmod(0)
+    try:
+        store = CompatToolsStore(tools)
+        assert store.installed() == [] and store.others() == []
+    finally:
+        tools.chmod(0o755)
 
 
 def test_a_tool_is_sized_by_its_files_counting_links_as_themselves(tmp_path):

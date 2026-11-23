@@ -124,10 +124,7 @@ class ProtonBuilds:
                 "games": name(appids),
                 "global_default": global_default,
             })
-        others = [
-            {"id": folder, "size": store.size(proton_builds.Tool(folder, frozenset())) if with_sizes else None}
-            for folder in store.others()
-        ]
+        others = [{"id": tool.folder, "size": store.size(tool) if with_sizes else None} for tool in store.others()]
         own = (
             sum(row["size"] for row in rows if not row["system"]) + sum(row["size"] for row in others) if with_sizes else None
         )
@@ -256,8 +253,8 @@ class ProtonBuilds:
         names, so only a mapping naming its folder can name it)."""
         store = self._store(root)
         tool = next((t for t in store.installed() if t.folder == folder), None)
-        if tool is None and folder in store.others():
-            tool = proton_builds.Tool(folder, frozenset())
+        if tool is None:
+            tool = next((t for t in store.others() if t.folder == folder), None)
         if tool is None:
             return f"{folder} is not installed."
         if tool.system:
