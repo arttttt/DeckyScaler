@@ -253,6 +253,11 @@ class Media:
                 link.unlink()
         self._list("ext4")
 
+    def mount_at(self, point: Path, device: str) -> None:
+        """Something mounted at a place of its own choosing, not by putting a drive in."""
+        self.mounted[point.resolve()] = self.devices / device
+        self._list("ext4")
+
     def _list(self, filesystem: str) -> None:
         lines = [
             f"{n} 1 179:{n} / {str(point).replace(' ', chr(92) + '040')} rw,relatime shared:{n} - {filesystem} {node} rw"
@@ -274,7 +279,6 @@ def media(tmp_path, monkeypatch) -> Media:
     monkeypatch.setattr(drives, "REMOVABLE_MEDIA", (fake.base,))
     monkeypatch.setattr(drives, "MOUNTS", fake.mounts)
     monkeypatch.setattr(drives, "BY_UUID", fake.by_uuid)
-    monkeypatch.setattr(drives, "ismount", lambda path: Path(path).resolve() in fake.mounted)
     return fake
 
 

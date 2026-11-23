@@ -33,9 +33,28 @@ def test_a_cards_older_path_is_followed_to_the_drive(media):
 
 
 def test_the_media_base_mounted_itself_isnt_a_drive(media):
-    media.mounted[media.base.resolve()] = media.devices / "sda1"
+    media.mount_at(media.base, "sda1")
 
     assert drives.on_unmounted_drive(media.base / "deck" / "SD" / "Game")
+
+
+def test_a_game_in_a_btrfs_subvolume_is_on_its_cards_drive(media):
+    card = media.put_in("SD", "5d6e7f80-0000-4000-8000-000000000003", filesystem="btrfs")
+    game = card / "@games" / "Hades"  # a subvolume: a device of its own to stat, though nothing is mounted there
+    game.mkdir(parents=True)
+
+    assert drives.identity(game) == "5d6e7f80-0000-4000-8000-000000000003"
+    assert not drives.on_unmounted_drive(game, "5d6e7f80-0000-4000-8000-000000000003")
+
+
+def test_the_innermost_mount_holding_a_path_is_its_drive(media):
+    usb = media.put_in("USB", "0F1E-2D3C", device="sda1", filesystem="exfat")
+    media.mount_at(usb / "inner", "sdb1")
+    (media.by_uuid / "9A8B-7C6D").symlink_to(media.devices / "sdb1")
+    (media.devices / "sdb1").touch()
+
+    assert drives.identity(usb / "inner" / "Hades") == "9A8B-7C6D"
+    assert drives.identity(usb / "Hades") == "0F1E-2D3C"
 
 
 def test_a_directory_outside_removable_media_is_never_on_an_unmounted_drive(media, tmp_path):
@@ -86,16 +105,22 @@ def test_another_card_with_the_same_label_isnt_the_one_a_game_was_patched_on(med
     assert not drives.on_unmounted_drive(game, patched_on)
 
 
-def test_the_device_a_mount_point_is_mounted_from_is_read_from_the_kernels_list():
+def test_what_is_mounted_where_is_read_from_the_kernels_list():
     mountinfo = (
         "22 1 0:21 / / rw - ext4 /dev/nvme0n1p8 rw\n"
         "41 22 179:1 / /run/media/deck/SD rw,nosuid shared:30 master:1 - ext4 /dev/mmcblk0p1 rw\n"
         "42 22 8:1 / /run/media/deck/My\\040Games rw - exfat /dev/sda1 rw,uid=1000\n"
-        "43 22 0:50 / /run/media/deck/odd rw -\n"
+        "43 22 0:50 /@games /run/media/deck/Sub rw - btrfs /dev/sdb1 rw,subvol=/@games\n"
+        "44 22 0:51 / /run/media/deck/odd rw -\n"
+        "broken line\n"
+        "45 22 - cut\n"
     )
 
-    assert drives.mounted_from(mountinfo, Path("/run/media/deck/SD")) == "/dev/mmcblk0p1"
-    assert drives.mounted_from(mountinfo, Path("/run/media/deck/My Games")) == "/dev/sda1"
-    assert drives.mounted_from(mountinfo, Path("/run/media/deck/odd")) is None  # no source listed
-    assert drives.mounted_from(mountinfo, Path("/run/media/deck/USB")) is None
-    assert drives.mounted_from("", Path("/")) is None
+    assert drives.mounts(mountinfo) == {
+        Path("/"): "/dev/nvme0n1p8",
+        Path("/run/media/deck/SD"): "/dev/mmcblk0p1",
+        Path("/run/media/deck/My Games"): "/dev/sda1",
+        Path("/run/media/deck/Sub"): "/dev/sdb1",
+        Path("/run/media/deck/odd"): None,  # no source listed
+    }
+    assert drives.mounts("") == {}
