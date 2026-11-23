@@ -3,14 +3,29 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import sys
+import threading
+from pathlib import Path
 
-from conftest import NIGHTLY, STABLE, make_game_dir, run
+from conftest import NIGHTLY, REPO_ROOT, STABLE, make_game_dir, run
 
 
 def using(plugin, version_id: str) -> list[str]:
     """The patched games and directories the plugin lists with a version."""
     return [g["name"] for g in run(plugin.patched_games())["games"] if g["version_id"] == version_id]
 from deckyscaler.infrastructure import game_directory
+from deckyscaler.infrastructure.patch_index import Indexed, PatchIndex
+
+_ADD_FROM_A_PROCESS = """
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from deckyscaler.infrastructure.patch_index import Indexed, PatchIndex
+for n in range(int(sys.argv[3]), int(sys.argv[3]) + 100):
+    PatchIndex(Path(sys.argv[2])).add(Path(f"/games/{n}"), f"Game {n}")
+"""
 
 
 def test_games_using_a_version_follow_patching_repatching_and_unpatching(plugin, plugin_home, steam_library, tmp_path):
@@ -41,6 +56,83 @@ def test_a_directory_whose_marker_went_another_way_is_not_counted(plugin, plugin
     assert using(plugin, STABLE) == []
 
 
+CARD, OTHER_CARD = "a1b2c3d4-0000-4000-8000-000000000001", "ffffffff-0000-4000-8000-000000000002"
+
+
+def test_a_game_on_a_card_taken_out_stays_indexed_and_keeps_its_version(plugin, plugin_home, media):
+    card = media.put_in("SD", CARD)
+    game = make_game_dir(card / "Games" / "Card Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    indexed = lambda: json.loads((plugin_home / "patched.json").read_text())  # noqa: E731
+    assert indexed()[str(game)] == {"name": str(game), "drive": CARD}
+
+    media.take_out(card)
+
+    assert using(plugin, STABLE) == []  # its patch can't be read
+    assert str(game) in indexed()
+    refused = run(plugin.library_remove(STABLE))
+    assert refused == {
+        "status": "error",
+        "message": (
+            f"{game} is on a drive that isn't mounted and may be patched with {STABLE}. "
+            "Put the drive back in, or forget it on the Games page."
+        ),
+    }
+    assert run(plugin.patched_games())["away"] == [{"directory": str(game), "name": str(game)}]
+    # What reaches every patched game says which it can't reach.
+    assert run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))["away"] == [str(game)]
+    assert run(plugin.user_libraries_apply())["away"] == [str(game)]
+
+    media.put_in("SD", CARD)  # back in
+    assert using(plugin, STABLE) == [str(game)]
+
+    shutil.rmtree(game)  # deleted from the card while it is in
+    assert using(plugin, STABLE) == []
+    assert str(game) not in indexed()
+
+
+def test_another_card_with_the_same_label_doesnt_make_a_game_on_the_first_one_gone(plugin, plugin_home, media):
+    card = media.put_in("SD", CARD)
+    game = make_game_dir(card / "Games" / "Card Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    media.take_out(card)
+
+    other = media.put_in("SD", OTHER_CARD)  # mounted where the first one was, without the game
+
+    assert run(plugin.patched_games())["away"] == [{"directory": str(game), "name": str(game)}]
+    assert run(plugin.library_remove(STABLE))["status"] == "error"
+    media.take_out(other)
+    media.put_in("SD", CARD)
+    assert using(plugin, STABLE) == [str(game)]
+
+
+def test_a_game_indexed_before_drives_were_kept_gets_its_drive_once_seen(plugin, plugin_home, media):
+    card = media.put_in("SD", CARD)
+    game = make_game_dir(card / "Games" / "Card Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    (plugin_home / "patched.json").write_text(json.dumps({str(game): "Card Game"}))  # as an older build wrote it
+
+    assert using(plugin, STABLE) == ["Card Game"]
+
+    assert json.loads((plugin_home / "patched.json").read_text()) == {str(game): {"name": "Card Game", "drive": CARD}}
+
+
+def test_a_game_on_a_card_that_wont_be_back_is_forgotten_and_its_version_can_go(plugin, plugin_home, tmp_path, media):
+    here = make_game_dir(tmp_path / "games" / "Here")
+    run(plugin.manual_patch_directory(str(here), "dxgi.dll", NIGHTLY))
+    away = str(media.base / "deck" / "SD" / "Games" / "Card Game")  # nothing mounted: the card is out
+    (plugin_home / "patched.json").write_text(json.dumps({**json.loads((plugin_home / "patched.json").read_text()), away: "Card Game"}))
+
+    assert run(plugin.forget_patched(str(here))) == {
+        "status": "error", "message": f"{here} isn't on a drive that isn't mounted: unpatch it rather than forget it.",
+    }
+    assert run(plugin.forget_patched(away)) == {"status": "success", "message": "Card Game is forgotten."}
+
+    assert run(plugin.patched_games())["away"] == []
+    assert using(plugin, NIGHTLY) == [str(here)]  # the game that is there stays
+    assert run(plugin.library_remove(STABLE))["status"] == "success"
+
+
 def test_an_interrupted_patch_still_counts_as_using_its_version(plugin, plugin_home, tmp_path, monkeypatch):
     game = make_game_dir(tmp_path / "games" / "Game")
 
@@ -60,3 +152,55 @@ def test_a_read_only_index_never_fails_a_patch(plugin, plugin_home, tmp_path):
     assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
     assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
 
+
+
+def test_changes_the_plugin_and_launch_wrappers_make_at_once_all_land(tmp_path):
+    path = tmp_path / "patched.json"
+
+    def add(start: int) -> None:
+        for n in range(start, start + 100):
+            PatchIndex(path).add(Path(f"/games/{n}"), f"Game {n}")
+
+    wrappers = [
+        subprocess.Popen([sys.executable, "-c", _ADD_FROM_A_PROCESS, str(REPO_ROOT / "py_modules"), str(path), str(start)])
+        for start in (1000, 1100, 1200)
+    ]
+    threads = [threading.Thread(target=add, args=(start,)) for start in range(0, 400, 100)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert [wrapper.wait() for wrapper in wrappers] == [0, 0, 0]
+
+    assert len(PatchIndex(path).entries()) == 700
+
+    def remove(start: int) -> None:
+        for n in range(start, start + 100):
+            PatchIndex(path).remove(Path(f"/games/{n}"))
+
+    threads = [threading.Thread(target=remove, args=(start,)) for start in (0, 100, 1000, 1100)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(PatchIndex(path).entries()) == sorted(
+        f"/games/{n}" for n in [*range(200, 400), *range(1200, 1300)]
+    )
+
+
+def test_the_index_reads_entries_from_before_drives_were_kept_and_writes_every_one_with_its_drive(tmp_path):
+    path = tmp_path / "patched.json"
+    path.write_text(json.dumps({
+        "/games/Old": "Old Game",  # an older build's entry: the name alone
+        "/games/New": {"name": "New Game", "drive": "0F1E-2D3C"},
+        "/games/Edited": {"name": "Edited Game", "drive": 7},  # edited by hand
+    }))
+
+    index = PatchIndex(path)
+    assert index.entries() == {
+        "/games/Old": Indexed("Old Game"),
+        "/games/New": Indexed("New Game", "0F1E-2D3C"),
+        "/games/Edited": Indexed("Edited Game"),
+    }
+    index.add(Path("/games/Added"), "Added Game")
+    assert json.loads(path.read_text())["/games/Old"] == {"name": "Old Game", "drive": None}

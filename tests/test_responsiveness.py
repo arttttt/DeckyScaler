@@ -10,6 +10,7 @@ from pathlib import Path
 from conftest import STABLE, run
 from deckyscaler.application.patcher import Patcher
 from deckyscaler.infrastructure import processes
+from deckyscaler.infrastructure.patch_index import PatchIndex
 from deckyscaler.infrastructure import steam as steam_dirs
 
 
@@ -57,6 +58,15 @@ def test_a_game_the_index_doesnt_know_is_still_found_by_searching(plugin, plugin
     (plugin_home / "patched.json").write_text("{}")  # e.g. patched before the index existed
 
     assert run(plugin.get_game_status("1234"))["target_dir"] == str(root)
+    assert [game["name"] for game in run(plugin.patched_games())["games"]] == ["Test Game"]  # back in the index
+
+
+def test_only_the_plugins_own_marker_goes_back_into_the_index(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("1234", "Test Game")
+    (root / "FRAMEGEN_PATCH").write_text("")  # patched by the original Decky Framegen
+
+    assert run(plugin.get_game_status("1234"))["patched"] is True
+    assert PatchIndex(plugin_home / "patched.json").entries() == {}
 
 
 def test_patching_scans_the_games_executables_and_processes_once(plugin, plugin_home, steam_library, monkeypatch):

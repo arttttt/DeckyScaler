@@ -270,6 +270,8 @@ export type LibrariesApplied = {
   applied: { name: string; appid: string; launch_options: string | null }[];
   skipped: string[];
   failed: { name: string; message: string }[];
+  /** Patched games on a drive that isn't mounted: whether they need the libraries can't be read. */
+  away: string[];
 };
 
 /** A game's own choice per slot (a library, "none", or absent: it follows the global choice), what that comes to,
@@ -461,7 +463,7 @@ export const gameSettings = callable<[appid: string], SettingsAnswer>("game_sett
 /** scope is "global" or an appid; a null value clears it, so the layer below shows through. */
 export const setSetting = callable<
   [scope: string, section: string, key: string, value: string | null],
-  { status: string; message?: string; skipped?: string[] }
+  { status: string; message?: string; skipped?: string[]; away?: string[] }
 >("set_setting");
 
 export const resetGameSettings = callable<[appid: string], { status: string; message?: string }>("reset_game_settings");
@@ -490,4 +492,11 @@ export type PatchedGame = {
   own_settings: boolean;
 };
 
-export const patchedGames = callable<[], { status: string; message?: string; games?: PatchedGame[] }>("patched_games");
+/** A patched game on a drive that isn't mounted: its patch can't be read until the drive is back. */
+export type AwayGame = { directory: string; name: string };
+
+export type PatchedGames = { status: string; message?: string; games?: PatchedGame[]; away?: AwayGame[] };
+
+export const patchedGames = callable<[], PatchedGames>("patched_games");
+/** Drops a game on a drive that won't be back from the patched games, so its version can be removed. */
+export const forgetPatched = callable<[directory: string], { status: string; message?: string }>("forget_patched");

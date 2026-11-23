@@ -191,7 +191,8 @@ export const launchOptionsToSet = (answer: LibrariesApplied | null): { appid: nu
     game.appid && game.launch_options !== null ? [{ appid: Number(game.appid), options: game.launch_options }] : [],
   );
 
-/** What applying the choice came to: the games patched again, those left alone while running, those that failed. */
+/** What applying the choice came to: the games patched again, those left alone while running, those that failed,
+ *  and those on a drive that isn't mounted. */
 export const applyOutcome = (answer: LibrariesApplied | null): string => {
   if (answer === null) return "The plugin backend did not answer.";
   const lines = [
@@ -200,6 +201,9 @@ export const applyOutcome = (answer: LibrariesApplied | null): string => {
       ? [`Skipped ${answer.skipped.join(", ")}: ${plural(answer.skipped.length, "it's", "they're")} running. Apply again once closed.`]
       : []),
     ...answer.failed.map((game) => `Couldn't apply to ${game.name}: ${game.message}`),
+    ...(answer.away.length
+      ? [`${answer.away.join(", ")} ${plural(answer.away.length, "is", "are")} on a drive that isn't mounted: apply again once it's back.`]
+      : []),
   ];
   return lines.length ? lines.join(" ") : "Nothing to apply.";
 };

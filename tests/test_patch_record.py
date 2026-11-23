@@ -312,6 +312,20 @@ def test_a_marker_describes_a_finished_patch_of_this_version_under_this_name():
     assert not marker.describes(details, "nightly-1", "winmm.dll")
 
 
+def test_a_patched_directory_is_shown_by_its_games_name_else_by_its_path():
+    from deckyscaler.domain import marker
+
+    game = marker.build(
+        dll_name="dxgi.dll", target_dir=Path("/g"), backed_up_files=[], optiscaler_version="nightly-1", family="10",
+        patched_at="t", steam_game=marker.SteamGame("1234", "Hades II", ""),
+    )
+    by_path = {**game, "game_name": ""}
+
+    assert marker.shown_name(game, Path("/g")) == "Hades II"
+    assert marker.shown_name(by_path, Path("/g")) == "/g"
+    assert marker.shown_name({}, Path("/g")) == "/g"  # no marker to read
+
+
 def test_a_marker_describes_a_patch_with_the_libraries_it_placed_and_keeps_the_keys_they_own():
     from deckyscaler.domain import marker
     from deckyscaler.domain.settings_layers import Owned

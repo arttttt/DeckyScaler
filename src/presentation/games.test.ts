@@ -38,6 +38,30 @@ describe("the Games page", () => {
     expect(gamesPageView(null, LIBRARY)).toEqual({ kind: "message", message: "Loading…" });
     expect(gamesPageView({ status: "error", message: "Broken." }, LIBRARY)).toEqual({ kind: "message", message: "Broken." });
     expect(gamesPageView({ status: "success", games: [] }, LIBRARY)).toEqual({ kind: "message", message: "No game is patched yet." });
+    expect(gamesPageView({ status: "success", games: [], away: [] }, LIBRARY)).toEqual({ kind: "message", message: "No game is patched yet." });
+  });
+
+  it("lists a game on a drive that isn't mounted last, to forget", () => {
+    const view = gamesPageView(
+      { status: "success", games: [game({})], away: [{ directory: "/run/media/deck/SD/Games/Hades", name: "Hades" }] },
+      LIBRARY,
+    );
+    if (view.kind !== "ready") throw new Error(view.kind);
+    expect(view.rows.map((row) => row.title)).toEqual(["Cyberpunk 2077", "Hades"]);
+    expect(view.rows[1]).toEqual({
+      key: "/run/media/deck/SD/Games/Hades",
+      title: "Hades",
+      lines: [
+        "On a drive that isn't mounted: put it back in to see its patch.",
+        "Forget it if the drive won't be back, so its OptiScaler version can be removed.",
+      ],
+      action: { kind: "forget", directory: "/run/media/deck/SD/Games/Hades", label: "Forget" },
+    });
+  });
+
+  it("lists games on a drive that isn't mounted when nothing else is patched", () => {
+    const view = gamesPageView({ status: "success", games: [], away: [{ directory: "/run/media/deck/SD/Hades", name: "Hades" }] }, LIBRARY);
+    expect(view.kind === "ready" && view.rows.map((row) => row.action.kind)).toEqual(["forget"]);
   });
 
   it("names a game's version as the library does, its proxy and when it was patched", () => {

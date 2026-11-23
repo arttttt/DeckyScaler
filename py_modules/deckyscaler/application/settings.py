@@ -111,7 +111,7 @@ class Settings:
                 return _error(f"{section}.{key} doesn't take {value!r}.")
             self.store.save_global(settings_layers.with_value(self.store.global_layer(), target, value))
             skipped = self._apply_everywhere()
-            return {"status": "success", "skipped": skipped}
+            return {"status": "success", "skipped": skipped, "away": self.patcher.away()}
         directory, details = self._game(scope)
         if directory is not None and self.patcher.is_running(directory):
             return _error(GAME_RUNNING)

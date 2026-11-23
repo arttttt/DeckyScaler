@@ -30,7 +30,7 @@ from deckyscaler.domain import (
     version_placement,
 )
 from deckyscaler.domain import patch_plan as plan
-from deckyscaler.infrastructure import files, game_directory, processes, proton
+from deckyscaler.infrastructure import drives, files, game_directory, processes, proton
 from deckyscaler.infrastructure.library_store import LibraryStore
 from deckyscaler.infrastructure.patch_index import PatchIndex
 from deckyscaler.infrastructure.settings_store import SettingsStore
@@ -184,7 +184,7 @@ class Patcher:
             )
             # The record lands before the first file does, so even an interrupted patch can be undone.
             files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
-            self._remember(directory, steam_game.name if steam_game else str(directory))
+            self._remember(directory, marker.shown_name(details, directory))
             game_directory.execute(operations, directory, source)
             files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
             if patch_record.placed_by(recorded, plan.INI_FILENAME):
@@ -300,11 +300,11 @@ class Patcher:
         return {"status": "success", "message": f"OptiScaler files removed from {directory}"}
 
     # The index of patched directories follows the markers: an entry is added once a marker is
-    # written and dropped once it is gone. Failing to update it never fails a patch.
+    # written and dropped once it is gone, but kept while its drive is out. Failing to update it never fails a patch.
 
     def _remember(self, directory: Path, name: str) -> None:
         try:
-            self.patches.add(directory, name)
+            self.patches.add(directory, name, drives.identity(directory))
         except OSError as exc:
             log.warning(f"Updating the index of patched directories failed: {exc}")
 
@@ -314,24 +314,33 @@ class Patcher:
         except OSError as exc:
             log.warning(f"Updating the index of patched directories failed: {exc}")
 
-    def patched_markers(self) -> list[tuple[Path, str, dict]]:
-        """Every indexed directory with its name and marker. A directory whose marker is gone (the game
-        was removed, or the marker by hand) is dropped from the index."""
-        found = []
-        for directory, name in self.patches.directories().items():
+    def _indexed(self) -> tuple[list[tuple[Path, str, dict]], list[tuple[Path, str]]]:
+        """The indexed directories by whether their patch can be read now: each one with its marker, with its name and
+        marker; each one on a drive that isn't mounted, with its name, kept until the drive is back. A directory whose
+        marker is gone from where it can be read (the game was removed, or the marker by hand) is dropped from the
+        index."""
+        found, away = [], []
+        for directory, entry in self.patches.entries().items():
             path = Path(directory)
             marker_path = path / bundle.MARKER_FILENAME
-            if not marker_path.is_file():
+            if marker_path.is_file():
+                found.append((path, entry.name, files.read_json(marker_path)))
+                if entry.drive is None and drives.identity(path) is not None:
+                    self._remember(path, entry.name)  # indexed before drives were kept: its drive is known now
+            elif drives.on_unmounted_drive(path, entry.drive):
+                away.append((path, entry.name))
+            else:
                 self._forget(path)
-                continue
-            found.append((path, name, files.read_json(marker_path)))
-        return found
+        return found, away
 
-    def _patched_with(self, version_id: str) -> list[tuple[str, dict]]:
-        """The name and marker of every indexed directory whose marker names this library version."""
-        return sorted(
-            (name, details) for _, name, details in self.patched_markers() if details.get("optiscaler_version") == version_id
-        )
+    def patched_markers(self) -> list[tuple[Path, str, dict]]:
+        """Every indexed directory whose patch can be read now, with its name and marker."""
+        return self._indexed()[0]
+
+    def away(self) -> list[str]:
+        """The names of the indexed directories on a drive that isn't mounted: what reaches every patched game
+        doesn't reach them until the drive is back."""
+        return sorted(name for _, name in self._indexed()[1])
 
     def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:
         """What a patched game's version, while still in the library, says of the game: whether the game lacks files
@@ -352,11 +361,12 @@ class Patcher:
     def patched_games(self) -> dict:
         """Every game and directory the plugin patched, by name: what it was patched with, what its version says of it
         (`_against_version`), and whether it has settings of its own. A Steam game has its appid; a directory patched
-        by path has none."""
+        by path has none. Those on a drive that isn't mounted are listed apart (`away`), by name alone."""
         installed = self.library.installed()
         seen: dict[str, frozenset[str]] = {}
         games = []
-        for directory, name, details in self.patched_markers():
+        found, away = self._indexed()
+        for directory, name, details in found:
             appid = str(details.get("appid") or "")
             dll_name = details.get("dll_name") or bundle.DEFAULT_PROXY_DLL
             version = details.get("optiscaler_version")
@@ -374,11 +384,33 @@ class Patcher:
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
                 "libraries": details.get("libraries") or [],
             })
-        return {"status": "success", "games": sorted(games, key=lambda game: game["name"].lower())}
+        return {
+            "status": "success",
+            "games": sorted(games, key=lambda game: game["name"].lower()),
+            "away": [{"directory": str(path), "name": name} for path, name in sorted(away, key=lambda item: item[1].lower())],
+        }
 
-    def games_using(self, version_id: str) -> list[str]:
-        """The patched games and directories whose marker names this library version."""
-        return [name for name, _ in self._patched_with(version_id)]
+    def forget(self, directory: str) -> dict:
+        """Drop a game on a drive that isn't mounted from the index, for a drive that won't be back: its versions can
+        then be removed. Should it come back after all, a Steam game's page finds its patch again."""
+        name = next((name for path, name in self._indexed()[1] if str(path) == directory), None)
+        if name is None:
+            known = entry.name if (entry := self.patches.entries().get(directory)) else directory
+            return _error(f"{known} isn't on a drive that isn't mounted: unpatch it rather than forget it.")
+        try:
+            self.patches.remove(Path(directory))
+        except OSError as exc:
+            return _error(f"Forgetting {name} failed: {exc}")
+        return {"status": "success", "message": f"{name} is forgotten."}
+
+    def games_using(self, version_id: str) -> library.Users:
+        """The patched games and directories whose marker names this library version, and those on a drive that isn't
+        mounted, whose marker can't be read."""
+        found, away = self._indexed()
+        return library.Users(
+            tuple(sorted(name for _, name, details in found if details.get("optiscaler_version") == version_id)),
+            tuple(sorted(name for _, name in away)),
+        )
 
 
     def patch_user_directory(
@@ -482,10 +514,10 @@ class Patcher:
     def find_marker(self, install_root: Path) -> Path | None:
         """The game's patch marker: where the patch index says the plugin patched it, else by searching
         the whole install, for the plugin's marker and then the original Decky Framegen's (whose patch is
-        reset, having no record)."""
+        reset, having no record). A marker of the plugin's found by searching goes back into the index."""
         if not install_root.exists():
             return None
-        for directory in self.patches.directories():
+        for directory in self.patches.entries():
             marker_path = Path(directory) / bundle.MARKER_FILENAME
             if marker_path.parent.is_relative_to(install_root) and marker_path.is_file():
                 return marker_path
@@ -493,10 +525,15 @@ class Patcher:
             for name in (bundle.MARKER_FILENAME, bundle.UPSTREAM_MARKER_FILENAME):
                 found = next((path for path in install_root.rglob(name) if path.is_file()), None)
                 if found is not None:
-                    return found
+                    break
+            else:
+                return None
         except OSError:
-            pass
-        return None
+            return None
+        if found.name == bundle.MARKER_FILENAME:
+            # The index learns a patch of ours it didn't know, so the pages listing from it show the game again.
+            self._remember(found.parent, marker.shown_name(files.read_json(found), found.parent))
+        return found
 
     def game_status(self, appid: str) -> dict:
         try:
