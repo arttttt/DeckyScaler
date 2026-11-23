@@ -335,6 +335,11 @@ class Patcher:
         """Every indexed directory whose patch can be read now, with its name and marker."""
         return self._indexed()[0]
 
+    def away(self) -> list[str]:
+        """The names of the indexed directories on a drive that isn't mounted: what reaches every patched game
+        doesn't reach them until the drive is back."""
+        return sorted(name for _, name in self._indexed()[1])
+
     def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:
         """What a patched game's version, while still in the library, says of the game: whether the game lacks files
         the version holds now (patched while they were gone, it gets them only when patched again, which the launch
@@ -388,7 +393,8 @@ class Patcher:
         then be removed. Should it come back after all, a Steam game's page finds its patch again."""
         name = next((name for path, name in self._indexed()[1] if str(path) == directory), None)
         if name is None:
-            return _error(f"{directory} isn't on a drive that is out: there is nothing to forget.")
+            known = self.patches.directories().get(directory, directory)
+            return _error(f"{known} isn't on a drive that isn't mounted: unpatch it rather than forget it.")
         try:
             self.patches.remove(Path(directory))
         except OSError as exc:

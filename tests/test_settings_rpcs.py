@@ -36,7 +36,7 @@ def test_a_global_change_reaches_every_patched_game_but_not_a_games_own(plugin, 
 
     answer = run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))
 
-    assert answer == {"status": "success", "skipped": []}
+    assert answer == {"status": "success", "skipped": [], "away": []}
     assert "Fsr4Model=1" in (first / "OptiScaler.ini").read_text()
     assert "Fsr4Model=0" in (second / "OptiScaler.ini").read_text()
     game = run(plugin.game_settings("2"))
@@ -71,7 +71,7 @@ def test_a_game_running_isnt_written(plugin, plugin_home, steam_library, monkeyp
     skipped = run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))
 
     assert refused["status"] == "error" and "Close the game" in refused["message"]
-    assert skipped == {"status": "success", "skipped": ["Game"]}
+    assert skipped == {"status": "success", "skipped": ["Game"], "away": []}
     assert "Fsr4Model=auto" in (root / "OptiScaler.ini").read_text()
     assert run(plugin.game_settings("1"))["running"] is True
 

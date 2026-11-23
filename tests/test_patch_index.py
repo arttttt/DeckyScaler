@@ -81,6 +81,9 @@ def test_a_game_on_a_card_taken_out_stays_indexed_and_keeps_its_version(plugin, 
         ),
     }
     assert run(plugin.patched_games())["away"] == [{"directory": str(game), "name": str(game)}]
+    # What reaches every patched game says which it can't reach.
+    assert run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))["away"] == [str(game)]
+    assert run(plugin.user_libraries_apply())["away"] == [str(game)]
 
     drawer.rename(card)
     mounted.add(card.resolve())  # back in
@@ -101,7 +104,7 @@ def test_a_game_on_a_card_that_wont_be_back_is_forgotten_and_its_version_can_go(
     (plugin_home / "patched.json").write_text(json.dumps({**json.loads((plugin_home / "patched.json").read_text()), away: "Card Game"}))
 
     assert run(plugin.forget_patched(str(here))) == {
-        "status": "error", "message": f"{here} isn't on a drive that is out: there is nothing to forget.",
+        "status": "error", "message": f"{here} isn't on a drive that isn't mounted: unpatch it rather than forget it.",
     }
     assert run(plugin.forget_patched(away)) == {"status": "success", "message": "Card Game is forgotten."}
 

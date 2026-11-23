@@ -144,6 +144,14 @@ describe("a change", () => {
     expect(skippedMessage([])).toBeNull();
     expect(skippedMessage(["Cyberpunk 2077"])).toBe("Cyberpunk 2077 is running and gets the change once closed.");
     expect(skippedMessage(["A", "B"])).toBe("A, B are running and get the change once closed.");
+    expect(skippedMessage([], [])).toBeNull();
+    expect(skippedMessage(["A"], ["Card Game"])).toBe(
+      "A is running and gets the change once closed. " +
+        "Card Game is on a drive that isn't mounted and gets the change once it's back and the game has run.",
+    );
+    expect(skippedMessage([], ["B", "C"])).toBe(
+      "B, C are on a drive that isn't mounted and get the change once it's back and the game has run.",
+    );
   });
 });
 
