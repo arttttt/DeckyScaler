@@ -171,20 +171,31 @@ describe("the manage dialog", () => {
     );
   });
 
-  it("lists a folder that isn't a build after the builds, to remove, and sizes it only when asked", () => {
-    const leftover = { id: "GE-Proton9-1", size: 400_000_000 };
+  it("lists a folder that isn't a build after the builds, to remove, with its size when asked and its games", () => {
+    const leftover = { id: "GE-Proton9-1", size: 400_000_000, games: [GE.games[0]], global_default: false };
     const view = protonManageView({ installed: installed({ tools: [GE], others: [leftover] }), busy: null, message: null });
 
     expect(view.rows[1]).toEqual({
-      id: "GE-Proton9-1", label: "GE-Proton9-1", description: "Not a Proton build: Steam can't use it · 400 MB",
+      id: "GE-Proton9-1", label: "GE-Proton9-1", description: "Not a Proton build: Steam can't use it · 400 MB · used by 1 game",
       action: { label: "Remove", enabled: true },
     });
-    const unsized = protonManageView({ installed: installed({ tools: [], others: [{ ...leftover, size: null }] }), busy: null, message: null });
-    expect(unsized.rows[0].description).toBe("Not a Proton build: Steam can't use it");
+    const unsized = protonManageView({ installed: installed({ tools: [], others: [{ ...leftover, size: null, games: [] }] }), busy: null, message: null });
+    expect(unsized.rows[0].description).toBe("Not a Proton build: Steam can't use it · no games");
     expect(unsized.message).toBeNull(); // a folder to remove is something to show
     expect(protonManageView({ installed: installed({ tools: [], others: [leftover] }), busy: leftover.id, message: null }).rows[0]).toMatchObject({
       description: "Removing…", action: { enabled: false },
     });
+  });
+
+  it("names the folders that aren't builds in the heading and the usage, only while there are any", () => {
+    const leftover = { id: "GE-Proton9-1", size: 400_000_000, games: [], global_default: false };
+    const withOther = protonManageView({ installed: installed({ tools: [], others: [leftover], installed_bytes: 400_000_000 }), busy: null, message: null });
+    const buildsOnly = protonManageView({ installed: installed(), busy: null, message: null });
+
+    expect(withOther.title).toBe("Installed Proton builds and other folders");
+    expect(withOther.usage).toBe("Installed builds and other folders take 400 MB.");
+    expect(buildsOnly.title).toBe("Installed Proton builds");
+    expect(buildsOnly.usage).toBe("Installed builds take 3.0 GB.");
   });
 
   it("offers no Remove for a build linked in from elsewhere, and says why", () => {
