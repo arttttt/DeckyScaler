@@ -137,12 +137,17 @@ class CompatToolsStore:
         manifest = tool_dir / MANIFEST
         return manifest.is_file(), (tool_dir / TOOL_MANIFEST).is_file(), _declared(manifest)
 
-    def commit(self, unpacked: Path, folder: str) -> None:
-        """Move an unpacked tool into compatibilitytools.d in one rename; a tool already there is never replaced."""
+    def taken(self, folder: str) -> bool:
+        """Whether something already holds a tool's name in compatibilitytools.d, a folder, a link or a file: a tool
+        moved in can't land there."""
         target = self._own(folder)
-        if target.exists() or target.is_symlink():
+        return target.exists() or target.is_symlink()
+
+    def commit(self, unpacked: Path, folder: str) -> None:
+        """Move an unpacked tool into compatibilitytools.d in one rename; whatever holds its name is never replaced."""
+        if self.taken(folder):
             raise FileExistsError(f"{folder} is already in {self.tools_dir}")
-        unpacked.rename(target)
+        unpacked.rename(self._own(folder))
 
     def remove(self, folder: str) -> None:
         """Delete a tool from compatibilitytools.d; a link, or anything outside it, is refused."""

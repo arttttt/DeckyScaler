@@ -241,6 +241,25 @@ def test_a_build_whose_name_a_folder_that_isnt_one_holds_is_refused_before_downl
     assert download.urls == [] and world.tree() == [NEWEST]
 
 
+@pytest.mark.parametrize("holder", ["link", "dangling link", "file"])
+def test_a_build_whose_name_a_link_or_a_file_holds_is_refused_before_downloading(world, tmp_path, holder):
+    world.tools.mkdir(parents=True, exist_ok=True)
+    if holder == "link":
+        (tmp_path / "elsewhere").mkdir()
+        os.symlink(tmp_path / "elsewhere", world.tools / NEWEST)
+    elif holder == "dangling link":
+        os.symlink(tmp_path / "gone", world.tools / NEWEST)
+    else:
+        write(world.tools / NEWEST, b"")
+    download = FakeDownload(world.archive)
+
+    assert world.proton(download).install(pb.GE_PROTON, NEWEST) == {
+        "status": "error",
+        "message": f"Something named {NEWEST} is already in compatibilitytools.d, and it isn't a build. Move it out of there first.",
+    }
+    assert download.urls == []
+
+
 def test_a_system_build_of_the_same_name_doesnt_hide_the_devices_own_folder(world, home):
     build_tree(home.parent / "system-compatibilitytools.d", "proton-cachyos")
     write(world.tools / "proton-cachyos" / "readme.txt", b"")  # the device's own, and no build
