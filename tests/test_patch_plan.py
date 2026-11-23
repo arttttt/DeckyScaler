@@ -7,6 +7,16 @@ from deckyscaler.domain.patch_plan import Copy, DeleteFile, Move, RemoveFileOrTr
 # ── keeping what was in the directory ────────────────────────────────────────
 
 
+def test_a_file_deep_in_the_directory_a_link_or_a_copy_would_take_is_backed_up_first():
+    from deckyscaler.domain.patch_plan import Link
+
+    link = preserving_existing((Link("OptiScaler/x.dll", "OptiScaler/x.dll"),), frozenset({"OptiScaler", "OptiScaler/x.dll"}))
+    copy = preserving_existing((Copy("/lib/u.dll", "OptiScaler/custom/U/u.dll"),), frozenset({"OptiScaler/custom/U/u.dll"}))
+
+    assert link == (Move("OptiScaler/x.dll", "OptiScaler/x.dll.b"), Link("OptiScaler/x.dll", "OptiScaler/x.dll"))
+    assert copy == (Move("OptiScaler/custom/U/u.dll", "OptiScaler/custom/U/u.dll.b"), Copy("/lib/u.dll", "OptiScaler/custom/U/u.dll"))
+
+
 def test_a_file_a_copy_would_overwrite_is_backed_up_first():
     operations = preserving_existing((Copy("x.dll", "x.dll"),), frozenset({"x.dll"}))
 

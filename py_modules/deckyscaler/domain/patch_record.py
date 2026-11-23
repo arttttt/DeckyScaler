@@ -70,7 +70,8 @@ def record(
 ) -> PatchRecord:
     """The record of a patch plan, made before it runs.
 
-    `entries` is the game directory before the patch; `bundle_hashes` maps every bundle file the
+    `entries` is the game directory before the patch, by path, every directory a placed file goes into among them
+    when it was there (a directory not among them is the patch's own); `bundle_hashes` maps every bundle file the
     plan copies to its sha256. `carried_over` names files a
     previous patch placed that this one keeps as they are (the user's OptiScaler.ini settings).
     `rewritten` names placed files a program rewrites besides OptiScaler.ini, and `owned_dirs` directories
@@ -91,22 +92,19 @@ def record(
         Backup(path, f"{path}{BACKUP_SUFFIX}") for path in placed if path not in entries and f"{path}{BACKUP_SUFFIX}" in entries
     ]
     created = sorted(
-        {
-            str(parent)
-            for item in placed
-            for parent in PurePosixPath(item).parents
-            if str(parent) != "." and str(parent).split("/")[0] not in entries
-        },
+        {str(parent) for item in placed for parent in PurePosixPath(item).parents if str(parent) not in (".", *entries)},
         key=lambda path: (-path.count("/"), path),
     )
     owned = tuple(directory for directory in owned_dirs if directory in created)
     return PatchRecord(tuple(placed.values()), tuple(backups), tuple(created), owned)
 
 
-def made_by_the_plugin(links: dict[str, str], plugin_home: str) -> tuple[str, ...]:
-    """The links in a game (`links` maps a link's path to its target) pointing into the plugin's home: only a patch of
-    the plugin's makes one, a backup's name included."""
-    return tuple(sorted(path for path, target in links.items() if PurePosixPath(target).is_relative_to(plugin_home)))
+def made_by_the_plugin(contents: dict[str, str | None], plugin_home: str) -> tuple[str, ...]:
+    """The links in a game (`contents` maps each entry's path to its target, None for what isn't a link) pointing into
+    the plugin's home: only a patch of the plugin's makes one, a backup's name included."""
+    return tuple(
+        sorted(path for path, target in contents.items() if target is not None and PurePosixPath(target).is_relative_to(plugin_home))
+    )
 
 
 def left_behind(links: tuple[str, ...], dirs: tuple[str, ...] = ()) -> tuple[Operation | RemoveDirIfEmpty, ...]:

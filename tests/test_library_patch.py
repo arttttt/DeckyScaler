@@ -290,3 +290,18 @@ def test_a_game_recorded_under_the_originals_name_keeps_its_libraries_keys_and_s
 
     wrapper_patch(home, game)  # patched as the wrapper would patch it: started as it is
     assert (game / "FRAMEGEN_PATCH").is_file() and not (game / "DECKYSCALER_PATCH").exists()
+
+
+def test_the_users_own_file_where_a_library_is_copied_is_set_aside_and_back_after_unpatching(plugin, plugin_home, tmp_path):
+    anr(plugin_home)
+    choose(plugin_home, library_choice.GLOBAL, FG, "anr")
+    game = make_game_dir(tmp_path / "games" / "Game", {f"OptiScaler/custom/{ANR}/dlssg/nvngx_dlssg.dll": b"the user's own build"})
+    before = snapshot(game)
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))["status"] == "success"
+    folder = game / "OptiScaler" / "custom" / ANR / "dlssg"
+    assert (folder / "nvngx_dlssg.dll").read_bytes() == b"anr dll"
+    assert (folder / "nvngx_dlssg.dll.b").read_bytes() == b"the user's own build"
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before
