@@ -99,13 +99,14 @@ class ProtonBuilds:
         return offers
 
     def installed(self, with_sizes: bool = False) -> dict:
-        """Every build Steam would find, newest first, with the games whose user chose it, and whether Steam must
-        restart to see the builds as they are now. Sizing walks thousands of files per build: only when asked."""
+        """Every build Steam would find, newest first, with the games whose user chose it; the device's own folders
+        in compatibilitytools.d that aren't builds, to remove; and whether Steam must restart to see the builds as
+        they are now. Sizing walks thousands of files per build: only when asked."""
         clients = steam_library.running_clients()
         active = self._active(clients)
         if active.root is None:
-            return {"status": "success", "problem": active.problem, "tools": [], "installed_bytes": 0, "restart_needed": False,
-                    "moves": []}
+            return {"status": "success", "problem": active.problem, "tools": [], "others": [], "installed_bytes": 0,
+                    "restart_needed": False, "moves": []}
         store = self._store(active.root)
         forced = proton.forced_mappings(active.root)
         name = self._namer(active.root)
@@ -123,12 +124,18 @@ class ProtonBuilds:
                 "games": name(appids),
                 "global_default": global_default,
             })
-        own = sum(row["size"] for row in rows if not row["system"]) if with_sizes else None
+        others = [
+            {"id": folder, "size": store.size(proton_builds.Tool(folder, frozenset())) if with_sizes else None}
+            for folder in store.others()
+        ]
+        own = (
+            sum(row["size"] for row in rows if not row["system"]) + sum(row["size"] for row in others) if with_sizes else None
+        )
         restart = steam.restart_needed(active.root, clients, store.changed_at())
         # Steam takes a game's move only to a build it lists, which a restart due means it doesn't yet.
         moves = [] if restart else self._offers(tools, forced, name)
-        return {"status": "success", "problem": None, "tools": rows, "installed_bytes": own, "restart_needed": restart,
-                "moves": moves}
+        return {"status": "success", "problem": None, "tools": rows, "others": others, "installed_bytes": own,
+                "restart_needed": restart, "moves": moves}
 
     def _published(self, build_id: str) -> list[proton_builds.Release]:
         return proton_builds.available(build_id, self.list_releases(proton_builds.BUILDS[build_id].repository))
@@ -245,7 +252,12 @@ class ProtonBuilds:
         return {"status": "success", "games": self._namer(active.root)(appids)}
 
     def _own_tool(self, root: Path, folder: str) -> proton_builds.Tool | str:
-        tool = next((t for t in self._store(root).installed() if t.folder == folder), None)
+        """A tool in compatibilitytools.d to remove: a build, or a folder there that isn't one (it declares no
+        names, so only a mapping naming its folder can name it)."""
+        store = self._store(root)
+        tool = next((t for t in store.installed() if t.folder == folder), None)
+        if tool is None and folder in store.others():
+            tool = proton_builds.Tool(folder, frozenset())
         if tool is None:
             return f"{folder} is not installed."
         if tool.system:

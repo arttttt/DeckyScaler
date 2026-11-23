@@ -57,6 +57,18 @@ class CompatToolsStore:
         """Every tool Steam would find, whoever put it there: this install's own, then the system's."""
         return _scan(self.tools_dir, system=False) + (_scan(self.system_dir, system=True) if self.system_dir else [])
 
+    def others(self) -> list[str]:
+        """The device's own folders in compatibilitytools.d that aren't tools Steam would find, because they have
+        no compatibilitytool.vdf: what a broken install or a folder copied by hand leaves. They are listed so that
+        they can be removed. A dot-folder (the plugin's own staging) or a link never counts."""
+        if not self.tools_dir.is_dir():
+            return []
+        return sorted(
+            path.name
+            for path in self.tools_dir.iterdir()
+            if path.is_dir() and not path.is_symlink() and not path.name.startswith(".") and not (path / MANIFEST).exists()
+        )
+
     def _own(self, folder: str) -> Path:
         """A tool's directory in compatibilitytools.d; anything that would point elsewhere is refused."""
         if not folder or folder.startswith(".") or "/" in folder or "\\" in folder:

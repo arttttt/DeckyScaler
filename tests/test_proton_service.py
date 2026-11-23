@@ -141,7 +141,7 @@ def test_without_a_steam_to_install_into_nothing_is_written_and_the_frontend_is_
     proton = world.proton()
 
     assert proton.install(pb.GE_PROTON, NEWEST) == {"status": "error", "problem": steam.NO_STEAM}
-    assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "installed_bytes": 0,
+    assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "others": [], "installed_bytes": 0,
                                   "restart_needed": False, "moves": []}
     assert proton.versions(pb.GE_PROTON)["problem"] == steam.NO_STEAM
     assert world.tree() == []
@@ -204,6 +204,27 @@ def test_a_system_wide_build_is_never_removed(world, home):
     assert "installed for every user" in proton.removal("proton-cachyos")["message"]
     assert "installed for every user" in proton.remove("proton-cachyos")["message"]
     assert (home.parent / "system-compatibilitytools.d" / "proton-cachyos").is_dir()
+
+
+def test_a_folder_that_isnt_a_build_is_listed_apart_and_removed_like_one(world, steam_library):
+    world.proton().install(pb.GE_PROTON, NEWEST)
+    write(world.tools / "GE-Proton9-1" / "proton", b"#!/bin/sh")  # a broken install: no compatibilitytool.vdf
+    steam_library.set_compat_tools({"730": "GE-Proton9-1"})
+    proton = world.proton()
+
+    listed = proton.installed(with_sizes=True)
+    assert [tool["id"] for tool in listed["tools"]] == [NEWEST]
+    size = listed["others"][0]["size"]
+    assert listed["others"] == [{"id": "GE-Proton9-1", "size": size}] and size > 0
+    assert listed["installed_bytes"] == listed["tools"][0]["size"] + size
+    assert proton.installed()["others"] == [{"id": "GE-Proton9-1", "size": None}]  # sizing is the manage dialog's
+
+    assert proton.removal("GE-Proton9-1") == {  # Steam still names it for a game: say so
+        "status": "success", "games": [{"appid": "730", "name": "Counter-Strike 2", "kind": "steam"}], "global_default": False,
+    }
+    assert proton.remove("GE-Proton9-1") == {"status": "success", "message": "GE-Proton9-1 is removed."}
+    assert world.tree() == [".deckyscaler-partial", NEWEST]
+    assert proton.remove("GE-Proton9-1") == {"status": "error", "message": "GE-Proton9-1 is not installed."}
 
 
 def test_github_failing_still_lists_what_is_installed(world, github_api):

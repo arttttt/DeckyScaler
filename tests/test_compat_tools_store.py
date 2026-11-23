@@ -137,6 +137,21 @@ def test_every_tool_steam_would_find_is_listed_whoever_installed_it(tmp_path):
     assert CompatToolsStore(tmp_path / "missing").installed() == []
 
 
+def test_a_folder_that_isnt_a_tool_steam_would_find_is_listed_apart_but_never_a_link_a_file_or_ours(tmp_path):
+    tools = tools_dir(tmp_path)
+    build_tree(tools)
+    write(tools / "not-a-tool" / "readme.txt", b"")
+    write(tools / "stray.tar.gz", b"")
+    (tools / "linked").symlink_to(tmp_path / "elsewhere", target_is_directory=True)
+    (tmp_path / "elsewhere").mkdir()
+    build_tree(tools / PARTIAL_DIRNAME / "GE-Proton11-13-x86_64")
+
+    store = CompatToolsStore(tools)
+    assert store.others() == ["not-a-tool"]
+    assert [tool.folder for tool in store.installed()] == [TOOL]
+    assert CompatToolsStore(tmp_path / "missing").others() == []
+
+
 def test_a_tool_is_sized_by_its_files_counting_links_as_themselves(tmp_path):
     tools = tools_dir(tmp_path)
     build_tree(tools)
