@@ -184,7 +184,7 @@ class Patcher:
             )
             # The record lands before the first file does, so even an interrupted patch can be undone.
             files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
-            self._remember(directory, steam_game.name if steam_game else str(directory))
+            self._remember(directory, marker.shown_name(details, directory))
             game_directory.execute(operations, directory, source)
             files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
             if patch_record.placed_by(recorded, plan.INI_FILENAME):
@@ -482,7 +482,7 @@ class Patcher:
     def find_marker(self, install_root: Path) -> Path | None:
         """The game's patch marker: where the patch index says the plugin patched it, else by searching
         the whole install, for the plugin's marker and then the original Decky Framegen's (whose patch is
-        reset, having no record)."""
+        reset, having no record). A marker of the plugin's found by searching goes back into the index."""
         if not install_root.exists():
             return None
         for directory in self.patches.directories():
@@ -493,10 +493,15 @@ class Patcher:
             for name in (bundle.MARKER_FILENAME, bundle.UPSTREAM_MARKER_FILENAME):
                 found = next((path for path in install_root.rglob(name) if path.is_file()), None)
                 if found is not None:
-                    return found
+                    break
+            else:
+                return None
         except OSError:
-            pass
-        return None
+            return None
+        if found.name == bundle.MARKER_FILENAME:
+            # The index learns a patch of ours it didn't know, so the pages listing from it show the game again.
+            self._remember(found.parent, marker.shown_name(files.read_json(found), found.parent))
+        return found
 
     def game_status(self, appid: str) -> dict:
         try:

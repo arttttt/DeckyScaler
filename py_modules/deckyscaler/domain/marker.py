@@ -53,6 +53,12 @@ def build(
     }
 
 
+def shown_name(details: dict, directory: Path) -> str:
+    """What the plugin's pages call a patched directory: the game its patch recorded, else the directory itself (a
+    patch by path, or the launch wrapper's, records none)."""
+    return str(details.get("game_name") or directory)
+
+
 def describes(details: dict, version_id: str, dll_name: str, placed: tuple[library_choice.Placed, ...] = ()) -> bool:
     """Whether a marker records a finished patch with this version under this proxy name and these libraries:
     patching again would place the same."""
