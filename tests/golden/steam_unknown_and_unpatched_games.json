@@ -16,6 +16,7 @@
     "message": "Game not found in Steam library.",
     "newer_version": null,
     "patched": false,
+    "record": null,
     "status": "success",
     "target_dir": null,
     "version_incomplete": false

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from deckyscaler.domain import patch_record
 from deckyscaler.domain import patch_plan as plan
@@ -43,6 +43,34 @@ def current_state(directory: Path, patch: patch_record.PatchRecord) -> dict[str,
         elif full.is_file():
             state[path] = files.sha256(full)
     return state
+
+
+def links(directory: Path, dirs: tuple[str, ...]) -> dict[str, str]:
+    """Every symlink right in each of `dirs` of a game directory ("" for its own), by its path in the game, with where
+    it points. A directory reached through a link is never looked into."""
+    found: dict[str, str] = {}
+    for name in dirs:
+        relative = PurePosixPath(name)
+        folder = directory / relative
+        if any((directory / step).is_symlink() for step in (relative, *relative.parents) if str(step) != ".") or not folder.is_dir():
+            continue
+        for entry in os.scandir(folder):
+            if entry.is_symlink():
+                found[str(relative / entry.name)] = os.readlink(entry.path)
+    return found
+
+
+def directories_under(directory: Path, roots: tuple[str, ...]) -> frozenset[str]:
+    """Every directory in each of `roots` of a game directory, the root included, by its path in the game. A
+    directory reached through a link is never looked into."""
+    found: set[str] = set()
+    for root in roots:
+        top = directory / root
+        if top.is_symlink() or not top.is_dir():
+            continue
+        for current, _, _ in os.walk(top):  # a linked directory is listed by its parent, never walked into
+            found.add(Path(current).relative_to(directory).as_posix())
+    return frozenset(found)
 
 
 def listing(directory: Path) -> tuple[frozenset[str], frozenset[str]]:

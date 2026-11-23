@@ -44,6 +44,9 @@ BUNDLE_IS_NOT_A_GAME = "The target directory is in DeckyScaler's own folder (~/d
 PATCHED_BY_DECKY_FRAMEGEN = (
     "This game was patched by Decky Framegen. Unpatch it first: the plugin shows what that removes."
 )
+DAMAGED_RECORD = (
+    "DeckyScaler's record of this patch is damaged, so it can't be undone by it. Patch the game again to repair it."
+)
 LAUNCH_OPTIONS_UNKNOWN = (
     "Steam didn't say what this game's launch options are, so Unpatch couldn't put them back. "
     "Nothing was changed; try patching again."
@@ -52,12 +55,25 @@ RECORD = "record"
 """How a directory is unpatched: by its patch record, exactly as the patch recorded it."""
 RESET = "reset"
 """How a directory Decky Framegen patched is unpatched: by what it placed, after the user confirms."""
+REPAIR = "repair"
+"""A directory whose record is damaged isn't unpatched: patching it again repairs the record first."""
+
+
+def _marker_of(directory: Path) -> Path:
+    """The file a directory's patch is recorded in: the plugin's marker, or the original's name when an early build
+    recorded its patch there; where the plugin's marker goes when there is neither."""
+    upstream = directory / bundle.UPSTREAM_MARKER_FILENAME
+    if not (directory / bundle.MARKER_FILENAME).is_file() and upstream.is_file():
+        if patch_record.state_of(upstream.name, files.read_json(upstream)) != patch_record.UPSTREAM:
+            return upstream
+    return directory / bundle.MARKER_FILENAME
 
 
 def _patched_by_upstream(directory: Path) -> bool:
     """Whether the original Decky Framegen patched a directory (and this plugin didn't since): its patch has
     no record, so it is reset after the user confirms, never patched over or unpatched by a record."""
-    return (directory / bundle.UPSTREAM_MARKER_FILENAME).is_file() and not (directory / bundle.MARKER_FILENAME).is_file()
+    upstream = directory / bundle.UPSTREAM_MARKER_FILENAME
+    return upstream.is_file() and _marker_of(directory) != upstream and not (directory / bundle.MARKER_FILENAME).is_file()
 
 
 def _error(message: str) -> dict:
@@ -116,20 +132,21 @@ class Patcher:
         if _patched_by_upstream(directory):
             return _error(PATCHED_BY_DECKY_FRAMEGEN)
         marker_path = directory / bundle.MARKER_FILENAME
+        recorded_in = _marker_of(directory)
         installed = self.library.installed()
         if version_id:
             entry = next((e for e in installed if e.id == version_id), None)
             if entry is None:
                 return _error(f"OptiScaler {version_id} is not in the library.")
         else:
-            entry = library.version_to_patch_with(installed, files.read_json(marker_path).get("optiscaler_version"))
+            entry = library.version_to_patch_with(installed, files.read_json(recorded_in).get("optiscaler_version"))
             if entry is None:
                 return _error(NO_VERSION)
         family = library.FAMILIES[entry.family]
         source = self.library.version_dir(entry.id) / library.FILES_DIRNAME
         settings_appid = steam_game.appid if steam_game else settings_appid
-        previous_details = files.read_json(marker_path)
-        had = library_choice.recorded_picks(previous_details.get("libraries")) if marker_path.exists() else None
+        previous_details = files.read_json(recorded_in)
+        had = library_choice.recorded_picks(previous_details.get("libraries")) if recorded_in.exists() else None
         to_place = self._libraries_to_place(settings_appid, had if keep_libraries else None, family)
         placed = library_choice.placed(to_place)
         version_files = files.files_under(source)
@@ -140,26 +157,40 @@ class Patcher:
             return {"status": "success", "message": f"OptiScaler {entry.version} is in {directory}.", "optiscaler_version": entry.id}
 
         carried_over: frozenset[str] = frozenset()
-        if marker_path.exists():
+        previous = patch_record.parse(previous_details)
+        if previous is not None:
             # A repatch first undoes the previous patch, exactly as its marker records it, keeping
             # the OptiScaler.ini it placed (the user's settings) unless asked to reset it or the
-            # new version is of another family, whose ini keys differ.
-            previous_marker = files.read_json(marker_path)
-            previous = patch_record.parse(previous_marker)
-            same_family = previous_marker.get("family") == entry.family
-            if previous is not None and same_family and not reset_ini and plan.INI_FILENAME in {p.path for p in previous.placed}:
+            # new version is of another family, whose ini keys differ. A damaged record undoes nothing: what its
+            # patch left is cleared below, and the new record replaces it.
+            same_family = previous_details.get("family") == entry.family
+            if same_family and not reset_ini and plan.INI_FILENAME in {p.path for p in previous.placed}:
                 carried_over = frozenset({plan.INI_FILENAME})
             undone = self.unpatch_directory(directory, keep=carried_over)
             if undone["status"] != "success":
                 return undone
         try:
+            # What a patch left whose record is gone (the marker lost, or damaged) goes first: nothing would take it
+            # away, and a link can't be made where one is. Which version it was, and whether the library still has
+            # it, isn't known, so every family's own folders are looked into. Its OptiScaler.ini is set aside as the
+            # game's, for a fresh one the settings reach.
+            looked_into = (
+                *version_placement.placed_dirs(version_files),
+                *sorted(game_directory.directories_under(directory, version_placement.family_dirs())),
+            )
+            here = game_directory.links(directory, looked_into)
+            lost = patch_record.made_by_the_plugin(here, str(self.plugin_home.absolute()))
+            repairing = previous is None and (recorded_in.exists() or bool(lost))
+            left = patch_record.left_behind(lost, self._plugin_dirs() if repairing else ())
+            if left:
+                game_directory.execute(left, directory, source)
             entries, _ = game_directory.listing(directory)
             driver = version_placement.driver_path(family)
             if os.path.lexists(directory / driver):
                 entries |= {driver}
             placement = self.placement(to_place, family)
             request = version_placement.Request(
-                dll_name, reset_ini, str(fsr4_driver) if fsr4_driver else None, placement.copies
+                dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies
             )
             operations = version_placement.plan_patch(entries, version_files, family, request)
             log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(placed)}")
@@ -183,10 +214,10 @@ class Patcher:
                 library_layer=placement.layer,
             )
             # The record lands before the first file does, so even an interrupted patch can be undone.
-            files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
+            files.replace_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
             self._remember(directory, marker.shown_name(details, directory))
             game_directory.execute(operations, directory, source)
-            files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
+            files.replace_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
             if patch_record.placed_by(recorded, plan.INI_FILENAME):
                 # Keys the previous patch's libraries set and these don't are written back once, in a kept ini; a
                 # fresh one holds none of them.
@@ -220,7 +251,7 @@ class Patcher:
             log.warning(f"Reading the version's OptiScaler.ini failed, settings left as they are: {exc}")
             return
         game = self.settings.game_layer(appid) if appid else {}
-        libraries = marker.library_layer(files.read_json(directory / bundle.MARKER_FILENAME))
+        libraries = marker.library_layer(files.read_json(_marker_of(directory)))
         values = settings_layers.to_write(schema, self.settings.global_layer(), game, libraries, released)
         game_directory.edit_ini(directory / plan.INI_FILENAME, lambda text: ini.set_values(text, values), "the user's settings")
 
@@ -232,6 +263,16 @@ class Patcher:
         installed = self.user_libraries.installed()
         chosen = library_choice.to_patch_with(self.library_choices.read(), appid, recorded, installed)
         return library_choice.to_place(chosen, installed, family)
+
+    def _plugin_dirs(self) -> tuple[str, ...]:
+        """The folders of a game only the plugin's libraries fill, for every family that takes libraries."""
+        libraries = self.user_libraries.installed()
+        return tuple(
+            path
+            for family in library.FAMILIES.values()
+            if family.libraries
+            for path in library_placement.plugin_dirs(family.main_dir, libraries)
+        )
 
     def placement(self, to_place: library_choice.ToPlace, family: library.Family) -> library_placement.Placement:
         """How a game's libraries go into a game of `family`, from their files on the device."""
@@ -258,7 +299,7 @@ class Patcher:
         """Whether a patch now would place nothing other than the directory has: the same version, proxy and
         libraries, every placed file still there, and every file the version holds now among them (one that came
         back with Download again after the game was patched without it is not)."""
-        details = files.read_json(directory / bundle.MARKER_FILENAME)
+        details = files.read_json(_marker_of(directory))
         recorded = patch_record.parse(details)
         return (
             recorded is not None
@@ -278,7 +319,7 @@ class Patcher:
         """
         if self._is_bundle(directory):
             return _error(BUNDLE_IS_NOT_A_GAME)
-        marker_path = directory / bundle.MARKER_FILENAME
+        marker_path = _marker_of(directory)
         if _patched_by_upstream(directory):
             return _error(PATCHED_BY_DECKY_FRAMEGEN)
         if not marker_path.exists():
@@ -286,9 +327,10 @@ class Patcher:
             return {"status": "success", "message": f"No DeckyScaler patch found in {directory}"}
         recorded = patch_record.parse(files.read_json(marker_path))
         if recorded is None:
-            return _error(PATCHED_BY_DECKY_FRAMEGEN)
+            return _error(DAMAGED_RECORD)
         try:
-            operations = patch_record.plan_unpatch(recorded, game_directory.current_state(directory, recorded), keep)
+            current = game_directory.current_state(directory, recorded)
+            operations = patch_record.plan_unpatch(recorded, current, keep, marker_path.name)
             game_directory.execute(operations, directory, self.plugin_home)
         except PermissionError as exc:
             log.error(f"Unpatch permission error: {exc}")
@@ -296,6 +338,8 @@ class Patcher:
         except Exception as exc:
             log.error(f"Unpatch failed: {exc}")
             return _error(f"Unpatch failed: {exc}")
+        # What a marker write cut short staged goes with the marker.
+        files.staged(directory / bundle.MARKER_FILENAME).unlink(missing_ok=True)
         self._forget(directory)
         return {"status": "success", "message": f"OptiScaler files removed from {directory}"}
 
@@ -322,7 +366,7 @@ class Patcher:
         found, away = [], []
         for directory, entry in self.patches.entries().items():
             path = Path(directory)
-            marker_path = path / bundle.MARKER_FILENAME
+            marker_path = _marker_of(path)
             if marker_path.is_file():
                 found.append((path, entry.name, files.read_json(marker_path)))
                 if entry.drive is None and drives.identity(path) is not None:
@@ -431,7 +475,7 @@ class Patcher:
         except (FileNotFoundError, NotADirectoryError, PermissionError) as exc:
             log.error(f"Manual unpatch validation failed: {exc}")
             return _error(str(exc))
-        if confirmed_reset and self._unpatch_mode(target / bundle.MARKER_FILENAME) == RESET:
+        if confirmed_reset and self._unpatch_mode(_marker_of(target)) == RESET:
             return self._reset_directory(target)
         # Decky Framegen's marker is refused there: its patch needs the confirmed reset.
         return self.unpatch_directory(target)
@@ -439,8 +483,11 @@ class Patcher:
     def preview_unpatch_directory(self, directory: str) -> dict:
         try:
             target = self.resolve_directory(directory)
-            if self._unpatch_mode(target / bundle.MARKER_FILENAME) == RECORD:
+            mode = self._unpatch_mode(_marker_of(target))
+            if mode == RECORD:
                 return {"status": "success", "mode": RECORD, "target_dir": str(target)}
+            if mode == REPAIR:
+                return _error(DAMAGED_RECORD)
             preview, _ = self._reset_plan(target, None, None)
             return {**preview, "mode": RESET} if preview["status"] == "success" else preview
         except Exception as exc:
@@ -449,11 +496,13 @@ class Patcher:
 
     @staticmethod
     def _unpatch_mode(marker_path: Path | None) -> str:
-        """RECORD when the marker holds a patch record; RESET for anything else (Decky Framegen's
-        marker, or no marker — then only the reset's own evidence rules decide whether anything is ours)."""
-        if marker_path is not None and marker_path.is_file() and patch_record.parse(files.read_json(marker_path)):
-            return RECORD
-        return RESET
+        """RECORD when the marker holds a patch record; REPAIR when it is the plugin's and its record is damaged;
+        RESET for anything else (Decky Framegen's marker, or no marker — then only the reset's own evidence rules
+        decide whether anything is ours)."""
+        if marker_path is None or not marker_path.is_file():
+            return RESET
+        state = patch_record.state_of(marker_path.name, files.read_json(marker_path))
+        return {patch_record.UPSTREAM: RESET, patch_record.DAMAGED: REPAIR}.get(state, RECORD)
 
     def path_defaults(self) -> dict:
         """Starting points for the pickers: home; the games of the first Steam library found (native or Flatpak),
@@ -514,11 +563,12 @@ class Patcher:
     def find_marker(self, install_root: Path) -> Path | None:
         """The game's patch marker: where the patch index says the plugin patched it, else by searching
         the whole install, for the plugin's marker and then the original Decky Framegen's (whose patch is
-        reset, having no record). A marker of the plugin's found by searching goes back into the index."""
+        reset, having no record). A patch of the plugin's found by searching, its record under either name, goes
+        back into the index."""
         if not install_root.exists():
             return None
         for directory in self.patches.entries():
-            marker_path = Path(directory) / bundle.MARKER_FILENAME
+            marker_path = _marker_of(Path(directory))
             if marker_path.parent.is_relative_to(install_root) and marker_path.is_file():
                 return marker_path
         try:
@@ -530,9 +580,10 @@ class Patcher:
                 return None
         except OSError:
             return None
-        if found.name == bundle.MARKER_FILENAME:
+        details = files.read_json(found)
+        if patch_record.state_of(found.name, details) != patch_record.UPSTREAM:
             # The index learns a patch of ours it didn't know, so the pages listing from it show the game again.
-            self._remember(found.parent, marker.shown_name(files.read_json(found), found.parent))
+            self._remember(found.parent, marker.shown_name(details, found.parent))
         return found
 
     def game_status(self, appid: str) -> dict:
@@ -554,6 +605,7 @@ class Patcher:
             "lacks_version_files": False,
             "version_incomplete": False,
             "fsr4": None,
+            "record": None,
         }
         if game is None:
             return {**unpatched, "install_found": False, "message": "Game not found in Steam library."}
@@ -566,10 +618,12 @@ class Patcher:
             return {**unpatched, "name": game.name, "install_found": True, "message": "Not patched."}
 
         metadata = files.read_json(marker_path)
-        if patch_record.parse(metadata) is None:
+        record = patch_record.state_of(marker_path.name, metadata)
+        if record in (patch_record.UPSTREAM, patch_record.DAMAGED):
             return {
-                **unpatched, "name": game.name, "install_found": True, "patched": True,
-                "target_dir": str(marker_path.parent), "message": PATCHED_BY_DECKY_FRAMEGEN,
+                **unpatched, "name": game.name, "install_found": True, "patched": True, "record": record,
+                "target_dir": str(marker_path.parent),
+                "message": PATCHED_BY_DECKY_FRAMEGEN if record == patch_record.UPSTREAM else DAMAGED_RECORD,
             }
         dll_name = metadata.get("dll_name", bundle.DEFAULT_PROXY_DLL)
         # The marker sits in the directory it patched; the path written into it can go stale.
@@ -595,6 +649,7 @@ class Patcher:
             **self._against_version(metadata, installed, {}),
             "fsr4": unpatched["fsr4"],
             "libraries": metadata.get("libraries") or [],
+            "record": record,
             "message": message,
         }
 
@@ -747,8 +802,11 @@ class Patcher:
         the user confirms first."""
         try:
             game, target, marker_path = self._reset_target(appid)
-            if self._unpatch_mode(marker_path) == RECORD:
+            mode = self._unpatch_mode(marker_path)
+            if mode == RECORD:
                 return {"status": "success", "mode": RECORD, "name": game.name, "target_dir": str(target)}
+            if mode == REPAIR:
+                return _error(DAMAGED_RECORD)
             preview, _ = self._reset_plan(target, marker_path, current_launch_options)
             return {**preview, "mode": RESET, "name": game.name} if preview["status"] == "success" else preview
         except Exception as exc:

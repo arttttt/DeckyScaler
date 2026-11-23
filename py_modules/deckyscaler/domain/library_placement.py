@@ -35,6 +35,13 @@ class Placement:
     """What the game's marker records of the libraries: slot (None for one only offered), id and label."""
 
 
+def plugin_dirs(main_dir: str, libraries: list[Library]) -> tuple[str, ...]:
+    """The folders of a game whose OptiScaler files are in `main_dir` that only the plugin's libraries fill: the
+    user-libraries one, and each provider's of the libraries on the device."""
+    providers = sorted({provider.name for library in libraries for provider in library.providers})
+    return (f"{main_dir}/{USER_LIBRARIES_DIRNAME}", *(f"{main_dir}/{CUSTOM_DIRNAME}/{name}" for name in providers))
+
+
 def _dll_serves(slot: str, dll_name: str) -> bool:
     slots = known_dll(dll_name).slots
     # A file that serves no slot comes along with its library, whichever slot it is placed for.

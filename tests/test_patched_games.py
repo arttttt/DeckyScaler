@@ -15,7 +15,14 @@ def test_a_marker_says_whether_its_patch_is_whole_unfinished_or_an_older_plugins
 
     assert patch_record.state(whole) == patch_record.OK
     assert patch_record.state(unfinished) == patch_record.INCOMPLETE
-    assert patch_record.state({"dll_name": "dxgi.dll"}) == patch_record.UPSTREAM
+    assert patch_record.state({"dll_name": "dxgi.dll"}) == patch_record.DAMAGED  # the plugin's, with no record
+    assert patch_record.state({}) == patch_record.DAMAGED  # half a file reads as nothing
+    assert patch_record.state_of("DECKYSCALER_PATCH", {"dll_name": "dxgi.dll"}) == patch_record.DAMAGED
+    assert patch_record.state_of("DECKYSCALER_PATCH", whole) == patch_record.OK
+    # Without a record, the original Decky Framegen's marker is its patch; a record there is one an early build wrote.
+    assert patch_record.state_of("FRAMEGEN_PATCH", {"dll_name": "dxgi.dll"}) == patch_record.UPSTREAM
+    assert patch_record.state_of("FRAMEGEN_PATCH", whole) == patch_record.OK
+    assert patch_record.state_of("FRAMEGEN_PATCH", unfinished) == patch_record.INCOMPLETE
 
 
 def test_steam_games_and_directories_patched_are_listed_by_name(plugin, plugin_home, steam_library, tmp_path):

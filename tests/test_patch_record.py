@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
-from conftest import STABLE, game_file, make_game_dir, run, snapshot, write
+from conftest import NIGHTLY, STABLE, game_file, make_game_dir, run, snapshot, write
 from deckyscaler.domain import patch_record
-from deckyscaler.domain.patch_plan import Copy, DeleteFile, Move, RemoveTree
+from deckyscaler.domain.patch_plan import Copy, DeleteFile, Link, Move, RemoveTree
 from deckyscaler.domain.patch_record import Backup, PatchRecord, Placed, RemoveDirIfEmpty
 from deckyscaler.infrastructure import game_directory
 
@@ -49,6 +50,57 @@ def test_a_plan_is_recorded_as_placed_files_backups_and_created_directories():
         # plugins/ was the game's own; D3D12_Optiscaler/ is the patch's.
         created_dirs=("D3D12_Optiscaler",),
     )
+
+
+def test_what_a_patch_whose_record_is_gone_left_is_every_link_into_the_plugins_home():
+    links = {
+        "dxgi.dll": "/home/deck/deckyscaler/library/versions/v/files/OptiScaler.dll",
+        "dxgi.dll.b": "/home/deck/deckyscaler/library/versions/old/files/OptiScaler.dll",  # set aside as a backup
+        "OptiScaler/libxess.dll": "/home/deck/deckyscaler/library/versions/v/files/OptiScaler/libxess.dll",
+        "OptiScaler/D3D12_OptiScaler/D3D12Core.dll": "/home/deck/deckyscaler/library/versions/v/files/x.dll",
+        "OptiScaler/amdxcffx64.dll": "/home/deck/.steam/steamapps/compatdata/1/pfx/amdxcffx64.dll",  # FSR 4's driver
+        "game.dll": "/home/deck/Games/game.dll",  # the user's own
+        "near.dll": "/home/deck/deckyscaler-old/x.dll",  # beside the home, not in it
+    }
+
+    lost = patch_record.made_by_the_plugin(links, "/home/deck/deckyscaler")
+    assert lost == ("OptiScaler/D3D12_OptiScaler/D3D12Core.dll", "OptiScaler/libxess.dll", "dxgi.dll", "dxgi.dll.b")
+    assert patch_record.left_behind(lost) == (
+        DeleteFile("OptiScaler/D3D12_OptiScaler/D3D12Core.dll"),
+        DeleteFile("OptiScaler/libxess.dll"),
+        DeleteFile("dxgi.dll"),
+        DeleteFile("dxgi.dll.b"),
+        RemoveDirIfEmpty("OptiScaler/D3D12_OptiScaler"),
+        RemoveDirIfEmpty("OptiScaler"),
+    )
+    assert patch_record.made_by_the_plugin({"game.dll": "/home/deck/Games/game.dll"}, "/home/deck/deckyscaler") == ()
+    assert patch_record.left_behind(()) == ()
+
+
+def test_what_a_lost_patch_left_takes_the_plugins_library_folders_whole():
+    dirs = ("OptiScaler/user-libraries", "OptiScaler/custom/Uniscaler")
+
+    assert patch_record.left_behind(("dxgi.dll",), dirs) == (
+        DeleteFile("dxgi.dll"),
+        RemoveTree("OptiScaler/user-libraries"),
+        RemoveTree("OptiScaler/custom/Uniscaler"),
+        RemoveDirIfEmpty("OptiScaler/custom"),
+        RemoveDirIfEmpty("OptiScaler"),
+    )
+
+
+def test_a_backup_a_patch_whose_record_is_gone_set_aside_is_restored_by_the_next_one():
+    operations = (Link("OptiScaler.dll", "dxgi.dll"), Link("libxess.dll", "libxess.dll"), Link("D/x.dll", "D/x.dll"))
+    hashes = {"OptiScaler.dll": "link:a", "libxess.dll": "link:b", "D/x.dll": "link:c"}
+
+    adopted = patch_record.record(operations, frozenset({"Game.exe", "dxgi.dll.b", "libxess.dll.b", "D"}), hashes)
+    assert adopted.backups == (Backup("dxgi.dll", "dxgi.dll.b"), Backup("libxess.dll", "libxess.dll.b"))
+
+    there = patch_record.record(operations, frozenset({"Game.exe", "dxgi.dll", "dxgi.dll.b"}), hashes)
+    assert there.backups == ()  # the file is there: its backup is someone else's business, as before
+
+    moved = (Move("dxgi.dll", "dxgi.dll.b"), *operations)
+    assert patch_record.record(moved, frozenset({"dxgi.dll"}), hashes).backups == (Backup("dxgi.dll", "dxgi.dll.b"),)
 
 
 def test_the_record_round_trips_through_the_marker_and_old_markers_have_none():
@@ -186,6 +238,257 @@ def test_an_interrupted_patch_can_still_be_undone(plugin, plugin_home, tmp_path,
 
     assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
     assert snapshot(game) == before
+
+
+def test_a_marker_write_cut_short_leaves_the_record_whole_and_unpatching_takes_what_it_staged(plugin, plugin_home, tmp_path, monkeypatch):
+    from deckyscaler.infrastructure import files
+
+    game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
+    before = snapshot(game)
+    real_write = files.write_json
+    marker_writes: list[Path] = []
+
+    def stop_in_the_second(path, payload):
+        if path.name.startswith("DECKYSCALER_PATCH"):
+            marker_writes.append(path)
+        if len(marker_writes) == 2 and path == marker_writes[-1]:
+            path.write_text(json.dumps(payload)[:17])  # the stop comes in the middle of the write
+            raise OSError("device went to sleep")
+        real_write(path, payload)
+
+    monkeypatch.setattr(files, "write_json", stop_in_the_second)
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "error"
+    monkeypatch.setattr(files, "write_json", real_write)
+
+    assert json.loads((game / "DECKYSCALER_PATCH").read_text())["complete"] is False  # the record before the stop
+    assert (game / "DECKYSCALER_PATCH.new").exists()
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before
+
+
+def as_before_but_the_ini(after: dict, before: dict) -> bool:
+    """The game as before a patch whose record was lost, but for its OptiScaler.ini: without the record it can't be
+    told from the user's own, so it stays."""
+    return {name: sha for name, sha in after.items() if name != "OptiScaler.ini"} == before and "OptiScaler.ini" in after
+
+
+def test_a_game_whose_marker_was_lost_is_patched_again_over_what_the_lost_patch_left(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "DECKYSCALER_PATCH").unlink()  # its links stay: OptiScaler/ and dxgi.dll
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))["status"] == "success"
+    assert not (game / "dxgi.dll.b").exists()  # the lost patch's proxy isn't taken for the game's own
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(game), before)
+
+
+def test_the_games_own_files_a_lost_patch_set_aside_come_back_with_the_next_ones_unpatch(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    (game / "DECKYSCALER_PATCH").unlink()  # libxess.dll.b, the game's own, stays beside the lost patch's link
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(game), before)
+
+
+def test_a_lost_patchs_proxy_once_set_aside_as_the_games_own_is_cleared(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    (game / "DECKYSCALER_PATCH").unlink()
+    (game / "dxgi.dll").rename(game / "dxgi.dll.b")  # what patching again did before: the link kept as a backup
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(game), before)
+
+
+DAMAGED = "DeckyScaler's record of this patch is damaged, so it can't be undone by it. Patch the game again to repair it."
+
+
+def test_a_damaged_record_is_said_unpatching_is_refused_and_patching_again_repairs_it(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("900", "Damaged Game")
+    before = snapshot(root)
+    run(plugin.patch_game("900", "dxgi.dll", "", NIGHTLY))
+    (root / "DECKYSCALER_PATCH").write_text('{"appid": "900", "dll_na')  # a write cut short by an older build
+
+    status = run(plugin.get_game_status("900"))
+    assert (status["patched"], status["record"], status["message"]) == (True, "damaged", DAMAGED)
+    assert [game["record"] for game in run(plugin.patched_games())["games"]] == ["damaged"]
+    assert run(plugin.preview_unpatch_game("900", "")) == {"status": "error", "message": DAMAGED}
+    assert run(plugin.unpatch_game("900")) == {"status": "error", "message": DAMAGED}
+    assert run(plugin.preview_unpatch_directory(str(root))) == {"status": "error", "message": DAMAGED}
+    assert run(plugin.manual_unpatch_directory(str(root))) == {"status": "error", "message": DAMAGED}
+
+    assert run(plugin.patch_game("900", "dxgi.dll", "", NIGHTLY))["status"] == "success"
+    assert run(plugin.get_game_status("900"))["record"] == "ok"
+    assert run(plugin.unpatch_game("900"))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(root), before)
+
+
+def test_the_launch_wrapper_repairs_a_damaged_record_as_the_game_starts(plugin, plugin_home, home, tmp_path):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    game = make_game_dir(tmp_path / "games" / "Game")
+    LaunchWrapper(home, {}).patch([str(game / "Game.exe")], "dxgi.dll")
+    (game / "DECKYSCALER_PATCH").write_text("")
+
+    LaunchWrapper(home, {}).patch([str(game / "Game.exe")], "dxgi.dll")
+
+    assert patch_record.state(json.loads((game / "DECKYSCALER_PATCH").read_text())) == patch_record.OK
+
+
+@pytest.mark.parametrize("version", [STABLE, NIGHTLY])
+def test_a_patch_an_early_build_recorded_under_the_originals_name_is_undone_by_its_record(plugin, plugin_home, tmp_path, version):
+    game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", version))
+    (game / "DECKYSCALER_PATCH").rename(game / "FRAMEGEN_PATCH")  # where those builds wrote it
+
+    assert run(plugin.preview_unpatch_directory(str(game)))["mode"] == "record"
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before  # exactly: OptiScaler 10's links under OptiScaler/ included
+
+
+def test_patching_over_a_patch_recorded_under_the_originals_name_undoes_it_first(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "DECKYSCALER_PATCH").rename(game / "FRAMEGEN_PATCH")
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+    assert not (game / "FRAMEGEN_PATCH").exists() and (game / "DECKYSCALER_PATCH").is_file()
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before
+
+
+def test_the_plugins_own_marker_wins_over_a_record_under_the_originals_name(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "FRAMEGEN_PATCH").write_text((game / "DECKYSCALER_PATCH").read_text())  # an early build's, left beside
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert not (game / "DECKYSCALER_PATCH").exists()  # undone by its own record
+
+
+def _damage(game: Path) -> None:
+    (game / "DECKYSCALER_PATCH").write_text("")
+
+
+def _lose(game: Path) -> None:
+    (game / "DECKYSCALER_PATCH").unlink()
+
+
+def _damage_with_its_links_gone(game: Path) -> None:
+    (game / "DECKYSCALER_PATCH").write_text("")
+    (game / "dxgi.dll").unlink()
+    shutil.rmtree(game / "OptiScaler")
+
+
+@pytest.mark.parametrize("break_record", [_damage, _lose, _damage_with_its_links_gone])
+def test_a_repaired_game_gets_a_fresh_ini_the_settings_reach(plugin, plugin_home, tmp_path, break_record):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    break_record(game)
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))["status"] == "success"
+    assert run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))["status"] == "success"
+
+    assert "Fsr4Model=1" in (game / "OptiScaler.ini").read_text()
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(game), before)  # the lost patch's ini, set aside as the game's, is back
+
+
+def test_a_repair_with_another_family_clears_the_lost_patchs_links_too(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))  # OptiScaler 10: its files under OptiScaler/
+    (game / "DECKYSCALER_PATCH").unlink()
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"  # 0.9: beside it
+    assert not (game / "OptiScaler").exists()
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(game), before)
+
+
+def test_a_patch_recorded_under_the_originals_name_is_listed_and_keeps_its_version(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "DECKYSCALER_PATCH").rename(game / "FRAMEGEN_PATCH")
+
+    assert [listed["name"] for listed in run(plugin.patched_games())["games"]] == [str(game)]
+    assert run(plugin.library_remove(NIGHTLY))["status"] == "error"
+
+
+def test_a_steam_game_recorded_under_the_originals_name_goes_back_into_the_index_when_found(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("910", "Early Game")
+    run(plugin.patch_game("910", "dxgi.dll", "", NIGHTLY))
+    (root / "DECKYSCALER_PATCH").rename(root / "FRAMEGEN_PATCH")
+    (plugin_home / "patched.json").write_text("{}")
+
+    assert run(plugin.get_game_status("910"))["record"] == "ok"
+    assert [listed["name"] for listed in run(plugin.patched_games())["games"]] == ["Early Game"]
+
+
+def test_a_repair_clears_the_links_of_a_version_no_longer_in_the_library(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "DECKYSCALER_PATCH").unlink()
+    assert run(plugin.library_remove(NIGHTLY))["status"] == "success"  # nothing records a game using it now
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+    assert not (game / "OptiScaler").exists()
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(game), before)
+
+
+def test_every_directory_in_a_familys_folder_is_walked_but_none_through_a_link(tmp_path):
+    game = tmp_path / "Game"
+    (game / "OptiScaler" / "D3D12_OptiScaler").mkdir(parents=True)
+    (game / "OptiScaler" / "custom" / "Provider").mkdir(parents=True)
+    (tmp_path / "elsewhere" / "inside").mkdir(parents=True)
+    (game / "OptiScaler" / "linked").symlink_to(tmp_path / "elsewhere")
+    (game / "D3D12_Optiscaler").symlink_to(tmp_path / "elsewhere")
+    (game / "Content" / "Paks").mkdir(parents=True)
+
+    assert game_directory.directories_under(game, ("D3D12_Optiscaler", "OptiScaler", "Missing")) == {
+        "OptiScaler", "OptiScaler/D3D12_OptiScaler", "OptiScaler/custom", "OptiScaler/custom/Provider",
+    }
+
+
+def test_links_are_looked_for_only_where_a_version_links_and_never_through_a_link(tmp_path):
+    game = tmp_path / "Game"
+    write(game / "OptiScaler" / "keep.txt", b"game")
+    (game / "OptiScaler" / "a.dll").symlink_to(tmp_path / "a.dll")
+    (game / "dxgi.dll").symlink_to(tmp_path / "b.dll")
+    (game / "Content").mkdir()
+    (game / "Content" / "c.dll").symlink_to(tmp_path / "c.dll")  # no version links there
+    (tmp_path / "elsewhere" / "D3D12_OptiScaler").mkdir(parents=True)
+    (tmp_path / "elsewhere" / "D3D12_OptiScaler" / "d.dll").symlink_to(tmp_path / "d.dll")
+    (game / "OptiScaler" / "D3D12_OptiScaler").symlink_to(tmp_path / "elsewhere" / "D3D12_OptiScaler")
+
+    found = game_directory.links(game, ("OptiScaler/D3D12_OptiScaler", "OptiScaler", ""))
+
+    assert found == {
+        "OptiScaler/a.dll": str(tmp_path / "a.dll"),
+        "OptiScaler/D3D12_OptiScaler": str(tmp_path / "elsewhere" / "D3D12_OptiScaler"),  # a link itself, not entered
+        "dxgi.dll": str(tmp_path / "b.dll"),
+    }
+    linked = tmp_path / "Linked"  # OptiScaler/ itself a link: nothing under it is looked into
+    (tmp_path / "kept" / "D3D12_OptiScaler").mkdir(parents=True)
+    (tmp_path / "kept" / "D3D12_OptiScaler" / "e.dll").symlink_to(tmp_path / "e.dll")
+    linked.mkdir()
+    (linked / "OptiScaler").symlink_to(tmp_path / "kept")
+    assert game_directory.links(linked, ("OptiScaler/D3D12_OptiScaler", "OptiScaler", "")) == {"OptiScaler": str(tmp_path / "kept")}
 
 
 def test_unpatching_restores_the_backup_over_a_file_put_there_after_patching(plugin, plugin_home, tmp_path):

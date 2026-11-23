@@ -85,6 +85,11 @@ def record(
             case Copy(source, destination) | Link(source, destination):
                 sha = None if destination == INI_FILENAME or destination in rewritten else bundle_hashes[source]
                 placed[destination] = Placed(destination, sha)
+    # A backup beside a file the patch places, the file itself gone, was set aside by a patch whose record was lost:
+    # it is the original this patch restores.
+    backups += [
+        Backup(path, f"{path}{BACKUP_SUFFIX}") for path in placed if path not in entries and f"{path}{BACKUP_SUFFIX}" in entries
+    ]
     created = sorted(
         {
             str(parent)
@@ -96,6 +101,24 @@ def record(
     )
     owned = tuple(directory for directory in owned_dirs if directory in created)
     return PatchRecord(tuple(placed.values()), tuple(backups), tuple(created), owned)
+
+
+def made_by_the_plugin(links: dict[str, str], plugin_home: str) -> tuple[str, ...]:
+    """The links in a game (`links` maps a link's path to its target) pointing into the plugin's home: only a patch of
+    the plugin's makes one, a backup's name included."""
+    return tuple(sorted(path for path, target in links.items() if PurePosixPath(target).is_relative_to(plugin_home)))
+
+
+def left_behind(links: tuple[str, ...], dirs: tuple[str, ...] = ()) -> tuple[Operation | RemoveDirIfEmpty, ...]:
+    """What a patch whose record is gone left in a game, to clear before patching it again: its links
+    (`made_by_the_plugin`), the folders only the plugin's libraries fill (`dirs`, whole), then the directories that
+    held them, deepest first, should nothing else be in them."""
+    holding = {str(parent) for path in (*links, *dirs) for parent in PurePosixPath(path).parents if str(parent) != "."}
+    return (
+        *(DeleteFile(path) for path in links),
+        *(RemoveTree(path) for path in dirs),
+        *(RemoveDirIfEmpty(path) for path in sorted(holding, key=lambda path: (-path.count("/"), path))),
+    )
 
 
 def to_json(patch: PatchRecord, complete: bool) -> dict:
@@ -110,7 +133,7 @@ def to_json(patch: PatchRecord, complete: bool) -> dict:
 
 
 def parse(marker: dict) -> PatchRecord | None:
-    """The record in a marker; None for a marker the original Decky Framegen wrote."""
+    """The record in a marker; None for one with no record that reads: the original Decky Framegen's, or damaged."""
     if marker.get("format") != FORMAT:
         return None
     try:
@@ -128,15 +151,25 @@ def parse(marker: dict) -> PatchRecord | None:
 OK = "ok"
 INCOMPLETE = "incomplete"
 UPSTREAM = "upstream"
+DAMAGED = "damaged"
 
 
 def state(marker: dict) -> str:
-    """What a marker says of its patch: OK; INCOMPLETE when the patch stopped before its last file (its
-    record still undoes what landed); UPSTREAM when the original Decky Framegen wrote it (undone by a
-    reset)."""
+    """What the plugin's marker says of its patch: OK; INCOMPLETE when the patch stopped before its last file (its
+    record still undoes what landed); DAMAGED when it holds no record that reads (a write cut short, an edit by
+    hand): the patch is the plugin's, but how to undo it is lost, and patching again makes a new one."""
     if parse(marker) is None:
-        return UPSTREAM
+        return DAMAGED
     return OK if marker.get("complete", True) else INCOMPLETE
+
+
+def state_of(name: str, marker: dict) -> str:
+    """What a game's marker says: a record that reads goes by itself, whatever the file is called (a few early builds
+    wrote theirs under the original's name, FRAMEGEN_PATCH, and it undoes their patch exactly); with none, the
+    original Decky Framegen's marker is UPSTREAM, undone by a reset, and the plugin's own is DAMAGED."""
+    if parse(marker) is None and name == bundle.UPSTREAM_MARKER_FILENAME:
+        return UPSTREAM
+    return state(marker)
 
 
 def placed_by(patch: PatchRecord | None, path: str) -> bool:
@@ -159,7 +192,7 @@ def covers(patch: PatchRecord, paths: frozenset[str]) -> bool:
 
 
 def plan_unpatch(
-    patch: PatchRecord, current: dict[str, str | None], keep: frozenset[str] = frozenset()
+    patch: PatchRecord, current: dict[str, str | None], keep: frozenset[str] = frozenset(), marker: str = bundle.MARKER_FILENAME
 ) -> tuple[Operation | RemoveDirIfEmpty, ...]:
     """Undo a recorded patch. `current` maps every placed path and backup still present to its sha256 now.
     Directories the patch owns go whole, with what their programs wrote into them since.
@@ -167,7 +200,8 @@ def plan_unpatch(
     A placed file someone replaced since stays when nothing was backed up for it. When something was,
     the backup comes back over it: Unpatch returns the directory to how it was before the patch, and
     a file put over a patched one after patching is its owner's to keep track of.
-    `keep` names placed files to leave where they are, for a repatch that carries them over.
+    `keep` names placed files to leave where they are, for a repatch that carries them over. `marker` is the file
+    the record is in, taken last.
     """
     operations: list[Operation | RemoveDirIfEmpty] = []
     backed_up = {backup.original for backup in patch.backups if backup.backup in current}
@@ -183,5 +217,5 @@ def plan_unpatch(
             operations.append(Move(backup.backup, backup.original))
     operations += [RemoveTree(path) for path in patch.owned_dirs]
     operations += [RemoveDirIfEmpty(path) for path in patch.created_dirs]
-    operations.append(DeleteFile(bundle.MARKER_FILENAME))
+    operations.append(DeleteFile(marker))
     return tuple(operations)

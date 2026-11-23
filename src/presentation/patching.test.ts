@@ -134,6 +134,24 @@ describe("steam game view", () => {
     });
   });
 
+  it("offers repairing a damaged record, and no unpatch until then", () => {
+    const damaged: GameStatus = { status: "success", install_found: true, patched: true, dll_name: null, record: "damaged" };
+    expect(steamGameView({ ...base, status: damaged })).toMatchObject({
+      status: { text: "Patched, but its record is damaged: repair it", tone: "warning" },
+      patch: { label: "Repair (dxgi.dll)", enabled: true },
+      unpatchVisible: false,
+    });
+    expect(steamGameView({ ...base, dllName: "winmm.dll", status: damaged }).patch.label).toBe("Repair (winmm.dll)");
+  });
+
+  it("says an older Decky Framegen patched a game, which Unpatch resets", () => {
+    const upstream: GameStatus = { status: "success", install_found: true, patched: true, dll_name: null, record: "upstream" };
+    expect(steamGameView({ ...base, status: upstream })).toMatchObject({
+      status: { text: "Patched by Decky Framegen", tone: "warning" },
+      unpatchVisible: true,
+    });
+  });
+
   it("names the user's libraries a patched game has", () => {
     const withLibraries: GameStatus = { ...patched, libraries: [{ slot: "frame-generation", id: "anr", label: "ANR V.B19" }] };
 
