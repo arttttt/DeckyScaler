@@ -52,7 +52,10 @@ class Library:
         sizes = {entry.id: self.store.size(entry.id) for entry in entries}
         damaged = [library.damaged_json(name, self.store.size(name)) for name, _ in self.store.damaged()]
         return {
-            "versions": [library.choice_json(entry, sizes[entry.id]) for entry in entries],
+            "versions": [
+                library.choice_json(entry, sizes[entry.id], bool(library.lost_files(entry, self.store.files_of(entry.id))))
+                for entry in entries
+            ],
             "damaged": damaged,
             "installed_bytes": sum(sizes.values()) + sum(item["size"] for item in damaged),
         }
@@ -120,10 +123,11 @@ class Library:
             files = stage / library.FILES_DIRNAME
             archive.extract_7z(self.seven_zip, archive_path, files)
             family = library.family_of(version.version)
-            missing = library.missing_files(family, files_under(files)) if family else {"a known layout"}
+            unpacked = files_under(files)
+            missing = library.missing_files(family, unpacked) if family else {"a known layout"}
             if missing:
                 return _error(f"The {version_id} archive lacks {', '.join(sorted(missing))}; not added.")
-            installed = library.entry(version, datetime.now(timezone.utc).isoformat())
+            installed = library.entry(version, datetime.now(timezone.utc).isoformat(), unpacked)
             (self.store.replace if replacing else self.store.commit)(stage, installed)
         except (ReleasesUnavailable, RuntimeError, OSError) as exc:
             log.error(f"Installing {version_id} failed: {exc}")

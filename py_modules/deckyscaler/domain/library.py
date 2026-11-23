@@ -199,30 +199,47 @@ class Installed:
     source_url: str
     sha256: str
     installed_at: str
+    files: tuple[str, ...] | None = None
+    """Every file the version was unpacked with, relative to its files' directory; None for a version installed
+    before the library kept the list, whose files are taken as they are."""
 
 
-def entry(version: Available, installed_at: str) -> Installed:
+def entry(version: Available, installed_at: str, files: frozenset[str]) -> Installed:
     if version.family is None:
         raise ValueError(f"{version.id} has no layout family")
     return Installed(
         version.id, version.channel, version.version, version.date, version.family, version.url, version.sha256,
-        installed_at,
+        installed_at, tuple(sorted(files)),
     )
 
 
 def entry_json(installed: Installed) -> dict:
-    return dict(installed.__dict__)
+    return {**installed.__dict__, "files": None if installed.files is None else list(installed.files)}
+
+
+_TEXT_FIELDS = tuple(name for name in Installed.__dataclass_fields__ if name != "files")
 
 
 def parse_entry(data: object) -> Installed | None:
-    """An entry.json's version, or None when the file isn't one (the directory is then not in the library)."""
+    """An entry.json's version, or None when the file isn't one (the directory is then not in the library). An entry
+    without a list of files, or with one that isn't a list, keeps none."""
     if not isinstance(data, dict):
         return None
+    listed = data.get("files")
     try:
-        installed = Installed(**{name: str(data[name]) for name in Installed.__dataclass_fields__})
+        installed = Installed(
+            **{name: str(data[name]) for name in _TEXT_FIELDS},
+            files=tuple(str(path) for path in listed) if isinstance(listed, list) else None,
+        )
     except KeyError:
         return None
     return installed if installed.family in FAMILIES and installed.channel in CHANNELS else None
+
+
+def lost_files(installed: Installed, present: frozenset[str]) -> frozenset[str]:
+    """The files a version was unpacked with that are gone from it: it is incomplete, and downloading it again
+    brings them back. Nothing for a version that keeps no list."""
+    return frozenset() if installed.files is None else frozenset(installed.files) - present
 
 
 def newest_first(installed: list[Installed]) -> list[Installed]:
@@ -239,8 +256,9 @@ def version_to_patch_with(installed: list[Installed], patched_with: str | None) 
     return newest[0] if newest else None
 
 
-def choice_json(installed: Installed, size: int) -> dict:
-    """An installed version as patching offers it and the library lists it; `size` is its bytes on disk."""
+def choice_json(installed: Installed, size: int, incomplete: bool) -> dict:
+    """An installed version as patching offers it and the library lists it; `size` is its bytes on disk,
+    `incomplete` whether files it was unpacked with are gone from it (`lost_files`)."""
     return {
         "id": installed.id,
         "version": installed.version,
@@ -248,6 +266,7 @@ def choice_json(installed: Installed, size: int) -> dict:
         "date": installed.date,
         "size": size,
         "libraries": FAMILIES[installed.family].libraries,
+        "incomplete": incomplete,
     }
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from deckyscaler.domain import library
 from deckyscaler.infrastructure.entry_store import EntryStore
+from deckyscaler.infrastructure.files import files_under
 
 
 class LibraryStore(EntryStore[library.Installed]):
@@ -18,6 +19,10 @@ class LibraryStore(EntryStore[library.Installed]):
 
     def version_dir(self, version_id: str) -> Path:
         return self.item_dir(version_id)
+
+    def files_of(self, version_id: str) -> frozenset[str]:
+        """Every file a version holds now, relative to its files' directory."""
+        return files_under(self.version_dir(version_id) / library.FILES_DIRNAME)
 
     # ── staging an install ───────────────────────────────────────────────────
 
