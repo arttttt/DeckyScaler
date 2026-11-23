@@ -4,7 +4,7 @@ import { useUserLibraries } from "../hooks/useUserLibraries";
 import { Confirmation } from "./Confirmation";
 import { VersionRows } from "./VersionRows";
 
-/** The libraries on the device: remove one. The Proton manage dialog's sibling. */
+/** The libraries on the device, and what is left of damaged ones: remove one. The Proton manage dialog's sibling. */
 export function ManageLibrariesModal({ closeModal }: { closeModal?: () => void }) {
   const { installed, reload } = useUserLibraries();
   const { view, onRemove, confirmation, onConfirm, onCancel } = useManageLibraries(installed, reload);

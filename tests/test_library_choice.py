@@ -105,6 +105,13 @@ def test_a_pick_naming_a_provider_an_earlier_slots_library_has_is_left_out():
     assert lc.left_out({UP: "anr", FG: "x-v2"}, [ANR, newer]) == ()  # ANR serves no upscaling: it takes no name
 
 
+def test_a_pick_naming_a_library_that_isnt_on_the_device_is_missing():
+    assert lc.missing({UP: "xess", FG: "gone"}, [XESS, ANR]) == (FG,)
+    assert lc.missing({UP: "gone", FG: "anr"}, [ANR]) == (UP,)
+    assert lc.missing({FG: "anr"}, [ANR]) == ()
+    assert lc.missing({}, []) == ()
+
+
 def test_optiscaler_0_9_takes_no_libraries():
     assert lc.to_place({FG: "anr", UP: "xess"}, [ANR, XESS], V09) == ToPlace((), ())
 

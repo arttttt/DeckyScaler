@@ -36,11 +36,13 @@ class UserLibraries:
     # ── what is on the device ────────────────────────────────────────────────
 
     def installed(self) -> dict:
-        """The libraries, by name, with what they serve and take and the games that have them; the slots, the
-        global choice and its slots that can't go in; and the patched games a patch now would give other libraries
-        ("Apply to them")."""
+        """The libraries, by name, with what they serve and take and the games that have them; what is left of the
+        damaged ones, to remove; the slots, the global choice and its slots that can't go in (left out, or naming a
+        library that isn't on the device); the patched games a
+        patch now would give other libraries ("Apply to them"); and what all of it takes on the device."""
         libraries = sorted(self.store.installed(), key=lambda item: item.label.lower())
         sizes = {item.id: self.store.size(item.id) for item in libraries}
+        damaged = [user_libraries.damaged_json(name, entry, self.store.size(name)) for name, entry in self.store.damaged()]
         patched = self.patcher.patched_markers()
         recorded = [(name, details.get("libraries")) for _, name, details in patched]
         choices = self.choices.read()
@@ -48,16 +50,18 @@ class UserLibraries:
             "libraries": [
                 user_libraries.library_json(item, sizes[item.id], library_choice.users(item.id, recorded)) for item in libraries
             ],
+            "damaged": damaged,
             "slots": list(user_libraries.SLOTS),
             "global": choices.global_choice,
             "left_out": list(library_choice.left_out(choices.global_choice, libraries)),
+            "missing": list(library_choice.missing(choices.global_choice, libraries)),
             "to_apply": [name for _, name, details in self._to_apply(patched, choices, libraries)],
-            "installed_bytes": sum(sizes.values()),
+            "installed_bytes": sum(sizes.values()) + sum(item["size"] for item in damaged),
         }
 
     def game_choice(self, appid: str) -> dict:
         """A game's own choice per slot (a library, none, or absent: the global choice), what it comes to and its
-        slots that can't go in, and whether the game, patched, has other libraries than a patch now would give it
+        slots that can't go in (left out, or naming a library that isn't on the device), and whether the game, patched, has other libraries than a patch now would give it
         ("patch again")."""
         choices, installed = self.choices.read(), self.store.installed()
         patched = [entry for entry in self.patcher.patched_markers() if str(entry[2].get("appid") or "") == appid]
@@ -67,6 +71,7 @@ class UserLibraries:
             "own": choices.games.get(appid, {}),
             "resolved": resolved,
             "left_out": list(library_choice.left_out(resolved, installed)),
+            "missing": list(library_choice.missing(resolved, installed)),
             "pending": bool(self._to_apply(patched, choices, installed)),
         }
 
@@ -182,9 +187,9 @@ class UserLibraries:
     # ── removing ─────────────────────────────────────────────────────────────
 
     def removal(self, library_id: str) -> dict:
-        """What removing a library touches, asked before the user confirms: the games that have it (each keeps its
-        copy until patched again) and whether it is the choice for every game."""
-        if not any(item.id == library_id for item in self.store.installed()):
+        """What removing a library, or what is left of a damaged one, touches, asked before the user confirms: the
+        games that have it (each keeps its copy until patched again) and whether it is the choice for every game."""
+        if library_id not in self.store.listed():
             return _error(f"{library_id} is not on the device.")
         return {
             "status": "success",
@@ -193,7 +198,8 @@ class UserLibraries:
         }
 
     def remove(self, library_id: str) -> dict:
-        if not any(item.id == library_id for item in self.store.installed()):
+        """Remove a library, or what is left of a damaged one, and every choice of it."""
+        if library_id not in self.store.listed():
             return _error(f"{library_id} is not on the device.")
         try:
             self.store.remove(library_id)

@@ -15,16 +15,32 @@ class UserLibraryStore(EntryStore):
     def __init__(self, root: Path):
         super().__init__(root, "entries", user_libraries.ENTRY_FILENAME)
 
-    def installed(self) -> list[user_libraries.Library]:
-        """Every library on disk with a readable entry and every file it lists; nothing else counts. A library whose
-        files went missing would fail every patch it goes into, the launch wrapper's too: it isn't on the device,
-        and the games that have it lose it at their next patch."""
+    def _scan(self) -> list[tuple[str, user_libraries.Library | None, bool]]:
+        """Each directory in the store: its name, the library its entry describes (None when the entry doesn't read)
+        and whether that library is whole: the directory's own, with every file it lists."""
+        if not self.items_dir.is_dir():
+            return []
         found = []
-        for name, data in self.entries():
-            parsed = user_libraries.parse_entry(data)
-            if parsed is not None and parsed.id == name and self._complete(parsed):
-                found.append(parsed)
+        for directory in sorted(path for path in self.items_dir.iterdir() if path.is_dir()):
+            entry = user_libraries.parse_entry(read_json(directory / self.entry_filename))
+            whole = entry is not None and entry.id == directory.name and self._complete(entry)
+            found.append((directory.name, entry, whole))
         return found
+
+    def installed(self) -> list[user_libraries.Library]:
+        """Every whole library; nothing else counts. A library whose files went missing would fail every patch it
+        goes into, the launch wrapper's too: it isn't on the device, and the games that have it lose it at their
+        next patch."""
+        return [entry for _, entry, whole in self._scan() if whole and entry is not None]
+
+    def damaged(self) -> list[tuple[str, user_libraries.Library | None]]:
+        """What is left of the libraries that aren't whole (their files or their entry gone, as an interrupted
+        removal leaves them): each directory's name and what its entry still says, for Manage libraries to remove."""
+        return [(name, entry) for name, entry, whole in self._scan() if not whole]
+
+    def listed(self) -> set[str]:
+        """Every directory's name, whole or damaged: the ids a removal may take, and nothing outside the store."""
+        return {name for name, _, _ in self._scan()}
 
     def _complete(self, library: user_libraries.Library) -> bool:
         files = self.files_dir(library.id)
