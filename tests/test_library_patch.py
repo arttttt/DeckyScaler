@@ -259,3 +259,19 @@ def test_a_fresh_ini_gets_no_key_the_previous_libraries_set(plugin, plugin_home,
 
     assert "FGNvngxReplacement" not in ini_of(game) and "DisableHudless" not in ini_of(game)
     assert not (game / "OptiScaler" / "custom").exists() and marker_of(game)["libraries"] == []
+
+
+def test_a_repaired_game_keeps_no_folder_of_the_lost_patchs_libraries(plugin, plugin_home, tmp_path):
+    anr(plugin_home)
+    choose(plugin_home, library_choice.GLOBAL, FG, "anr")
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))["status"] == "success"
+    write(game / "OptiScaler" / "custom" / ANR / "dlssg" / "nr_fg.log", b"written by the provider")
+    (game / "DECKYSCALER_PATCH").write_text('{"half')
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))["status"] == "success"
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+
+    after = snapshot(game)
+    assert {path: sha for path, sha in after.items() if path != "OptiScaler.ini"} == before  # no folder of OptiScaler/ left

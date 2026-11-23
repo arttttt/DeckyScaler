@@ -170,10 +170,14 @@ class Patcher:
             if undone["status"] != "success":
                 return undone
         try:
-            # Links a patch left whose record is gone (the marker lost, or damaged) go first: nothing would take them
-            # away, and a link can't be made where one is.
-            here = game_directory.links(directory, version_placement.placed_dirs(version_files))
-            left = patch_record.left_behind(here, str(self.plugin_home.absolute()))
+            # What a patch left whose record is gone (the marker lost, or damaged) goes first: nothing would take it
+            # away, and a link can't be made where one is. Which version it was isn't known, so every one's folders
+            # are looked into. Its OptiScaler.ini is set aside as the game's, for a fresh one the settings reach.
+            looked_into = frozenset().union(version_files, *(self.library.files_of(item.id) for item in installed))
+            here = game_directory.links(directory, version_placement.placed_dirs(looked_into))
+            lost = patch_record.made_by_the_plugin(here, str(self.plugin_home.absolute()))
+            repairing = previous is None and (recorded_in.exists() or bool(lost))
+            left = patch_record.left_behind(lost, self._plugin_dirs() if repairing else ())
             if left:
                 game_directory.execute(left, directory, source)
             entries, _ = game_directory.listing(directory)
@@ -182,7 +186,7 @@ class Patcher:
                 entries |= {driver}
             placement = self.placement(to_place, family)
             request = version_placement.Request(
-                dll_name, reset_ini, str(fsr4_driver) if fsr4_driver else None, placement.copies
+                dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies
             )
             operations = version_placement.plan_patch(entries, version_files, family, request)
             log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(placed)}")
@@ -255,6 +259,16 @@ class Patcher:
         installed = self.user_libraries.installed()
         chosen = library_choice.to_patch_with(self.library_choices.read(), appid, recorded, installed)
         return library_choice.to_place(chosen, installed, family)
+
+    def _plugin_dirs(self) -> tuple[str, ...]:
+        """The folders of a game only the plugin's libraries fill, for every family that takes libraries."""
+        libraries = self.user_libraries.installed()
+        return tuple(
+            path
+            for family in library.FAMILIES.values()
+            if family.libraries
+            for path in library_placement.plugin_dirs(family.main_dir, libraries)
+        )
 
     def placement(self, to_place: library_choice.ToPlace, family: library.Family) -> library_placement.Placement:
         """How a game's libraries go into a game of `family`, from their files on the device."""

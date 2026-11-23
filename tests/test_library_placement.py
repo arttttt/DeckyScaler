@@ -170,3 +170,11 @@ def test_a_file_picked_for_frame_generation_never_selects_the_upscaler():
     placement = lp.place(picked((FG, _library("a", "amd_fidelityfx_dx12.dll"))), "OptiScaler", FILES)
 
     assert set(placement.layer) == {("Libraries", "FfxDx12Path")}
+
+
+def test_the_folders_only_the_plugins_libraries_fill_are_user_libraries_and_each_providers():
+    assert lp.plugin_dirs("OptiScaler", [ANR, XESS]) == (
+        "OptiScaler/user-libraries", f"OptiScaler/custom/{ANR_NAME}",
+    )
+    assert lp.plugin_dirs("OptiScaler", [ANR, ANR]) == ("OptiScaler/user-libraries", f"OptiScaler/custom/{ANR_NAME}")
+    assert lp.plugin_dirs("OptiScaler", []) == ("OptiScaler/user-libraries",)

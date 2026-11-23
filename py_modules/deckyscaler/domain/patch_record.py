@@ -103,14 +103,20 @@ def record(
     return PatchRecord(tuple(placed.values()), tuple(backups), tuple(created), owned)
 
 
-def left_behind(links: dict[str, str], plugin_home: str) -> tuple[Operation | RemoveDirIfEmpty, ...]:
-    """What a patch whose record is gone left in a game, to clear before patching it again: every link pointing into
-    the plugin's home (`links` maps a link's path to its target), which only a patch of the plugin's makes, a backup's
-    name included; then the directories that held them, deepest first, should nothing else be in them."""
-    ours = sorted(path for path, target in links.items() if PurePosixPath(target).is_relative_to(plugin_home))
-    holding = {str(parent) for path in ours for parent in PurePosixPath(path).parents if str(parent) != "."}
+def made_by_the_plugin(links: dict[str, str], plugin_home: str) -> tuple[str, ...]:
+    """The links in a game (`links` maps a link's path to its target) pointing into the plugin's home: only a patch of
+    the plugin's makes one, a backup's name included."""
+    return tuple(sorted(path for path, target in links.items() if PurePosixPath(target).is_relative_to(plugin_home)))
+
+
+def left_behind(links: tuple[str, ...], dirs: tuple[str, ...] = ()) -> tuple[Operation | RemoveDirIfEmpty, ...]:
+    """What a patch whose record is gone left in a game, to clear before patching it again: its links
+    (`made_by_the_plugin`), the folders only the plugin's libraries fill (`dirs`, whole), then the directories that
+    held them, deepest first, should nothing else be in them."""
+    holding = {str(parent) for path in (*links, *dirs) for parent in PurePosixPath(path).parents if str(parent) != "."}
     return (
-        *(DeleteFile(path) for path in ours),
+        *(DeleteFile(path) for path in links),
+        *(RemoveTree(path) for path in dirs),
         *(RemoveDirIfEmpty(path) for path in sorted(holding, key=lambda path: (-path.count("/"), path))),
     )
 
