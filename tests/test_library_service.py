@@ -63,6 +63,10 @@ def test_a_patch_naming_no_version_keeps_the_games_else_takes_the_newest():
     assert library.version_to_patch_with([], None) is None
 
 
+def test_whats_left_of_a_damaged_version_is_listed_by_its_directory_and_size():
+    assert library.damaged_json("stable-0.9.4", 12) == {"id": "stable-0.9.4", "size": 12}
+
+
 def test_an_entry_that_is_not_one_is_not_in_the_library():
     good = library.entry_json(installed_entry())
 
@@ -136,11 +140,11 @@ def world(home, tmp_path, github_api):
             github_api.body = json.dumps(listing).encode()
             self.archive = archive_bytes
 
-        def library(self, download=None) -> Library:
+        def library(self, download=None, games_using=lambda _version_id: []) -> Library:
             return Library(
                 self.plugin_home, self.seven_zip, github_releases.list_releases,
                 download or FakeDownload(self.archive), lambda *args: self.reports.append(args),
-                lambda: self.refreshes.append("core"),
+                lambda: self.refreshes.append("core"), games_using,
             )
 
         def tree(self) -> list[str]:
@@ -169,7 +173,7 @@ def test_installing_adds_the_unpacked_version(world):
         "id": NEWEST, "version": "10.0.0-pre1", "date": "20261023", "family": "10",
         "state": "installed", "reason": None, "size": 0,
     }
-    assert listed["installed_bytes"] == sum(len(data) for data in V10_FILES.values()) + len(
+    assert world.library().installed()["installed_bytes"] == sum(len(data) for data in V10_FILES.values()) + len(
         (world.plugin_home / "library" / "versions" / NEWEST / "entry.json").read_bytes()
     )
 
@@ -228,12 +232,56 @@ def test_installing_twice_is_refused_and_a_version_is_removed(world):
     assert world.tree() == ["versions"]
 
 
-def test_a_library_directory_without_a_readable_entry_is_not_a_version(world):
+def test_a_library_directory_without_a_readable_entry_is_not_a_version_and_installing_it_replaces_it(world):
     write(world.plugin_home / "library" / "versions" / NEWEST / "files" / "OptiScaler.dll", b"leftover")
+    write(world.plugin_home / "library" / "versions" / NEWEST / "files" / "stray.dll", b"leftover")
 
     rows = world.library().versions(library.NIGHTLY)["versions"]
-
     assert rows[0]["id"] == NEWEST and rows[0]["state"] == "available"
+
+    assert world.library().install(library.NIGHTLY, NEWEST)["status"] == "success"
+    files = world.plugin_home / "library" / "versions" / NEWEST / "files"
+    assert (files / "OptiScaler.dll").read_bytes() == b"opti" and not (files / "stray.dll").exists()
+
+
+def test_what_isnt_a_whole_version_is_damaged_and_a_copy_set_aside_is_neither(world):
+    world.library().install(library.NIGHTLY, NEWEST)
+    versions = world.plugin_home / "library" / "versions"
+    write(versions / "stable-0.9.4" / "files" / "OptiScaler.dll", b"leftover")  # an interrupted removal took its entry
+    write(versions / "stable-0.9.5" / "entry.json", b"{not json")
+    shutil.copytree(versions / NEWEST, versions / "nightly-20261020")  # renamed by hand: its entry names another
+    write(versions / f".{NEWEST}.old" / "files" / "OptiScaler.dll", b"set aside")  # a replace's own, settled by clear_partial
+
+    store = world.library().store
+    newest = store.installed()
+    assert [entry.id for entry in newest] == [NEWEST]
+    assert store.damaged() == [("nightly-20261020", newest[0]), ("stable-0.9.4", None), ("stable-0.9.5", None)]
+    assert store.listed() == {NEWEST, "nightly-20261020", "stable-0.9.4", "stable-0.9.5"}
+
+
+def test_whats_left_of_a_damaged_version_is_listed_and_removed_unless_games_are_patched_with_it(world):
+    world.library().install(library.NIGHTLY, NEWEST)
+    leftover = world.plugin_home / "library" / "versions" / "stable-0.9.4"
+    write(leftover / "files" / "OptiScaler.dll", b"leftover")
+    sizes = {NEWEST: world.library().store.size(NEWEST), "stable-0.9.4": world.library().store.size("stable-0.9.4")}
+
+    listed = world.library().installed()
+    assert [version["id"] for version in listed["versions"]] == [NEWEST]
+    assert listed["damaged"] == [{"id": "stable-0.9.4", "size": sizes["stable-0.9.4"]}]
+    assert listed["installed_bytes"] == sizes[NEWEST] + sizes["stable-0.9.4"]
+
+    used = world.library(games_using=lambda version_id: ["Hades II"] if version_id == "stable-0.9.4" else [])
+    assert used.removal("stable-0.9.4") == {
+        "status": "success", "refused": "Hades II is patched with stable-0.9.4. Unpatch them first.",
+    }  # its games link into what is left of it
+    assert used.remove("stable-0.9.4")["status"] == "error" and leftover.exists()
+
+    assert world.library().removal("stable-0.9.4") == {"status": "success", "refused": None}
+    assert world.library().remove("stable-0.9.4")["status"] == "success"
+    assert not leftover.exists() and world.library().installed()["damaged"] == []
+    for outside in ("..", ".", f".{NEWEST}.old", "nothing"):
+        assert world.library().remove(outside)["status"] == "error"
+    assert [version["id"] for version in world.library().installed()["versions"]] == [NEWEST]
 
 
 def test_github_failing_still_lists_what_is_installed(world, github_api):
@@ -298,7 +346,7 @@ def test_the_plugin_lists_what_games_can_be_patched_with(plugin, plugin_home):
 
     installed = run(plugin.library_installed())
 
-    assert installed.keys() == {"versions", "installed_bytes"}
+    assert installed.keys() == {"versions", "damaged", "installed_bytes"} and installed["damaged"] == []
     assert [version["id"] for version in installed["versions"]] == [NIGHTLY, STABLE]
     assert installed["installed_bytes"] == sum(version["size"] for version in installed["versions"]) > 0
 

@@ -1,18 +1,17 @@
 import { DialogBody, DialogHeader, Field, Menu, MenuItem, ModalRoot, showContextMenu } from "@decky/ui";
 import { useManageVersions } from "../hooks/useManageVersions";
-import { MANAGE_MENU } from "../presentation/library";
 import { Confirmation } from "./Confirmation";
 import { VersionRows } from "./VersionRows";
 
-/** The OptiScaler versions on the device: download one again, remove one. */
+/** The OptiScaler versions on the device, and what is left of damaged ones: download one again, remove one. */
 export function ManageVersionsModal({ closeModal, onChanged }: { closeModal?: () => void; onChanged: () => void }) {
-  const { view, onSelect, confirmation, onConfirm, onCancel } = useManageVersions(onChanged);
+  const { view, menuOf, onSelect, confirmation, onConfirm, onCancel } = useManageVersions(onChanged);
 
   const openMenu = (id: string, label: string) =>
     showContextMenu(
       <Menu label={label}>
-        {MANAGE_MENU.map((item) => (
-          <MenuItem key={item.action} tone={item.destructive ? "destructive" : undefined} onSelected={() => onSelect(id, item)}>
+        {menuOf(id).map((item) => (
+          <MenuItem key={item.action} tone={item.destructive ? "destructive" : undefined} onSelected={() => onSelect(id, label, item)}>
             {item.label}
           </MenuItem>
         ))}
