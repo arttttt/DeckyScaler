@@ -44,7 +44,8 @@ def test_a_failed_refresh_doesnt_stop_the_plugin_loading(plugin, home, monkeypat
     run(plugin._main())  # logged, not raised
 
 
-def test_loading_clears_what_downloads_the_last_stop_cut_short_left(plugin, home, steam_library, monkeypatch):
+def _leftovers(home, steam_library, monkeypatch):
+    """What downloads a stop cut short left in each store, in the active Steam's compatibilitytools.d too."""
     monkeypatch.setattr(processes, "started_processes", lambda: [])  # no Steam client running
     steam_library.set_compat_tools({})  # a Steam that has run: the one builds go into
     write(home / "deckyscaler" / "library" / ".partial" / "nightly-20261023" / "files" / "OptiScaler.dll", b"half")
@@ -52,6 +53,11 @@ def test_loading_clears_what_downloads_the_last_stop_cut_short_left(plugin, home
     write(home / "deckyscaler" / "libraries" / ".partial" / "anr-v-b19.zip", b"half")
     tools = steam_library.root / "compatibilitytools.d"
     write(tools / ".deckyscaler-partial" / "GE-Proton11-12-x86_64" / "archive.tar.gz", b"half")
+    return tools
+
+
+def test_loading_clears_what_downloads_the_last_stop_cut_short_left(plugin, home, steam_library, monkeypatch):
+    tools = _leftovers(home, steam_library, monkeypatch)
 
     run(plugin._main())
 
@@ -61,8 +67,10 @@ def test_loading_clears_what_downloads_the_last_stop_cut_short_left(plugin, home
     assert list((tools / ".deckyscaler-partial").iterdir()) == []  # kept itself: Steam needs no restart for it
 
 
-def test_a_failed_clearing_doesnt_stop_the_plugin_loading(plugin, home, monkeypatch):
+def test_a_store_that_fails_to_clear_leaves_the_others_cleared_and_the_plugin_loading(plugin, home, steam_library, monkeypatch):
     from deckyscaler.application.library import Library
+
+    tools = _leftovers(home, steam_library, monkeypatch)
 
     def clear(_self):
         raise OSError("Read-only file system")
@@ -70,3 +78,7 @@ def test_a_failed_clearing_doesnt_stop_the_plugin_loading(plugin, home, monkeypa
     monkeypatch.setattr(Library, "clear_interrupted", clear)
 
     run(plugin._main())  # logged, not raised
+
+    assert (home / "deckyscaler" / "library" / ".partial").exists()
+    assert not (home / "deckyscaler" / "libraries" / ".partial").exists()
+    assert list((tools / ".deckyscaler-partial").iterdir()) == []
