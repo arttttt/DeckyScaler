@@ -22,18 +22,22 @@ BY_UUID = Path("/dev/disk/by-uuid")
 exFAT and FAT's serial, NTFS's)."""
 
 
+def _unescaped(field: str) -> str:
+    """A mountinfo field as it is: a space and other such bytes are written there as octal escapes."""
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m[1], 8)), field)
+
+
 def mounts(mountinfo: str) -> dict[Path, str | None]:
     """Every mount point a /proc/self/mountinfo text lists, with the device it is mounted from (None when it names
-    none): the fifth field is the mount point (a space and other such bytes written as octal escapes), the second
-    after the lone "-" the source."""
+    none): the fifth field is the mount point, the second after the lone "-" the source. Of mounts stacked on one
+    point the last listed is the one seen there."""
     found: dict[Path, str | None] = {}
     for line in mountinfo.splitlines():
         fields = line.split(" ")
         if len(fields) < 5 or "-" not in fields:
             continue
         source = fields.index("-") + 2
-        point = Path(re.sub(r"\\([0-7]{3})", lambda m: chr(int(m[1], 8)), fields[4]))
-        found[point] = fields[source] if source < len(fields) else None
+        found[Path(_unescaped(fields[4]))] = _unescaped(fields[source]) if source < len(fields) else None
     return found
 
 
