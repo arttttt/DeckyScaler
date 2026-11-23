@@ -96,3 +96,27 @@ def test_the_panel_gets_every_proxy_with_its_launch_options_and_the_wrapper_comm
 
 def test_the_wrapper_command_is_recognised_as_the_plugins():
     assert launch_options.is_managed(launch_options.WRAPPER_PATCH)
+
+
+@pytest.mark.parametrize(
+    ("options", "rest"),
+    [
+        ("~/deckyscaler/patch %command%", ""),
+        ("$HOME/deckyscaler/patch %command%", ""),
+        ('"/home/deck/deckyscaler/patch" %COMMAND%', ""),
+        ("~/deckyscaler/unpatch %command%", ""),
+        ("gamemoderun ~/deckyscaler/patch %command%", "gamemoderun %command%"),
+        ("~/deckyscaler/patch gamemoderun %command%", "gamemoderun %command%"),
+        ("~/deckyscaler/patch %command% -dx12", "%command% -dx12"),
+        ("PROTON_FSR4_UPGRADE=1 ~/deckyscaler/patch %command%", "PROTON_FSR4_UPGRADE=1 %command%"),
+        ('FOO="a b" ~/deckyscaler/patch %command%', 'FOO="a b" %command%'),  # the rest as the user wrote it
+        ("gamemoderun %command%", None),
+        ("~/deckyscaler/patcher %command%", None),
+        ("~/my-deckyscaler/patch %command%", None),
+        ("~/fgmod/fgmod %command%", None),  # the original's wrapper isn't this plugin's to take out
+        ('gamemoderun "unbalanced ~/deckyscaler/patch %command%', None),  # no telling the words apart
+        (None, None),
+    ],
+)
+def test_the_launch_wrapper_is_taken_out_of_launch_options_and_the_rest_kept(options, rest):
+    assert launch_options.without_wrapper(options) == rest

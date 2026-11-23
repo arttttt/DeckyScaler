@@ -146,3 +146,9 @@ def test_a_patch_leaves_unknown_options_while_the_plugins_are_what_its_last_patc
     assert marker.launch_options_after_patch(None, ours, None) == ours  # a marker from before it was kept
     assert marker.launch_options_after_patch(ours, ours, "gamemoderun %command%") == ours  # read: the patch sets its own
     assert marker.launch_options_after_patch(None, ours, "") == ours  # a first patch
+
+
+def test_unpatching_takes_the_launch_wrapper_out_and_keeps_what_the_user_put_around_it():
+    assert marker.launch_options_after_unpatch("gamemoderun ~/deckyscaler/patch %command%", "", "dxgi.dll") == "gamemoderun %command%"
+    assert marker.launch_options_after_unpatch("~/deckyscaler/patch %command%", "", "dxgi.dll") == ""
+    assert marker.launch_options_after_unpatch("~/deckyscaler/patch %command%", "mangohud %command%", "dxgi.dll") == "mangohud %command%"

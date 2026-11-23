@@ -77,9 +77,9 @@ def _patched_by_upstream(directory: Path) -> bool:
 
 
 def _options_left(current: str | None, after: str | None) -> str:
-    """What an unpatch that leaves a game's launch options as they are says of them."""
+    """What an unpatch says of a game's launch options: the launch wrapper taken out of them, or why they were left."""
     if after is not None:
-        return ""
+        return " The launch wrapper's command is out of its launch options." if launch_options.without_wrapper(current) is not None else ""
     if current is None:
         return " Steam didn't say what its launch options are, so they were left as they are."
     return " Its launch options were changed since it was patched, so they were left as they are."
