@@ -490,4 +490,11 @@ export type PatchedGame = {
   own_settings: boolean;
 };
 
-export const patchedGames = callable<[], { status: string; message?: string; games?: PatchedGame[] }>("patched_games");
+/** A patched game on a drive that isn't mounted: its patch can't be read until the drive is back. */
+export type AwayGame = { directory: string; name: string };
+
+export type PatchedGames = { status: string; message?: string; games?: PatchedGame[]; away?: AwayGame[] };
+
+export const patchedGames = callable<[], PatchedGames>("patched_games");
+/** Drops a game on a drive that won't be back from the patched games, so its version can be removed. */
+export const forgetPatched = callable<[directory: string], { status: string; message?: string }>("forget_patched");

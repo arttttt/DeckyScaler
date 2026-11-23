@@ -339,5 +339,9 @@ def removal_refused(version_id: str, listed: set[str], users: Users) -> str | No
     if users.patched:
         return f"{_are(users.patched)} patched with {version_id}. Unpatch them first."
     if users.away:
-        return f"{_are(users.away)} on a drive that isn't mounted and may be patched with {version_id}. Put the drive back in first."
+        them = "it" if len(users.away) == 1 else "them"
+        return (
+            f"{_are(users.away)} on a drive that isn't mounted and may be patched with {version_id}. "
+            f"Put the drive back in, or forget {them} on the Games page."
+        )
     return None

@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { PatchedGame, patchedGames } from "../api";
+import { PatchedGames, patchedGames } from "../api";
 import { gamesPageView } from "../presentation/games";
 import { useInstalledLibrary } from "./useInstalledLibrary";
-
-type Answer = { status: string; message?: string; games?: PatchedGame[] };
 
 /** Every game the plugin patched, read when the page opens and again after a row changes one. */
 export const usePatchedGames = () => {
   const { library } = useInstalledLibrary();
-  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [answer, setAnswer] = useState<PatchedGames | null>(null);
 
   const reload = useCallback(async () => {
     try {

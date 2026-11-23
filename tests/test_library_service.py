@@ -49,11 +49,11 @@ def test_installed_versions_stay_listed_even_when_upstream_no_longer_publishes_t
         ("a", {"a", "b"}, library.Users(("Game", "Other")), "Game, Other are patched with a. Unpatch them first."),
         (
             "a", {"a", "b"}, library.Users(away=("Card Game",)),
-            "Card Game is on a drive that isn't mounted and may be patched with a. Put the drive back in first.",
+            "Card Game is on a drive that isn't mounted and may be patched with a. Put the drive back in, or forget it on the Games page.",
         ),
         (
             "a", {"a", "b"}, library.Users(away=("Card Game", "USB Game")),
-            "Card Game, USB Game are on a drive that isn't mounted and may be patched with a. Put the drive back in first.",
+            "Card Game, USB Game are on a drive that isn't mounted and may be patched with a. Put the drive back in, or forget them on the Games page.",
         ),
         ("a", {"a", "b"}, library.Users(("Game",), ("Card Game",)), "Game is patched with a. Unpatch them first."),
     ],

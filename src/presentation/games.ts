@@ -1,4 +1,4 @@
-import type { InstalledLibrary, PatchedGame } from "../api";
+import type { AwayGame, InstalledLibrary, PatchedGame, PatchedGames } from "../api";
 import { versionLabel } from "./releases";
 
 export type GameRowView = {
@@ -6,8 +6,11 @@ export type GameRowView = {
   title: string;
   lines: string[];
   /** A Steam game opens its page, which patches and unpatches it; a directory patched by path is
-   *  unpatched here, having no page. */
-  action: { kind: "open"; appid: string; label: string } | { kind: "unpatch"; directory: string; label: string };
+   *  unpatched here, having no page; a game on a drive that isn't mounted can only be forgotten. */
+  action:
+    | { kind: "open"; appid: string; label: string }
+    | { kind: "unpatch"; directory: string; label: string }
+    | { kind: "forget"; directory: string; label: string };
 };
 
 export type GamesPageView =
@@ -48,13 +51,22 @@ const row = (game: PatchedGame, library: InstalledLibrary | null): GameRowView =
   };
 };
 
-/** The Games page: every game the plugin patched, or why there is nothing to list. */
-export const gamesPageView = (
-  answer: { status: string; message?: string; games?: PatchedGame[] } | null,
-  library: InstalledLibrary | null,
-): GamesPageView => {
+const awayRow = (game: AwayGame): GameRowView => ({
+  key: game.directory,
+  title: game.name,
+  lines: [
+    "On a drive that isn't mounted: put it back in to see its patch.",
+    "Forget it if the drive won't be back, so its OptiScaler version can be removed.",
+  ],
+  action: { kind: "forget", directory: game.directory, label: "Forget" },
+});
+
+/** The Games page: every game the plugin patched, those on a drive that isn't mounted last, or why there is nothing
+ *  to list. */
+export const gamesPageView = (answer: PatchedGames | null, library: InstalledLibrary | null): GamesPageView => {
   if (answer === null) return { kind: "message", message: "Loading…" };
   if (answer.status !== "success" || !answer.games) return { kind: "message", message: answer.message || "Couldn't list the patched games." };
-  if (answer.games.length === 0) return { kind: "message", message: "No game is patched yet." };
-  return { kind: "ready", rows: answer.games.map((game) => row(game, library)) };
+  const away = answer.away ?? [];
+  if (answer.games.length === 0 && away.length === 0) return { kind: "message", message: "No game is patched yet." };
+  return { kind: "ready", rows: [...answer.games.map((game) => row(game, library)), ...away.map(awayRow)] };
 };

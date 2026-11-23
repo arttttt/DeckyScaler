@@ -289,6 +289,9 @@ class Plugin:
     async def patched_games(self) -> dict:
         return await asyncio.to_thread(self._patcher().patched_games)
 
+    async def forget_patched(self, directory: str) -> dict:
+        return await asyncio.to_thread(self._patcher().forget, directory)
+
     async def get_path_defaults(self) -> dict:
         return self._patcher().path_defaults()
 

@@ -1,5 +1,6 @@
 import { ButtonItem, Field, PanelSection, PanelSectionRow } from "@decky/ui";
 import { openGamePage } from "../api/pages";
+import { useForgetPatched } from "../hooks/useForgetPatched";
 import { usePatchedGames } from "../hooks/usePatchedGames";
 import { useUnpatch } from "../hooks/useUnpatch";
 import type { GameRowView } from "../presentation/games";
@@ -31,7 +32,31 @@ function DirectoryRow({ row, directory, onChanged }: { row: GameRowView; directo
   );
 }
 
-/** Every game the plugin patched: a Steam game opens its page, a directory is unpatched in place. */
+/** A game on a drive that isn't mounted: its patch can't be read, so it can only be forgotten. */
+function AwayRow({ row, directory, onChanged }: { row: GameRowView; directory: string; onChanged: () => void }) {
+  const forget = useForgetPatched(directory, onChanged);
+  return (
+    <PanelSectionRow>
+      <ButtonItem label={row.title} description={describe(row.lines)} disabled={forget.busy} onClick={forget.onForget}>
+        {row.action.label}
+      </ButtonItem>
+    </PanelSectionRow>
+  );
+}
+
+const GameRow = ({ row, onChanged }: { row: GameRowView; onChanged: () => void }) => {
+  switch (row.action.kind) {
+    case "open":
+      return <SteamGameRow row={row} appid={row.action.appid} />;
+    case "unpatch":
+      return <DirectoryRow row={row} directory={row.action.directory} onChanged={onChanged} />;
+    case "forget":
+      return <AwayRow row={row} directory={row.action.directory} onChanged={onChanged} />;
+  }
+};
+
+/** Every game the plugin patched: a Steam game opens its page, a directory is unpatched in place, a game on a drive
+ *  that isn't mounted is forgotten. */
 export function GamesPage() {
   const { view, reload } = usePatchedGames();
   return (
@@ -41,13 +66,7 @@ export function GamesPage() {
           <Field label={view.message} />
         </PanelSectionRow>
       ) : (
-        view.rows.map((row) =>
-          row.action.kind === "open" ? (
-            <SteamGameRow key={row.key} row={row} appid={row.action.appid} />
-          ) : (
-            <DirectoryRow key={row.key} row={row} directory={row.action.directory} onChanged={() => void reload()} />
-          ),
-        )
+        view.rows.map((row) => <GameRow key={row.key} row={row} onChanged={() => void reload()} />)
       )}
     </PanelSection>
   );

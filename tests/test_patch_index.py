@@ -75,8 +75,12 @@ def test_a_game_on_a_card_taken_out_stays_indexed_and_keeps_its_version(plugin, 
     refused = run(plugin.library_remove(STABLE))
     assert refused == {
         "status": "error",
-        "message": f"{game} is on a drive that isn't mounted and may be patched with {STABLE}. Put the drive back in first.",
+        "message": (
+            f"{game} is on a drive that isn't mounted and may be patched with {STABLE}. "
+            "Put the drive back in, or forget it on the Games page."
+        ),
     }
+    assert run(plugin.patched_games())["away"] == [{"directory": str(game), "name": str(game)}]
 
     drawer.rename(card)
     mounted.add(card.resolve())  # back in
@@ -85,6 +89,25 @@ def test_a_game_on_a_card_taken_out_stays_indexed_and_keeps_its_version(plugin, 
     shutil.rmtree(game)  # deleted from the card while it is in
     assert using(plugin, STABLE) == []
     assert str(game) not in indexed()
+
+
+def test_a_game_on_a_card_that_wont_be_back_is_forgotten_and_its_version_can_go(plugin, plugin_home, tmp_path, monkeypatch):
+    media = tmp_path / "run" / "media"
+    monkeypatch.setattr(drives, "REMOVABLE_MEDIA", (media,))
+    monkeypatch.setattr(drives, "ismount", lambda path: False)  # nothing mounted: the card is out
+    here = make_game_dir(tmp_path / "games" / "Here")
+    run(plugin.manual_patch_directory(str(here), "dxgi.dll", NIGHTLY))
+    away = str(media / "deck" / "SD" / "Games" / "Card Game")
+    (plugin_home / "patched.json").write_text(json.dumps({**json.loads((plugin_home / "patched.json").read_text()), away: "Card Game"}))
+
+    assert run(plugin.forget_patched(str(here))) == {
+        "status": "error", "message": f"{here} isn't on a drive that is out: there is nothing to forget.",
+    }
+    assert run(plugin.forget_patched(away)) == {"status": "success", "message": "Card Game is forgotten."}
+
+    assert run(plugin.patched_games())["away"] == []
+    assert using(plugin, NIGHTLY) == [str(here)]  # the game that is there stays
+    assert run(plugin.library_remove(STABLE))["status"] == "success"
 
 
 def test_an_interrupted_patch_still_counts_as_using_its_version(plugin, plugin_home, tmp_path, monkeypatch):

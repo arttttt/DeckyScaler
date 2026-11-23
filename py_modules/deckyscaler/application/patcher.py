@@ -354,11 +354,12 @@ class Patcher:
     def patched_games(self) -> dict:
         """Every game and directory the plugin patched, by name: what it was patched with, what its version says of it
         (`_against_version`), and whether it has settings of its own. A Steam game has its appid; a directory patched
-        by path has none."""
+        by path has none. Those on a drive that isn't mounted are listed apart (`away`), by name alone."""
         installed = self.library.installed()
         seen: dict[str, frozenset[str]] = {}
         games = []
-        for directory, name, details in self.patched_markers():
+        found, away = self._indexed()
+        for directory, name, details in found:
             appid = str(details.get("appid") or "")
             dll_name = details.get("dll_name") or bundle.DEFAULT_PROXY_DLL
             version = details.get("optiscaler_version")
@@ -376,7 +377,23 @@ class Patcher:
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
                 "libraries": details.get("libraries") or [],
             })
-        return {"status": "success", "games": sorted(games, key=lambda game: game["name"].lower())}
+        return {
+            "status": "success",
+            "games": sorted(games, key=lambda game: game["name"].lower()),
+            "away": [{"directory": str(path), "name": name} for path, name in sorted(away, key=lambda item: item[1].lower())],
+        }
+
+    def forget(self, directory: str) -> dict:
+        """Drop a game on a drive that isn't mounted from the index, for a drive that won't be back: its versions can
+        then be removed. Should it come back after all, a Steam game's page finds its patch again."""
+        name = next((name for path, name in self._indexed()[1] if str(path) == directory), None)
+        if name is None:
+            return _error(f"{directory} isn't on a drive that is out: there is nothing to forget.")
+        try:
+            self.patches.remove(Path(directory))
+        except OSError as exc:
+            return _error(f"Forgetting {name} failed: {exc}")
+        return {"status": "success", "message": f"{name} is forgotten."}
 
     def games_using(self, version_id: str) -> library.Users:
         """The patched games and directories whose marker names this library version, and those on a drive that isn't
