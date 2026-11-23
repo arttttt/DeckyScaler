@@ -74,7 +74,6 @@ class Library:
             "status": "success",
             "versions": [row.__dict__ for row in rows],
             "listing_error": listing_error,
-            "installed_bytes": sum(sizes.values()),
         }
 
     def install(self, channel: str, version_id: str) -> dict:

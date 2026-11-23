@@ -50,7 +50,7 @@ describe("panel summary", () => {
 
 const downloadState = (overrides: Partial<DownloadState> = {}): DownloadState => ({
   channel: "nightly",
-  listing: { status: "success", versions: [downloaded, available, unsupported], listing_error: null, installed_bytes: 1 },
+  listing: { status: "success", versions: [downloaded, available, unsupported], listing_error: null },
   checking: false,
   busy: null,
   download: null,
@@ -91,7 +91,7 @@ describe("download dialog", () => {
   });
 
   it("says when GitHub could not be reached, nothing is published, or how the last download went", () => {
-    const listing = { status: "success" as const, versions: [], listing_error: "GitHub answered 403", installed_bytes: 0 };
+    const listing = { status: "success" as const, versions: [], listing_error: "GitHub answered 403" };
     expect(downloadView(downloadState({ listing })).message).toBe("Could not list what OptiScaler publishes (GitHub answered 403).");
     expect(downloadView(downloadState({ listing: { ...listing, listing_error: null } })).message).toBe(
       "No nightly versions are published.",

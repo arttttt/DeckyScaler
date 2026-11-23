@@ -173,7 +173,7 @@ def test_installing_adds_the_unpacked_version(world):
         "id": NEWEST, "version": "10.0.0-pre1", "date": "20261023", "family": "10",
         "state": "installed", "reason": None, "size": 0,
     }
-    assert listed["installed_bytes"] == sum(len(data) for data in V10_FILES.values()) + len(
+    assert world.library().installed()["installed_bytes"] == sum(len(data) for data in V10_FILES.values()) + len(
         (world.plugin_home / "library" / "versions" / NEWEST / "entry.json").read_bytes()
     )
 

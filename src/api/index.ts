@@ -122,7 +122,7 @@ export type ReleaseVersion = {
 export type LibraryVersion = ReleaseVersion & { family: string | null };
 
 export type LibraryListing =
-  | { status: "success"; versions: LibraryVersion[]; listing_error: string | null; installed_bytes: number }
+  | { status: "success"; versions: LibraryVersion[]; listing_error: string | null }
   | { status: "error"; message: string };
 
 type LibraryResult = { status: "success"; message?: string } | { status: "error"; message: string };
