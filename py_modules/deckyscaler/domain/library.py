@@ -213,10 +213,15 @@ def entry(version: Available, installed_at: str, files: frozenset[str]) -> Insta
     )
 
 
-def listing_files(installed: Installed, present: frozenset[str]) -> Installed | None:
-    """A version installed before the library kept file lists, with the list of what it holds now (`present`), so a
-    file it loses from now on is seen; what it lost already can't be told. None for a version that has a list."""
-    return replace(installed, files=tuple(sorted(present))) if installed.files is None else None
+def lacks_file_list(installed: Installed) -> bool:
+    """Whether a version was installed before the library kept file lists."""
+    return installed.files is None
+
+
+def with_file_list(installed: Installed, present: frozenset[str]) -> Installed:
+    """A version with the list of what it holds now (`present`), so a file it loses from now on is seen; what it
+    lost before can't be told."""
+    return replace(installed, files=tuple(sorted(present)))
 
 
 def entry_json(installed: Installed) -> dict:

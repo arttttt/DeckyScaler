@@ -48,9 +48,8 @@ class Library:
     def keep_file_lists(self) -> None:
         """Give each version installed before the library kept file lists the list of what it holds now."""
         for entry in self.store.installed():
-            listed = library.listing_files(entry, self.store.files_of(entry.id))
-            if listed is not None:
-                self.store.rewrite_entry(listed)
+            if library.lacks_file_list(entry):
+                self.store.rewrite_entry(library.with_file_list(entry, self.store.files_of(entry.id)))
 
     def installed(self) -> dict:
         """The versions games can be patched with, newest first; what is left of the damaged ones, to remove; and
