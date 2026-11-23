@@ -6,8 +6,8 @@ const LIBRARY: InstalledLibrary = {
   damaged: [],
   installed_bytes: 0,
   versions: [
-    { id: "nightly-20261024", version: "10.0.0-pre1", channel: "nightly", date: "20261024", size: 1, libraries: true },
-    { id: "nightly-20261023", version: "10.0.0-pre1", channel: "nightly", date: "20261023", size: 1, libraries: true },
+    { id: "nightly-20261024", version: "10.0.0-pre1", channel: "nightly", date: "20261024", size: 1, libraries: true, incomplete: false },
+    { id: "nightly-20261023", version: "10.0.0-pre1", channel: "nightly", date: "20261023", size: 1, libraries: true, incomplete: false },
   ],
 };
 
@@ -19,6 +19,8 @@ const game = (overrides: Partial<PatchedGame>): PatchedGame => ({
   dll_present: true,
   version_id: "nightly-20261023",
   newer_version: null,
+  lacks_version_files: false,
+  version_incomplete: false,
   patched_at: "2026-10-23T18:04:00+00:00",
   record: "ok",
   own_settings: false,
@@ -65,6 +67,11 @@ describe("the Games page", () => {
     expect(rowOf(game({ record: "upstream" })).lines[1]).toBe(
       "Patched by Decky Framegen: Unpatch resets it to the game's own files.",
     );
+    expect(rowOf(game({ lacks_version_files: true })).lines[1]).toBe("Its OptiScaler version has files this patch lacks: patch it again.");
+    expect(rowOf(game({ lacks_version_files: true, dll_present: false })).lines[1]).toBe("dxgi.dll is missing: patch it again.");
+    expect(rowOf(game({ version_incomplete: true, lacks_version_files: true })).lines[1]).toBe(
+      "Its OptiScaler version is missing files: download it again from the OptiScaler page.",
+    ); // the version is mended first: patching again before that adds nothing
   });
 
   it("opens a Steam game's page, and unpatches a directory patched by path in place", () => {

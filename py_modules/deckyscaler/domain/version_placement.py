@@ -14,7 +14,8 @@ from pathlib import PurePosixPath
 
 from . import fsr4
 from .bundle import VALID_DLL_NAMES
-from .library import Family
+from .library import Family, Installed
+from .patch_record import PatchRecord, covers
 from .patch_plan import BACKUP_SUFFIX, INI_FILENAME, Copy, Link, Move, Operation, PlanError, preserving_existing
 
 INJECTOR = "OptiScaler.dll"
@@ -41,6 +42,27 @@ def is_for_the_game(path: str) -> bool:
     return not (len(parts) == 1 and name.endswith(".txt"))
 
 
+def linked_files(files: frozenset[str]) -> frozenset[str]:
+    """The files of a version's archive (`files`) a patch links into a game at their own paths: all those for the
+    game, but the injector (linked as the proxy DLL) and OptiScaler.ini (copied)."""
+    return frozenset(path for path in files if path not in (INJECTOR, INI_FILENAME) and is_for_the_game(path))
+
+
+def lost_files(installed: Installed, present: frozenset[str]) -> frozenset[str]:
+    """The files a game gets from a version (`is_for_the_game`) that it was unpacked with and are gone from it now
+    (`present`): it is incomplete, and downloading it again brings them back. A lost licence or note is no loss to
+    a game. Nothing for a version that keeps no list."""
+    if installed.files is None:
+        return frozenset()
+    return frozenset(path for path in installed.files if path not in present and is_for_the_game(path))
+
+
+def placed_every_file(patch: PatchRecord, version_files: frozenset[str]) -> bool:
+    """Whether a game's patch placed every file its version holds now (`version_files`) that a patch links at its
+    own path: one patched while some were gone lacks them until patched again."""
+    return covers(patch, linked_files(version_files))
+
+
 def plan_patch(entries: frozenset[str], files: frozenset[str], family: Family, request: Request) -> tuple[Operation, ...]:
     """The operations that patch a directory holding `entries` with a version whose archive holds `files`.
 
@@ -64,9 +86,7 @@ def plan_patch(entries: frozenset[str], files: frozenset[str], family: Family, r
         # The user's settings go into it after placing (Patcher, domain settings_layers).
         operations.append(Copy(INI_FILENAME, INI_FILENAME))
 
-    for path in sorted(files):
-        if path not in (INJECTOR, INI_FILENAME) and is_for_the_game(path):
-            operations.append(Link(path, path))
+    operations += [Link(path, path) for path in sorted(linked_files(files))]
 
     driver = driver_path(family)
     # A DLL already there is the user's own choice of FSR 4: it stays, and nothing is linked over it.

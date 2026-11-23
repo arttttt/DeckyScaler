@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
-from deckyscaler.domain import library
+from deckyscaler.domain import library, version_placement
 from deckyscaler.infrastructure import archive
 from deckyscaler.infrastructure.files import files_under, sha256
 from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
@@ -50,6 +50,12 @@ class Library:
         short: the old copy comes back when no new one took its place."""
         self.store.clear_partial()
 
+    def keep_file_lists(self) -> None:
+        """Give each version installed before the library kept file lists the list of what it holds now."""
+        for entry in self.store.installed():
+            if library.lacks_file_list(entry):
+                self.store.rewrite_entry(library.with_file_list(entry, self.store.files_of(entry.id)))
+
     def installed(self) -> dict:
         """The versions games can be patched with, newest first; what is left of the damaged ones, to remove; and
         what all of it takes on disk."""
@@ -57,7 +63,10 @@ class Library:
         sizes = {entry.id: self.store.size(entry.id) for entry in entries}
         damaged = [library.damaged_json(name, self.store.size(name)) for name, _ in self.store.damaged()]
         return {
-            "versions": [library.choice_json(entry, sizes[entry.id]) for entry in entries],
+            "versions": [
+                library.choice_json(entry, sizes[entry.id], bool(version_placement.lost_files(entry, self.store.files_of(entry.id))))
+                for entry in entries
+            ],
             "damaged": damaged,
             "installed_bytes": sum(sizes.values()) + sum(item["size"] for item in damaged),
         }
@@ -125,10 +134,11 @@ class Library:
             files = stage / library.FILES_DIRNAME
             archive.extract_7z(self.seven_zip, archive_path, files)
             family = library.family_of(version.version)
-            missing = library.missing_files(family, files_under(files)) if family else {"a known layout"}
+            unpacked = files_under(files)
+            missing = library.missing_files(family, unpacked) if family else {"a known layout"}
             if missing:
                 return _error(f"The {version_id} archive lacks {', '.join(sorted(missing))}; not added.")
-            installed = library.entry(version, datetime.now(timezone.utc).isoformat())
+            installed = library.entry(version, datetime.now(timezone.utc).isoformat(), unpacked)
             (self.store.replace if replacing else self.store.commit)(stage, installed)
         except (ReleasesUnavailable, RuntimeError, OSError) as exc:
             log.error(f"Installing {version_id} failed: {exc}")

@@ -49,6 +49,10 @@ class Plugin:
                 await asyncio.to_thread(owner().clear_interrupted)
             except OSError as exc:
                 decky.logger.error(f"Clearing what an interrupted download of {what} left failed: {exc}")
+        try:
+            await asyncio.to_thread(self._library().keep_file_lists)
+        except OSError as exc:
+            decky.logger.error(f"Keeping the OptiScaler versions' file lists failed: {exc}")
 
     async def _unload(self):
         decky.logger.info("DeckyScaler unloaded.")

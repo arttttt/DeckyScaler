@@ -42,6 +42,10 @@ export const getGameStatus = callable<
     optiscaler_version?: string | null;
     /** A later build of the game's version channel that is in the library. */
     newer_version?: string | null;
+    /** Its version holds files its patch didn't place (they came back since): patching again adds them. */
+    lacks_version_files?: boolean;
+    /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
+    version_incomplete?: boolean;
   }
 >("get_game_status");
 
@@ -88,6 +92,8 @@ export type InstalledVersion = {
   size: number;
   /** Whether a game patched with it takes the user's libraries (OptiScaler 10 does). */
   libraries: boolean;
+  /** Files it was unpacked with are gone from it: Download again brings them back. */
+  incomplete: boolean;
 };
 
 /** What is left of a version that isn't whole, by its directory's name: no game can be patched with it, and it can
@@ -475,6 +481,10 @@ export type PatchedGame = {
   version_id: string | null;
   /** A later build of the game's version channel that is in the library. */
   newer_version: string | null;
+  /** Its version holds files its patch didn't place (they came back since): patching again adds them. */
+  lacks_version_files: boolean;
+  /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
+  version_incomplete: boolean;
   patched_at: string | null;
   record: "ok" | "incomplete" | "upstream";
   own_settings: boolean;

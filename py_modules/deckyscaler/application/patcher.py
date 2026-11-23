@@ -132,7 +132,8 @@ class Patcher:
         had = library_choice.recorded_picks(previous_details.get("libraries")) if marker_path.exists() else None
         to_place = self._libraries_to_place(settings_appid, had if keep_libraries else None, family)
         placed = library_choice.placed(to_place)
-        if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name, placed):
+        version_files = files.files_under(source)
+        if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name, placed, version_files):
             log.info(f"{directory} is already patched with OptiScaler {entry.id}, {dll_name}")
             if patch_record.placed_by(patch_record.parse(files.read_json(marker_path)), plan.INI_FILENAME):
                 self.apply_settings(directory, source, settings_appid)
@@ -160,9 +161,7 @@ class Patcher:
             request = version_placement.Request(
                 dll_name, reset_ini, str(fsr4_driver) if fsr4_driver else None, placement.copies
             )
-            operations = version_placement.plan_patch(
-                entries, files.files_under(source), family, request
-            )
+            operations = version_placement.plan_patch(entries, version_files, family, request)
             log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(placed)}")
             recorded = patch_record.record(
                 operations,
@@ -249,14 +248,23 @@ class Patcher:
         return library_choice.users(library_id, [(name, details.get("libraries")) for _, name, details in self.patched_markers()])
 
     def _patched_as(
-        self, directory: Path, version_id: str, dll_name: str, placed: tuple[library_choice.Placed, ...]
+        self,
+        directory: Path,
+        version_id: str,
+        dll_name: str,
+        placed: tuple[library_choice.Placed, ...],
+        version_files: frozenset[str],
     ) -> bool:
+        """Whether a patch now would place nothing other than the directory has: the same version, proxy and
+        libraries, every placed file still there, and every file the version holds now among them (one that came
+        back with Download again after the game was patched without it is not)."""
         details = files.read_json(directory / bundle.MARKER_FILENAME)
         recorded = patch_record.parse(details)
         return (
             recorded is not None
             and marker.describes(details, version_id, dll_name, placed)
             and patch_record.intact(recorded, game_directory.current_state(directory, recorded))
+            and version_placement.placed_every_file(recorded, version_files)
         )
 
     def _is_bundle(self, directory: Path) -> bool:
@@ -325,10 +333,28 @@ class Patcher:
             (name, details) for _, name, details in self.patched_markers() if details.get("optiscaler_version") == version_id
         )
 
+    def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:
+        """What a patched game's version, while still in the library, says of the game: whether the game lacks files
+        the version holds now (patched while they were gone, it gets them only when patched again, which the launch
+        wrapper does at launch), and whether the version is incomplete (files a game gets are gone from it, so the
+        game's links to them lead nowhere). `seen` keeps each version's files for the rest of one listing."""
+        version = str(details.get("optiscaler_version") or "")
+        entry, recorded = next((e for e in installed if e.id == version), None), patch_record.parse(details)
+        if entry is None or recorded is None:
+            return {"lacks_version_files": False, "version_incomplete": False}
+        if version not in seen:
+            seen[version] = self.library.files_of(version)
+        return {
+            "lacks_version_files": not version_placement.placed_every_file(recorded, seen[version]),
+            "version_incomplete": bool(version_placement.lost_files(entry, seen[version])),
+        }
+
     def patched_games(self) -> dict:
-        """Every game and directory the plugin patched, by name: what it was patched with, and whether it
-        has settings of its own. A Steam game has its appid; a directory patched by path has none."""
+        """Every game and directory the plugin patched, by name: what it was patched with, what its version says of it
+        (`_against_version`), and whether it has settings of its own. A Steam game has its appid; a directory patched
+        by path has none."""
         installed = self.library.installed()
+        seen: dict[str, frozenset[str]] = {}
         games = []
         for directory, name, details in self.patched_markers():
             appid = str(details.get("appid") or "")
@@ -342,6 +368,7 @@ class Patcher:
                 "dll_present": (directory / dll_name).exists(),
                 "version_id": version,
                 "newer_version": library.newer_in_channel(installed, version),
+                **self._against_version(details, installed, seen),
                 "patched_at": details.get("patched_at"),
                 "record": patch_record.state(details),
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
@@ -487,6 +514,8 @@ class Patcher:
             "dll_name": None,
             "target_dir": None,
             "newer_version": None,
+            "lacks_version_files": False,
+            "version_incomplete": False,
             "fsr4": None,
         }
         if game is None:
@@ -510,6 +539,7 @@ class Patcher:
         target_dir = marker_path.parent
         dll_present = (target_dir / dll_name).exists()
         version = metadata.get("optiscaler_version")
+        installed = self.library.installed()
         if dll_present:
             message = f"Patched with OptiScaler {version} using {dll_name}."
         else:
@@ -524,7 +554,8 @@ class Patcher:
             "target_dir": str(target_dir),
             "patched_at": metadata.get("patched_at"),
             "optiscaler_version": version,
-            "newer_version": library.newer_in_channel(self.library.installed(), version),
+            "newer_version": library.newer_in_channel(installed, version),
+            **self._against_version(metadata, installed, {}),
             "fsr4": unpatched["fsr4"],
             "libraries": metadata.get("libraries") or [],
             "message": message,

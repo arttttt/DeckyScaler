@@ -152,6 +152,12 @@ def intact(patch: PatchRecord, current: dict[str, str | None]) -> bool:
     )
 
 
+def covers(patch: PatchRecord, paths: frozenset[str]) -> bool:
+    """Whether the patch placed every one of `paths`: a version's files that came back after it was patched while
+    some were gone (`version_placement.linked_files`) are not in the game until it is patched again."""
+    return paths <= {item.path for item in patch.placed}
+
+
 def plan_unpatch(
     patch: PatchRecord, current: dict[str, str | None], keep: frozenset[str] = frozenset()
 ) -> tuple[Operation | RemoveDirIfEmpty, ...]:

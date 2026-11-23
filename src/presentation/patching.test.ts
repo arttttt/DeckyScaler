@@ -13,6 +13,7 @@ const LIBRARY: InstalledLibrary = {
       date: "20261023",
       size: 300_000_000,
       libraries: true,
+      incomplete: false,
     },
     {
       id: "stable-0.9.4",
@@ -21,6 +22,7 @@ const LIBRARY: InstalledLibrary = {
       date: "20260718",
       size: 200_000_000,
       libraries: false,
+      incomplete: false,
     },
   ],
 };
@@ -59,6 +61,8 @@ describe("patch choice", () => {
 
   it("keeps a picked version while it is installed", () => {
     expect(patchChoice(LIBRARY, "stable-0.9.4").patchWith).toBe("stable-0.9.4");
+    const incomplete = { ...LIBRARY, versions: [{ ...LIBRARY.versions[0], incomplete: true }] };
+    expect(patchChoice(incomplete, null).versionOptions[0].label).toBe("10.0.0-pre1 · 2026-10-23 (nightly, incomplete)");
   });
 
   it("says whether the version a patch uses takes the user's libraries", () => {
@@ -87,6 +91,16 @@ describe("game version line", () => {
     expect(gameVersionLine(patched)).toBe("nightly-20261023");
     expect(gameVersionLine({ ...patched, newer_version: "nightly-20261101" })).toBe(
       "nightly-20261023. nightly-20261101 is in the library; choose it and patch again to update.",
+    );
+    expect(gameVersionLine({ ...patched, lacks_version_files: true })).toBe(
+      "nightly-20261023. This version has files the patch lacks; patch again to add them.",
+    );
+    expect(gameVersionLine({ ...patched, newer_version: "nightly-20261101", lacks_version_files: true })).toBe(
+      "nightly-20261023. nightly-20261101 is in the library; choose it and patch again to update. " +
+        "This version has files the patch lacks; patch again to add them.",
+    );
+    expect(gameVersionLine({ ...patched, version_incomplete: true })).toBe(
+      "nightly-20261023. This version is missing files; download it again from the OptiScaler page.",
     );
     expect(gameVersionLine({ patched: true })).toBe("Unknown version");
     expect(gameVersionLine({ patched: false })).toBeNull();
