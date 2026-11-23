@@ -40,17 +40,26 @@ def test_installed_versions_stay_listed_even_when_upstream_no_longer_publishes_t
 
 
 @pytest.mark.parametrize(
-    ("version_id", "installed", "games", "refusal"),
+    ("version_id", "installed", "users", "refusal"),
     [
-        ("a", {"a", "b"}, [], None),
-        ("a", {"a"}, [], None),  # the last version goes too
-        ("c", {"a"}, [], "c is not in the library."),
-        ("a", {"a", "b"}, ["Game"], "Game is patched with a. Unpatch them first."),
-        ("a", {"a", "b"}, ["Game", "Other"], "Game, Other are patched with a. Unpatch them first."),
+        ("a", {"a", "b"}, library.Users(), None),
+        ("a", {"a"}, library.Users(), None),  # the last version goes too
+        ("c", {"a"}, library.Users(), "c is not in the library."),
+        ("a", {"a", "b"}, library.Users(("Game",)), "Game is patched with a. Unpatch them first."),
+        ("a", {"a", "b"}, library.Users(("Game", "Other")), "Game, Other are patched with a. Unpatch them first."),
+        (
+            "a", {"a", "b"}, library.Users(away=("Card Game",)),
+            "Card Game is on a drive that isn't mounted and may be patched with a. Put the drive back in first.",
+        ),
+        (
+            "a", {"a", "b"}, library.Users(away=("Card Game", "USB Game")),
+            "Card Game, USB Game are on a drive that isn't mounted and may be patched with a. Put the drive back in first.",
+        ),
+        ("a", {"a", "b"}, library.Users(("Game",), ("Card Game",)), "Game is patched with a. Unpatch them first."),
     ],
 )
-def test_a_version_is_removed_unless_games_are_patched_with_it(version_id, installed, games, refusal):
-    assert library.removal_refused(version_id, installed, games) == refusal
+def test_a_version_is_removed_unless_games_are_or_may_be_patched_with_it(version_id, installed, users, refusal):
+    assert library.removal_refused(version_id, installed, users) == refusal
 
 
 def test_a_patch_naming_no_version_keeps_the_games_else_takes_the_newest():
@@ -159,7 +168,7 @@ def world(home, tmp_path, github_api):
             github_api.body = json.dumps(listing).encode()
             self.archive = archive_bytes
 
-        def library(self, download=None, games_using=lambda _version_id: []) -> Library:
+        def library(self, download=None, games_using=lambda _version_id: library.Users()) -> Library:
             return Library(
                 self.plugin_home, self.seven_zip, github_releases.list_releases,
                 download or FakeDownload(self.archive), lambda *args: self.reports.append(args),
@@ -289,7 +298,7 @@ def test_whats_left_of_a_damaged_version_is_listed_and_removed_unless_games_are_
     assert listed["damaged"] == [{"id": "stable-0.9.4", "size": sizes["stable-0.9.4"]}]
     assert listed["installed_bytes"] == sizes[NEWEST] + sizes["stable-0.9.4"]
 
-    used = world.library(games_using=lambda version_id: ["Hades II"] if version_id == "stable-0.9.4" else [])
+    used = world.library(games_using=lambda version_id: library.Users(("Hades II",) if version_id == "stable-0.9.4" else ()))
     assert used.removal("stable-0.9.4") == {
         "status": "success", "refused": "Hades II is patched with stable-0.9.4. Unpatch them first.",
     }  # its games link into what is left of it

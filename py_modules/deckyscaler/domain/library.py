@@ -318,11 +318,26 @@ def catalog(installed: list[Installed], published: list[Available], sizes: dict[
     return sorted(rows, key=lambda row: row.date, reverse=True)
 
 
-def removal_refused(version_id: str, listed: set[str], games: list[str]) -> str | None:
+@dataclass(frozen=True)
+class Users:
+    """The games keeping a version: those patched with it, and those on a drive that isn't mounted, whose patch can't
+    be read until it is, so any of them may be patched with it."""
+
+    patched: tuple[str, ...] = ()
+    away: tuple[str, ...] = ()
+
+
+def _are(names: tuple[str, ...]) -> str:
+    return f"{', '.join(names)} {'is' if len(names) == 1 else 'are'}"
+
+
+def removal_refused(version_id: str, listed: set[str], users: Users) -> str | None:
     """Why a version, or what is left of a damaged one (`listed` holds both), can't be removed, or None. It stays
-    while games are patched with it: their files are symlinks into it, so removing it would break them."""
+    while games are patched with it, or may be: their files are symlinks into it, so removing it would break them."""
     if version_id not in listed:
         return f"{version_id} is not in the library."
-    if games:
-        return f"{', '.join(games)} {'is' if len(games) == 1 else 'are'} patched with {version_id}. Unpatch them first."
+    if users.patched:
+        return f"{_are(users.patched)} patched with {version_id}. Unpatch them first."
+    if users.away:
+        return f"{_are(users.away)} on a drive that isn't mounted and may be patched with {version_id}. Put the drive back in first."
     return None

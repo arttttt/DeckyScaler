@@ -30,7 +30,7 @@ class Library:
         download: Download,
         report: Report,
         refresh_core: Callable[[], None],
-        games_using: Callable[[str], list[str]] = lambda _version_id: [],
+        games_using: Callable[[str], library.Users] = lambda _version_id: library.Users(),
     ):
         self.store = LibraryStore(plugin_home / "library")
         self.seven_zip = seven_zip
@@ -40,7 +40,7 @@ class Library:
         self.refresh_core = refresh_core
         """Puts the plugin's core and launch scripts into ~/deckyscaler; every install does it until the patching mechanism settles."""
         self.games_using = games_using
-        """The games patched with a version; it can't be removed while there are any."""
+        """The games keeping a version; it can't be removed while there are any."""
 
     def _published(self, channel: str) -> list[library.Available]:
         return library.available(channel, self.list_releases(library.CHANNELS[channel].repository))

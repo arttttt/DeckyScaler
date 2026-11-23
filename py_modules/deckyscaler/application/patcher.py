@@ -30,7 +30,7 @@ from deckyscaler.domain import (
     version_placement,
 )
 from deckyscaler.domain import patch_plan as plan
-from deckyscaler.infrastructure import files, game_directory, processes, proton
+from deckyscaler.infrastructure import drives, files, game_directory, processes, proton
 from deckyscaler.infrastructure.library_store import LibraryStore
 from deckyscaler.infrastructure.patch_index import PatchIndex
 from deckyscaler.infrastructure.settings_store import SettingsStore
@@ -300,7 +300,7 @@ class Patcher:
         return {"status": "success", "message": f"OptiScaler files removed from {directory}"}
 
     # The index of patched directories follows the markers: an entry is added once a marker is
-    # written and dropped once it is gone. Failing to update it never fails a patch.
+    # written and dropped once it is gone, but kept while its drive is out. Failing to update it never fails a patch.
 
     def _remember(self, directory: Path, name: str) -> None:
         try:
@@ -314,24 +314,26 @@ class Patcher:
         except OSError as exc:
             log.warning(f"Updating the index of patched directories failed: {exc}")
 
-    def patched_markers(self) -> list[tuple[Path, str, dict]]:
-        """Every indexed directory with its name and marker. A directory whose marker is gone (the game
-        was removed, or the marker by hand) is dropped from the index."""
-        found = []
+    def _indexed(self) -> tuple[list[tuple[Path, str, dict]], list[tuple[Path, str]]]:
+        """The indexed directories by whether their patch can be read now: each one with its marker, with its name and
+        marker; each one on a drive that isn't mounted, with its name, kept until the drive is back. A directory whose
+        marker is gone from where it can be read (the game was removed, or the marker by hand) is dropped from the
+        index."""
+        found, away = [], []
         for directory, name in self.patches.directories().items():
             path = Path(directory)
             marker_path = path / bundle.MARKER_FILENAME
-            if not marker_path.is_file():
+            if marker_path.is_file():
+                found.append((path, name, files.read_json(marker_path)))
+            elif drives.on_unmounted_drive(path):
+                away.append((path, name))
+            else:
                 self._forget(path)
-                continue
-            found.append((path, name, files.read_json(marker_path)))
-        return found
+        return found, away
 
-    def _patched_with(self, version_id: str) -> list[tuple[str, dict]]:
-        """The name and marker of every indexed directory whose marker names this library version."""
-        return sorted(
-            (name, details) for _, name, details in self.patched_markers() if details.get("optiscaler_version") == version_id
-        )
+    def patched_markers(self) -> list[tuple[Path, str, dict]]:
+        """Every indexed directory whose patch can be read now, with its name and marker."""
+        return self._indexed()[0]
 
     def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:
         """What a patched game's version, while still in the library, says of the game: whether the game lacks files
@@ -376,9 +378,14 @@ class Patcher:
             })
         return {"status": "success", "games": sorted(games, key=lambda game: game["name"].lower())}
 
-    def games_using(self, version_id: str) -> list[str]:
-        """The patched games and directories whose marker names this library version."""
-        return [name for name, _ in self._patched_with(version_id)]
+    def games_using(self, version_id: str) -> library.Users:
+        """The patched games and directories whose marker names this library version, and those on a drive that isn't
+        mounted, whose marker can't be read."""
+        found, away = self._indexed()
+        return library.Users(
+            tuple(sorted(name for _, name, details in found if details.get("optiscaler_version") == version_id)),
+            tuple(sorted(name for _, name in away)),
+        )
 
 
     def patch_user_directory(

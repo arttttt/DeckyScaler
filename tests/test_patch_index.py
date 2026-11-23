@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import threading
@@ -14,7 +15,7 @@ from conftest import NIGHTLY, REPO_ROOT, STABLE, make_game_dir, run
 def using(plugin, version_id: str) -> list[str]:
     """The patched games and directories the plugin lists with a version."""
     return [g["name"] for g in run(plugin.patched_games())["games"] if g["version_id"] == version_id]
-from deckyscaler.infrastructure import game_directory
+from deckyscaler.infrastructure import drives, game_directory
 from deckyscaler.infrastructure.patch_index import PatchIndex
 
 _ADD_FROM_A_PROCESS = """
@@ -53,6 +54,37 @@ def test_a_directory_whose_marker_went_another_way_is_not_counted(plugin, plugin
     (game / "DECKYSCALER_PATCH").unlink()  # e.g. the user deleted the game's files
 
     assert using(plugin, STABLE) == []
+
+
+def test_a_game_on_a_card_taken_out_stays_indexed_and_keeps_its_version(plugin, plugin_home, tmp_path, monkeypatch):
+    media = tmp_path / "run" / "media"
+    card = media / "deck" / "SD"
+    mounted = {card.resolve()}
+    monkeypatch.setattr(drives, "REMOVABLE_MEDIA", (media,))
+    monkeypatch.setattr(drives, "ismount", lambda path: Path(path) in mounted)
+    game = make_game_dir(card / "Games" / "Card Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    indexed = lambda: json.loads((plugin_home / "patched.json").read_text())  # noqa: E731
+
+    drawer = tmp_path / "drawer"
+    card.rename(drawer)
+    mounted.clear()  # the card is out
+
+    assert using(plugin, STABLE) == []  # its patch can't be read
+    assert str(game) in indexed()
+    refused = run(plugin.library_remove(STABLE))
+    assert refused == {
+        "status": "error",
+        "message": f"{game} is on a drive that isn't mounted and may be patched with {STABLE}. Put the drive back in first.",
+    }
+
+    drawer.rename(card)
+    mounted.add(card.resolve())  # back in
+    assert using(plugin, STABLE) == [str(game)]
+
+    shutil.rmtree(game)  # deleted from the card while it is in
+    assert using(plugin, STABLE) == []
+    assert str(game) not in indexed()
 
 
 def test_an_interrupted_patch_still_counts_as_using_its_version(plugin, plugin_home, tmp_path, monkeypatch):
