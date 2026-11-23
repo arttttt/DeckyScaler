@@ -67,6 +67,7 @@ def record(
     carried_over: frozenset[str] = frozenset(),
     rewritten: frozenset[str] = frozenset(),
     owned_dirs: tuple[str, ...] = (),
+    links: frozenset[str] = frozenset(),
 ) -> PatchRecord:
     """The record of a patch plan, made before it runs.
 
@@ -75,7 +76,9 @@ def record(
     plan copies to its sha256. `carried_over` names files a
     previous patch placed that this one keeps as they are (the user's OptiScaler.ini settings).
     `rewritten` names placed files a program rewrites besides OptiScaler.ini, and `owned_dirs` directories
-    whose every file is the patch's: only those the patch creates are recorded as its own.
+    whose every file is the patch's: only those the patch creates are recorded as its own. `links` names the links
+    among `entries`: what is behind one (a folder shared with other games) isn't listed, so nothing at or below one
+    is the patch's.
     """
     placed: dict[str, Placed] = {path: Placed(path, None) for path in sorted(carried_over)}
     backups: list[Backup] = []
@@ -92,7 +95,12 @@ def record(
         Backup(path, f"{path}{BACKUP_SUFFIX}") for path in placed if path not in entries and f"{path}{BACKUP_SUFFIX}" in entries
     ]
     created = sorted(
-        {str(parent) for item in placed for parent in PurePosixPath(item).parents if str(parent) not in (".", *entries)},
+        {
+            str(parent)
+            for item in placed
+            for parent in PurePosixPath(item).parents
+            if str(parent) != "." and str(parent) not in entries and not any(parent.is_relative_to(link) for link in links)
+        },
         key=lambda path: (-path.count("/"), path),
     )
     owned = tuple(directory for directory in owned_dirs if directory in created)

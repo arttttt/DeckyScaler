@@ -186,7 +186,11 @@ class Patcher:
                 game_directory.execute(left, directory, source)
             # What is in the game where a patch places files, at any depth: a file there that isn't ours (OptiScaler
             # unpacked by hand, the user's own provider files) is set aside as a backup, never linked or copied over.
-            entries = game_directory.listing(directory)[0] | frozenset(game_directory.contents(directory, looked_into))
+            there = game_directory.contents(directory, looked_into)
+            entries = game_directory.listing(directory)[0] | frozenset(there)
+            driver = version_placement.driver_path(family)
+            if os.path.lexists(directory / driver):
+                entries |= {driver}  # behind a linked folder too, where nothing is listed
             placement = self.placement(to_place, family)
             request = version_placement.Request(
                 dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies
@@ -200,6 +204,7 @@ class Patcher:
                 carried_over & entries,
                 placement.settings_files,
                 placement.owned_dirs,
+                frozenset(path for path, target in there.items() if target is not None),
             )
             details = marker.build(
                 dll_name=dll_name,

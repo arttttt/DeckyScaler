@@ -149,6 +149,12 @@ def test_a_folder_the_patch_makes_inside_one_the_game_had_is_the_patchs():
     assert recorded.created_dirs == ("OptiScaler/custom/ANR", "OptiScaler/D3D12")  # OptiScaler/ and custom/ were there
     assert recorded.owned_dirs == ("OptiScaler/custom/ANR",)
 
+    behind_a_link = patch_record.record(
+        operations, frozenset({"Game.exe", "OptiScaler"}), {"/lib/anr/a.dll": "1" * 64, "OptiScaler/x.dll": "link:x"},
+        owned_dirs=("OptiScaler/custom/ANR",), links=frozenset({"OptiScaler"}),
+    )
+    assert behind_a_link.created_dirs == () and behind_a_link.owned_dirs == ()  # nothing behind it is listed
+
 
 # ── unit: undoing a record ───────────────────────────────────────────────────
 
