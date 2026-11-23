@@ -44,6 +44,9 @@ BUNDLE_IS_NOT_A_GAME = "The target directory is in DeckyScaler's own folder (~/d
 PATCHED_BY_DECKY_FRAMEGEN = (
     "This game was patched by Decky Framegen. Unpatch it first: the plugin shows what that removes."
 )
+DAMAGED_RECORD = (
+    "DeckyScaler's record of this patch is damaged, so it can't be undone by it. Patch the game again to repair it."
+)
 LAUNCH_OPTIONS_UNKNOWN = (
     "Steam didn't say what this game's launch options are, so Unpatch couldn't put them back. "
     "Nothing was changed; try patching again."
@@ -52,6 +55,8 @@ RECORD = "record"
 """How a directory is unpatched: by its patch record, exactly as the patch recorded it."""
 RESET = "reset"
 """How a directory Decky Framegen patched is unpatched: by what it placed, after the user confirms."""
+REPAIR = "repair"
+"""A directory whose record is damaged isn't unpatched: patching it again repairs the record first."""
 
 
 def _patched_by_upstream(directory: Path) -> bool:
@@ -140,14 +145,14 @@ class Patcher:
             return {"status": "success", "message": f"OptiScaler {entry.version} is in {directory}.", "optiscaler_version": entry.id}
 
         carried_over: frozenset[str] = frozenset()
-        if marker_path.exists():
+        previous = patch_record.parse(previous_details)
+        if previous is not None:
             # A repatch first undoes the previous patch, exactly as its marker records it, keeping
             # the OptiScaler.ini it placed (the user's settings) unless asked to reset it or the
-            # new version is of another family, whose ini keys differ.
-            previous_marker = files.read_json(marker_path)
-            previous = patch_record.parse(previous_marker)
-            same_family = previous_marker.get("family") == entry.family
-            if previous is not None and same_family and not reset_ini and plan.INI_FILENAME in {p.path for p in previous.placed}:
+            # new version is of another family, whose ini keys differ. A damaged record undoes nothing: what its
+            # patch left is cleared below, and the new record replaces it.
+            same_family = previous_details.get("family") == entry.family
+            if same_family and not reset_ini and plan.INI_FILENAME in {p.path for p in previous.placed}:
                 carried_over = frozenset({plan.INI_FILENAME})
             undone = self.unpatch_directory(directory, keep=carried_over)
             if undone["status"] != "success":
@@ -292,7 +297,7 @@ class Patcher:
             return {"status": "success", "message": f"No DeckyScaler patch found in {directory}"}
         recorded = patch_record.parse(files.read_json(marker_path))
         if recorded is None:
-            return _error(PATCHED_BY_DECKY_FRAMEGEN)
+            return _error(DAMAGED_RECORD)
         try:
             operations = patch_record.plan_unpatch(recorded, game_directory.current_state(directory, recorded), keep)
             game_directory.execute(operations, directory, self.plugin_home)
@@ -445,8 +450,11 @@ class Patcher:
     def preview_unpatch_directory(self, directory: str) -> dict:
         try:
             target = self.resolve_directory(directory)
-            if self._unpatch_mode(target / bundle.MARKER_FILENAME) == RECORD:
+            mode = self._unpatch_mode(target / bundle.MARKER_FILENAME)
+            if mode == RECORD:
                 return {"status": "success", "mode": RECORD, "target_dir": str(target)}
+            if mode == REPAIR:
+                return _error(DAMAGED_RECORD)
             preview, _ = self._reset_plan(target, None, None)
             return {**preview, "mode": RESET} if preview["status"] == "success" else preview
         except Exception as exc:
@@ -455,11 +463,13 @@ class Patcher:
 
     @staticmethod
     def _unpatch_mode(marker_path: Path | None) -> str:
-        """RECORD when the marker holds a patch record; RESET for anything else (Decky Framegen's
-        marker, or no marker — then only the reset's own evidence rules decide whether anything is ours)."""
-        if marker_path is not None and marker_path.is_file() and patch_record.parse(files.read_json(marker_path)):
-            return RECORD
-        return RESET
+        """RECORD when the marker holds a patch record; REPAIR when it is the plugin's and its record is damaged;
+        RESET for anything else (Decky Framegen's marker, or no marker — then only the reset's own evidence rules
+        decide whether anything is ours)."""
+        if marker_path is None or not marker_path.is_file():
+            return RESET
+        state = patch_record.state_of(marker_path.name, files.read_json(marker_path))
+        return {patch_record.UPSTREAM: RESET, patch_record.DAMAGED: REPAIR}.get(state, RECORD)
 
     def path_defaults(self) -> dict:
         """Starting points for the pickers: home; the games of the first Steam library found (native or Flatpak),
@@ -560,6 +570,7 @@ class Patcher:
             "lacks_version_files": False,
             "version_incomplete": False,
             "fsr4": None,
+            "record": None,
         }
         if game is None:
             return {**unpatched, "install_found": False, "message": "Game not found in Steam library."}
@@ -572,10 +583,12 @@ class Patcher:
             return {**unpatched, "name": game.name, "install_found": True, "message": "Not patched."}
 
         metadata = files.read_json(marker_path)
-        if patch_record.parse(metadata) is None:
+        record = patch_record.state_of(marker_path.name, metadata)
+        if record in (patch_record.UPSTREAM, patch_record.DAMAGED):
             return {
-                **unpatched, "name": game.name, "install_found": True, "patched": True,
-                "target_dir": str(marker_path.parent), "message": PATCHED_BY_DECKY_FRAMEGEN,
+                **unpatched, "name": game.name, "install_found": True, "patched": True, "record": record,
+                "target_dir": str(marker_path.parent),
+                "message": PATCHED_BY_DECKY_FRAMEGEN if record == patch_record.UPSTREAM else DAMAGED_RECORD,
             }
         dll_name = metadata.get("dll_name", bundle.DEFAULT_PROXY_DLL)
         # The marker sits in the directory it patched; the path written into it can go stale.
@@ -601,6 +614,7 @@ class Patcher:
             **self._against_version(metadata, installed, {}),
             "fsr4": unpatched["fsr4"],
             "libraries": metadata.get("libraries") or [],
+            "record": record,
             "message": message,
         }
 
@@ -753,8 +767,11 @@ class Patcher:
         the user confirms first."""
         try:
             game, target, marker_path = self._reset_target(appid)
-            if self._unpatch_mode(marker_path) == RECORD:
+            mode = self._unpatch_mode(marker_path)
+            if mode == RECORD:
                 return {"status": "success", "mode": RECORD, "name": game.name, "target_dir": str(target)}
+            if mode == REPAIR:
+                return _error(DAMAGED_RECORD)
             preview, _ = self._reset_plan(target, marker_path, current_launch_options)
             return {**preview, "mode": RESET, "name": game.name} if preview["status"] == "success" else preview
         except Exception as exc:

@@ -98,6 +98,8 @@ export type GameStatus = {
   install_found?: boolean;
   patched?: boolean;
   dll_name?: string | null;
+  /** What its marker is: DeckyScaler's record (whole, unfinished, or damaged), or the original Decky Framegen's. */
+  record?: "ok" | "incomplete" | "damaged" | "upstream" | null;
   optiscaler_version?: string | null;
   newer_version?: string | null;
   /** Its version holds files its patch didn't place: patching again adds them. */
@@ -145,6 +147,8 @@ export const steamGameView = (s: {
     if (!status || status.status === "error") return { text: status?.message || "—", tone: "neutral" };
     if (!status.install_found) return { text: "Install not found", tone: "warning" };
     if (!status.patched) return { text: "Not patched", tone: "neutral" };
+    if (status.record === "damaged") return { text: "Patched, but its record is damaged: repair it", tone: "warning" };
+    if (status.record === "upstream") return { text: "Patched by Decky Framegen", tone: "warning" };
     if (otherDll) return { text: `Patched (${dllLabel}) — switch available`, tone: "warning" };
     return { text: `Patched (${dllLabel})`, tone: "good" };
   })();
@@ -153,6 +157,7 @@ export const steamGameView = (s: {
     if (busy === "patch") return "Patching...";
     if (!s.gameSelected) return "Patch this game";
     if (!status?.install_found) return "Install not found";
+    if (status?.record === "damaged") return `Repair (${dllName})`;
     if (otherDll) return `Switch to ${dllName}`;
     if (status?.patched) return `Reinstall (${dllName})`;
     return `Patch with ${dllName}`;
@@ -166,7 +171,8 @@ export const steamGameView = (s: {
     fsr4Line: s.statusLoading ? null : fsr4Line(status?.fsr4),
     librariesLine: s.statusLoading || !status?.patched ? null : librariesLine(status.libraries),
     patch: { label: patch.label, enabled: patch.enabled && canPatch },
-    unpatchVisible: Boolean(status?.patched),
+    // A damaged record undoes nothing: it is repaired first.
+    unpatchVisible: Boolean(status?.patched) && status?.record !== "damaged",
     unpatch: { label: busy === "unpatch" ? "Unpatching..." : "Unpatch this game", enabled: busy === null },
   };
 };

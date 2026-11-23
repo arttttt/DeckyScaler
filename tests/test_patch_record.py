@@ -293,6 +293,41 @@ def test_a_lost_patchs_proxy_once_set_aside_as_the_games_own_is_cleared(plugin, 
     assert as_before_but_the_ini(snapshot(game), before)
 
 
+DAMAGED = "DeckyScaler's record of this patch is damaged, so it can't be undone by it. Patch the game again to repair it."
+
+
+def test_a_damaged_record_is_said_unpatching_is_refused_and_patching_again_repairs_it(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("900", "Damaged Game")
+    before = snapshot(root)
+    run(plugin.patch_game("900", "dxgi.dll", "", NIGHTLY))
+    (root / "DECKYSCALER_PATCH").write_text('{"appid": "900", "dll_na')  # a write cut short by an older build
+
+    status = run(plugin.get_game_status("900"))
+    assert (status["patched"], status["record"], status["message"]) == (True, "damaged", DAMAGED)
+    assert [game["record"] for game in run(plugin.patched_games())["games"]] == ["damaged"]
+    assert run(plugin.preview_unpatch_game("900", "")) == {"status": "error", "message": DAMAGED}
+    assert run(plugin.unpatch_game("900")) == {"status": "error", "message": DAMAGED}
+    assert run(plugin.preview_unpatch_directory(str(root))) == {"status": "error", "message": DAMAGED}
+    assert run(plugin.manual_unpatch_directory(str(root))) == {"status": "error", "message": DAMAGED}
+
+    assert run(plugin.patch_game("900", "dxgi.dll", "", NIGHTLY))["status"] == "success"
+    assert run(plugin.get_game_status("900"))["record"] == "ok"
+    assert run(plugin.unpatch_game("900"))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(root), before)
+
+
+def test_the_launch_wrapper_repairs_a_damaged_record_as_the_game_starts(plugin, plugin_home, home, tmp_path):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    game = make_game_dir(tmp_path / "games" / "Game")
+    LaunchWrapper(home, {}).patch([str(game / "Game.exe")], "dxgi.dll")
+    (game / "DECKYSCALER_PATCH").write_text("")
+
+    LaunchWrapper(home, {}).patch([str(game / "Game.exe")], "dxgi.dll")
+
+    assert patch_record.state(json.loads((game / "DECKYSCALER_PATCH").read_text())) == patch_record.OK
+
+
 def test_links_are_looked_for_only_where_a_version_links_and_never_through_a_link(tmp_path):
     game = tmp_path / "Game"
     write(game / "OptiScaler" / "keep.txt", b"game")

@@ -88,9 +88,7 @@ describe("the Games page", () => {
   it("says what is wrong with a patch and what to do", () => {
     expect(rowOf(game({ dll_present: false })).lines[1]).toBe("dxgi.dll is missing: patch it again.");
     expect(rowOf(game({ record: "incomplete", dll_present: false })).lines[1]).toBe("The patch didn't finish: unpatch it, then patch again.");
-    expect(rowOf(game({ record: "upstream" })).lines[1]).toBe(
-      "Patched by Decky Framegen: Unpatch resets it to the game's own files.",
-    );
+    expect(rowOf(game({ record: "damaged", dll_present: false })).lines[1]).toBe("Its patch record is damaged: patch it again to repair it.");
     expect(rowOf(game({ lacks_version_files: true })).lines[1]).toBe("Its OptiScaler version has files this patch lacks: patch it again.");
     expect(rowOf(game({ lacks_version_files: true, dll_present: false })).lines[1]).toBe("dxgi.dll is missing: patch it again.");
     expect(rowOf(game({ version_incomplete: true, lacks_version_files: true })).lines[1]).toBe(

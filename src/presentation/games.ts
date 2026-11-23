@@ -25,7 +25,7 @@ const versionName = (library: InstalledLibrary | null, id: string | null): strin
 
 /** What is wrong with a patch, if anything, and what to do about it. */
 const problem = (game: PatchedGame): string | null => {
-  if (game.record === "upstream") return "Patched by Decky Framegen: Unpatch resets it to the game's own files.";
+  if (game.record === "damaged") return "Its patch record is damaged: patch it again to repair it.";
   if (game.record === "incomplete") return "The patch didn't finish: unpatch it, then patch again.";
   if (!game.dll_present) return `${game.dll_name} is missing: patch it again.`;
   if (game.version_incomplete) return "Its OptiScaler version is missing files: download it again from the OptiScaler page.";

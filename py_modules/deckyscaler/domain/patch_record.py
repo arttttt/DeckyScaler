@@ -127,7 +127,7 @@ def to_json(patch: PatchRecord, complete: bool) -> dict:
 
 
 def parse(marker: dict) -> PatchRecord | None:
-    """The record in a marker; None for a marker the original Decky Framegen wrote."""
+    """The record in a marker; None for one with no record that reads: the original Decky Framegen's, or damaged."""
     if marker.get("format") != FORMAT:
         return None
     try:
@@ -145,15 +145,22 @@ def parse(marker: dict) -> PatchRecord | None:
 OK = "ok"
 INCOMPLETE = "incomplete"
 UPSTREAM = "upstream"
+DAMAGED = "damaged"
 
 
 def state(marker: dict) -> str:
-    """What a marker says of its patch: OK; INCOMPLETE when the patch stopped before its last file (its
-    record still undoes what landed); UPSTREAM when the original Decky Framegen wrote it (undone by a
-    reset)."""
+    """What the plugin's marker says of its patch: OK; INCOMPLETE when the patch stopped before its last file (its
+    record still undoes what landed); DAMAGED when it holds no record that reads (a write cut short, an edit by
+    hand): the patch is the plugin's, but how to undo it is lost, and patching again makes a new one."""
     if parse(marker) is None:
-        return UPSTREAM
+        return DAMAGED
     return OK if marker.get("complete", True) else INCOMPLETE
+
+
+def state_of(name: str, marker: dict) -> str:
+    """What a game's marker says, by the file it is: the original Decky Framegen's (FRAMEGEN_PATCH) is UPSTREAM,
+    undone by a reset; the plugin's goes by its record."""
+    return UPSTREAM if name == bundle.UPSTREAM_MARKER_FILENAME else state(marker)
 
 
 def placed_by(patch: PatchRecord | None, path: str) -> bool:

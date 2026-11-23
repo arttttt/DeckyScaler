@@ -488,7 +488,8 @@ export type PatchedGame = {
   /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
   version_incomplete: boolean;
   patched_at: string | null;
-  record: "ok" | "incomplete" | "upstream";
+  /** Its marker's record: whole, stopped before the last file, or damaged (patching again repairs it). */
+  record: "ok" | "incomplete" | "damaged";
   own_settings: boolean;
 };
 
