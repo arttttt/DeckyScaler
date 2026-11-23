@@ -9,18 +9,12 @@ from deckyscaler.domain import library
 from deckyscaler.infrastructure.entry_store import EntryStore
 
 
-class LibraryStore(EntryStore):
+class LibraryStore(EntryStore[library.Installed]):
     def __init__(self, root: Path):
         super().__init__(root, "versions", library.ENTRY_FILENAME)
 
-    def installed(self) -> list[library.Installed]:
-        """Every version on disk with a readable entry.json; nothing else counts as installed."""
-        found = []
-        for name, data in self.entries():
-            parsed = library.parse_entry(data)
-            if parsed is not None and parsed.id == name:
-                found.append(parsed)
-        return found
+    def parse(self, data: object) -> library.Installed | None:
+        return library.parse_entry(data)
 
     def version_dir(self, version_id: str) -> Path:
         return self.item_dir(version_id)

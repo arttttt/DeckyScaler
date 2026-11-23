@@ -3,6 +3,7 @@ import type { InstalledLibrary } from "../api";
 import { GameStatus, fsr4Line, gameToShow, toneColor, gamePageTitle, gamePickerView, gameVersionLine, quickPatchWith, libraryReady, patchButton, patchChoice, steamGameView } from "./patching";
 
 const LIBRARY: InstalledLibrary = {
+  damaged: [],
   installed_bytes: 500_000_000,
   versions: [
     {
@@ -37,7 +38,7 @@ describe("patch button", () => {
 describe("library readiness", () => {
   it("is unknown until the library answers, then whether any version is installed", () => {
     expect(libraryReady(null)).toBeNull();
-    expect(libraryReady({ versions: [], installed_bytes: 0 })).toBe(false);
+    expect(libraryReady({ versions: [], damaged: [], installed_bytes: 0 })).toBe(false);
     expect(libraryReady(LIBRARY)).toBe(true);
   });
 });
@@ -71,7 +72,7 @@ describe("patch choice", () => {
   });
 
   it("offers nothing and says where to get a version when the library is empty", () => {
-    for (const library of [null, { versions: [], installed_bytes: 0 }]) {
+    for (const library of [null, { versions: [], damaged: [], installed_bytes: 0 }]) {
       const view = patchChoice(library, "stable-0.9.4");
       expect(view).toMatchObject({ versionId: null, ready: false, versionOptions: [], patchWith: "" });
       expect(view.versionHint).toMatch(/Open DeckyScaler → OptiScaler/);

@@ -11,6 +11,7 @@ import {
   ManageState,
   RemoveConfirmation,
   manageDone,
+  manageMenu,
   manageView,
   removeConfirmation,
 } from "../presentation/library";
@@ -48,21 +49,11 @@ export const useManageVersions = (onChanged: () => void) => {
     load();
   };
 
-  const versionOf = (id: string) => state.library?.versions.find((v) => v.id === id);
-
-  /** What to show before removing: the games patched with the version, or why it can't be removed. */
-  const removalOf = async (id: string) => {
-    const version = versionOf(id);
-    if (!version) return null;
-    const removal = await safeAsyncOperation(() => libraryRemoval(id), "ManageVersions -> libraryRemoval");
-    return removeConfirmation(version, removal ?? null);
-  };
-
-  /** A menu item picked for a version: runs, or first asks what the view model says to ask. */
-  const onSelect = async (id: string, item: ManageMenuItem) => {
+  /** A menu item picked for a row (`label` the row's): runs, or first asks what the view model says to ask. */
+  const onSelect = async (id: string, label: string, item: ManageMenuItem) => {
     if (!item.confirms) return void run(id, item.action);
-    const confirmation = await removalOf(id);
-    if (confirmation) setPending({ id, confirmation });
+    const removal = await safeAsyncOperation(() => libraryRemoval(id), "ManageVersions -> libraryRemoval");
+    setPending({ id, confirmation: removeConfirmation(label, removal ?? null) });
   };
 
   const onConfirm = () => {
@@ -72,7 +63,8 @@ export const useManageVersions = (onChanged: () => void) => {
 
   return {
     view: manageView(state),
-    onSelect: (id: string, item: ManageMenuItem) => void onSelect(id, item),
+    menuOf: (id: string) => manageMenu(state.library, id),
+    onSelect: (id: string, label: string, item: ManageMenuItem) => void onSelect(id, label, item),
     confirmation: pending?.confirmation ?? null,
     onConfirm,
     onCancel: () => setPending(null),

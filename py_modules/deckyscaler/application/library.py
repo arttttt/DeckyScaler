@@ -46,12 +46,15 @@ class Library:
         return library.available(channel, self.list_releases(library.CHANNELS[channel].repository))
 
     def installed(self) -> dict:
-        """The versions games can be patched with, newest first, and what they take on disk."""
+        """The versions games can be patched with, newest first; what is left of the damaged ones, to remove; and
+        what all of it takes on disk."""
         entries = library.newest_first(self.store.installed())
         sizes = {entry.id: self.store.size(entry.id) for entry in entries}
+        damaged = [library.damaged_json(name, self.store.size(name)) for name, _ in self.store.damaged()]
         return {
             "versions": [library.choice_json(entry, sizes[entry.id]) for entry in entries],
-            "installed_bytes": sum(sizes.values()),
+            "damaged": damaged,
+            "installed_bytes": sum(sizes.values()) + sum(item["size"] for item in damaged),
         }
 
     def versions(self, channel: str) -> dict:
@@ -71,7 +74,6 @@ class Library:
             "status": "success",
             "versions": [row.__dict__ for row in rows],
             "listing_error": listing_error,
-            "installed_bytes": sum(sizes.values()),
         }
 
     def install(self, channel: str, version_id: str) -> dict:
@@ -139,11 +141,11 @@ class Library:
         return {"status": "success", "id": version_id, "message": message}
 
     def _removal_refused(self, version_id: str) -> str | None:
-        installed = {entry.id for entry in self.store.installed()}
-        return library.removal_refused(version_id, installed, self.games_using(version_id))
+        return library.removal_refused(version_id, self.store.listed(), self.games_using(version_id))
 
     def removal(self, version_id: str) -> dict:
-        """Why a version can't be removed (None when it can), asked before the user confirms removing it."""
+        """Why a version, or what is left of a damaged one, can't be removed (None when it can), asked before the
+        user confirms removing it."""
         return {"status": "success", "refused": self._removal_refused(version_id)}
 
     def remove(self, version_id: str) -> dict:
