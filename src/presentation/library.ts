@@ -1,4 +1,5 @@
 import type {
+  DamagedVersion,
   InstalledLibrary,
   InstalledVersion,
   LibraryChannel,
@@ -102,21 +103,24 @@ const describeInstalled = (version: InstalledVersion): string =>
 const busyDescription = (action: ManageAction, download: ReleaseDownload | null): string =>
   action === "reinstall" ? downloadProgress(download) : "Removing…";
 
+const describeDamaged = (damaged: DamagedVersion): string => `Damaged: no game can be patched with it · ${byteSize(damaged.size)}`;
+
 export const manageView = (state: ManageState): ManageView => {
   const { library, busy } = state;
-  const versions = library?.versions ?? [];
+  const row = (id: string, label: string, description: string): ReleaseRowView => ({
+    id,
+    label,
+    description: busy?.id === id ? busyDescription(busy.action, state.download) : description,
+    action: { label: "Manage", enabled: busy === null },
+  });
+  const rows = [
+    ...(library?.versions ?? []).map((version) => row(version.id, versionLabel(version), describeInstalled(version))),
+    ...(library?.damaged ?? []).map((damaged) => row(damaged.id, damaged.id, describeDamaged(damaged))),
+  ];
   return {
-    rows: versions.map((version) => ({
-      id: version.id,
-      label: versionLabel(version),
-      description:
-        busy?.id === version.id
-          ? busyDescription(busy.action, state.download)
-          : describeInstalled(version),
-      action: { label: "Manage", enabled: busy === null },
-    })),
+    rows,
     usage: library && library.installed_bytes > 0 ? `Downloaded versions take ${byteSize(library.installed_bytes)}.` : null,
-    message: state.message ?? (library && versions.length === 0 ? "No version is downloaded yet." : null),
+    message: state.message ?? (library && rows.length === 0 ? "No version is downloaded yet." : null),
   };
 };
 
@@ -130,23 +134,28 @@ export const MANAGE_MENU: ManageMenuItem[] = [
   { action: "remove", label: "Remove", destructive: true, confirms: true },
 ];
 
+/** What a row's menu offers: a downloaded version everything; what is left of a damaged one only removing, as its
+ *  entry no longer says where to download it from (Download versions brings it back). */
+export const manageMenu = (library: InstalledLibrary | null, id: string): ManageMenuItem[] =>
+  library?.damaged.some((damaged) => damaged.id === id) ? MANAGE_MENU.filter((item) => item.action === "remove") : MANAGE_MENU;
+
 /** What the dialog shows when Remove is picked: the question, or — told before asking — why it can't be removed. */
 export type RemoveConfirmation = { title: string; lines: string[]; okLabel: string; removes: boolean; alert: boolean };
 
-const cantRemove = (version: InstalledVersion, reason: string): RemoveConfirmation => ({
-  title: `Can't remove OptiScaler ${versionLabel(version)}`,
+const cantRemove = (label: string, reason: string): RemoveConfirmation => ({
+  title: `Can't remove OptiScaler ${label}`,
   lines: [reason],
   okLabel: "OK",
   removes: false,
   alert: true,
 });
 
-/** Removing a version asks first, or says why it can't: games are patched with it. */
-export const removeConfirmation = (version: InstalledVersion, removal: LibraryRemoval | null): RemoveConfirmation => {
-  if (removal === null) return cantRemove(version, "The plugin backend did not answer.");
-  if (removal.refused !== null) return cantRemove(version, removal.refused);
+/** Removing a version (by its row's label) asks first, or says why it can't: games are patched with it. */
+export const removeConfirmation = (label: string, removal: LibraryRemoval | null): RemoveConfirmation => {
+  if (removal === null) return cantRemove(label, "The plugin backend did not answer.");
+  if (removal.refused !== null) return cantRemove(label, removal.refused);
   return {
-    title: `Remove OptiScaler ${versionLabel(version)}?`,
+    title: `Remove OptiScaler ${label}?`,
     lines: ["No game is patched with it."],
     okLabel: "Remove",
     removes: true,

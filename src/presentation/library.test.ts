@@ -7,6 +7,7 @@ import {
   librarySummary,
   manageDone,
   MANAGE_MENU,
+  manageMenu,
   manageView,
   removeConfirmation,
 } from "./library";
@@ -28,6 +29,7 @@ const unsupported: LibraryVersion = {
 const removal = (refused: string | null): LibraryRemoval => ({ status: "success", refused });
 
 const LIBRARY: InstalledLibrary = {
+  damaged: [],
   installed_bytes: 512_000_000,
   versions: [
     { id: "nightly-20261023", version: "10.0.0-pre1", channel: "nightly", date: "20261023", size: 312_000_000, libraries: true },
@@ -41,7 +43,7 @@ describe("panel summary", () => {
     expect(librarySummary({ ...LIBRARY, versions: LIBRARY.versions.slice(1) })).toBe(
       "1 version downloaded. Newest: 0.9.4 · 2026-07-18.",
     );
-    expect(librarySummary({ versions: [], installed_bytes: 0 })).toBe("No version is downloaded yet.");
+    expect(librarySummary({ versions: [], damaged: [], installed_bytes: 0 })).toBe("No version is downloaded yet.");
     expect(librarySummary(null)).toBe("Loading…");
   });
 });
@@ -138,7 +140,7 @@ describe("manage dialog", () => {
   });
 
   it("says when nothing is downloaded, and how the last action went", () => {
-    const empty = manageView(manageState({ library: { versions: [], installed_bytes: 0 } }));
+    const empty = manageView(manageState({ library: { versions: [], damaged: [], installed_bytes: 0 } }));
     expect(empty).toEqual({ rows: [], usage: null, message: "No version is downloaded yet." });
     expect(manageView(manageState({ library: null }))).toEqual({ rows: [], usage: null, message: null });
     expect(manageView(manageState({ message: "Removing failed: busy" })).message).toBe("Removing failed: busy");
@@ -151,8 +153,37 @@ describe("manage dialog", () => {
     ]);
   });
 
+  it("lists what is left of a damaged version after the others, by its directory, to remove", () => {
+    const damaged = { ...LIBRARY, damaged: [{ id: "stable-0.9.1", size: 250_000_000 }], installed_bytes: 762_000_000 };
+    const view = manageView(manageState({ library: damaged }));
+
+    expect(view.rows[2]).toEqual({
+      id: "stable-0.9.1", label: "stable-0.9.1", description: "Damaged: no game can be patched with it · 250 MB",
+      action: { label: "Manage", enabled: true },
+    });
+    expect(view.usage).toBe("Downloaded versions take 762 MB.");
+    expect(manageView(manageState({ library: damaged, busy: { id: "stable-0.9.1", action: "remove" } })).rows[2].description).toBe(
+      "Removing…",
+    );
+    expect(librarySummary(damaged)).toBe("2 versions downloaded. Newest: 10.0.0-pre1 · 2026-10-23.");
+  });
+
+  it("doesn't call the dialog empty while a damaged version is listed", () => {
+    const onlyDamaged = { versions: [], damaged: [{ id: "stable-0.9.1", size: 250_000_000 }], installed_bytes: 250_000_000 };
+
+    expect(manageView(manageState({ library: onlyDamaged })).message).toBeNull();
+  });
+
+  it("offers only removing what is left of a damaged version, and everything for a downloaded one", () => {
+    const damaged = { ...LIBRARY, damaged: [{ id: "stable-0.9.1", size: 250_000_000 }] };
+
+    expect(manageMenu(damaged, "stable-0.9.1")).toEqual([{ action: "remove", label: "Remove", destructive: true, confirms: true }]);
+    expect(manageMenu(damaged, "stable-0.9.4")).toEqual(MANAGE_MENU);
+    expect(manageMenu(null, "stable-0.9.4")).toEqual(MANAGE_MENU);
+  });
+
   it("asks before removing a version no game is patched with", () => {
-    expect(removeConfirmation(LIBRARY.versions[0], removal(null))).toEqual({
+    expect(removeConfirmation("10.0.0-pre1 · 2026-10-23", removal(null))).toEqual({
       title: "Remove OptiScaler 10.0.0-pre1 · 2026-10-23?",
       lines: ["No game is patched with it."],
       okLabel: "Remove",
@@ -162,14 +193,14 @@ describe("manage dialog", () => {
   });
 
   it("says why a version can't be removed before asking, instead of the question", () => {
-    expect(removeConfirmation(LIBRARY.versions[0], removal("Game is patched with it. Unpatch them first."))).toEqual({
+    expect(removeConfirmation("10.0.0-pre1 · 2026-10-23", removal("Game is patched with it. Unpatch them first."))).toEqual({
       title: "Can't remove OptiScaler 10.0.0-pre1 · 2026-10-23",
       lines: ["Game is patched with it. Unpatch them first."],
       okLabel: "OK",
       removes: false,
       alert: true,
     });
-    expect(removeConfirmation(LIBRARY.versions[0], null)).toMatchObject({
+    expect(removeConfirmation("10.0.0-pre1 · 2026-10-23", null)).toMatchObject({
       lines: ["The plugin backend did not answer."],
       removes: false,
       alert: true,

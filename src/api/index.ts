@@ -90,8 +90,12 @@ export type InstalledVersion = {
   libraries: boolean;
 };
 
-/** The downloaded versions, newest first, and what they take on disk. */
-export type InstalledLibrary = { versions: InstalledVersion[]; installed_bytes: number };
+/** What is left of a version that isn't whole, by its directory's name: no game can be patched with it, and it can
+ *  only be removed (Download versions brings it back). */
+export type DamagedVersion = { id: string; size: number };
+
+/** The downloaded versions, newest first, what is left of damaged ones, and what all of it takes on disk. */
+export type InstalledLibrary = { versions: InstalledVersion[]; damaged: DamagedVersion[]; installed_bytes: number };
 
 /** Why a release can't be downloaded (the backend's kinds; presentation/releases.ts words them). */
 export type ReleaseReason =
@@ -129,7 +133,7 @@ export const libraryVersions = callable<[channel: LibraryChannel], LibraryListin
 export const libraryInstall = callable<[channel: LibraryChannel, version_id: string], LibraryResult>("library_install");
 export const libraryReinstall = callable<[version_id: string], LibraryResult>("library_reinstall");
 export const libraryRemove = callable<[version_id: string], LibraryResult>("library_remove");
-/** What removing a version would come to: why it can't be removed (or null) and the games patched with it. */
+/** What removing a version would come to: why it can't be removed, or null when it can. */
 export type LibraryRemoval = { status: "success"; refused: string | null };
 export const libraryRemoval = callable<[version_id: string], LibraryRemoval>("library_removal");
 

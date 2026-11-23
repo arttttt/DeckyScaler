@@ -3,6 +3,7 @@ import type { InstalledLibrary, PatchedGame } from "../api";
 import { gamesPageView } from "./games";
 
 const LIBRARY: InstalledLibrary = {
+  damaged: [],
   installed_bytes: 0,
   versions: [
     { id: "nightly-20261024", version: "10.0.0-pre1", channel: "nightly", date: "20261024", size: 1, libraries: true },
