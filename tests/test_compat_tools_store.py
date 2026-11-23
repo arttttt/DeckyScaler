@@ -176,6 +176,7 @@ def test_a_build_linked_in_from_elsewhere_is_a_tool_said_to_be_linked(tmp_path):
     assert found == {"GE-Proton9-1": True, TOOL: False}
 
 
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root reads a directory whatever its mode")
 def test_an_unreadable_compatibilitytools_d_lists_nothing(tmp_path):
     tools = tools_dir(tmp_path)
     build_tree(tools)
