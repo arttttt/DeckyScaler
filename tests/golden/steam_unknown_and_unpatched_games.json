@@ -17,7 +17,8 @@
     "newer_version": null,
     "patched": false,
     "status": "success",
-    "target_dir": null
+    "target_dir": null,
+    "version_incomplete": false
   },
   "unpatch never patched": {
     "appid": "400",

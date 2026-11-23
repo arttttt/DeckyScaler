@@ -11,7 +11,8 @@
       "newer_version": null,
       "patched": false,
       "status": "success",
-      "target_dir": null
+      "target_dir": null,
+      "version_incomplete": false
     },
     "step": "status unpatched",
     "tree": {
@@ -98,7 +99,8 @@
       "optiscaler_version": "nightly-20261023",
       "patched": true,
       "status": "success",
-      "target_dir": "<root>/home/.local/share/Steam/steamapps/common/VersionGame"
+      "target_dir": "<root>/home/.local/share/Steam/steamapps/common/VersionGame",
+      "version_incomplete": false
     },
     "step": "status nightly",
     "tree": {
@@ -257,7 +259,8 @@
       "optiscaler_version": "stable-0.9.4",
       "patched": true,
       "status": "success",
-      "target_dir": "<root>/home/.local/share/Steam/steamapps/common/VersionGame"
+      "target_dir": "<root>/home/.local/share/Steam/steamapps/common/VersionGame",
+      "version_incomplete": false
     },
     "step": "status stable",
     "tree": {

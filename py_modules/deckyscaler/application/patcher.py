@@ -333,20 +333,25 @@ class Patcher:
             (name, details) for _, name, details in self.patched_markers() if details.get("optiscaler_version") == version_id
         )
 
-    def _lacks_version_files(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> bool:
-        """Whether a game patched with a version still in the library lacks files the version holds now: one patched
-        while the version lacked them gets them only when patched again, which the launch wrapper does at launch.
-        `seen` keeps each version's files for the rest of one listing."""
-        recorded, version = patch_record.parse(details), str(details.get("optiscaler_version") or "")
-        if recorded is None or not any(entry.id == version for entry in installed):
-            return False
+    def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:
+        """What a patched game's version, while still in the library, says of the game: whether the game lacks files
+        the version holds now (patched while they were gone, it gets them only when patched again, which the launch
+        wrapper does at launch), and whether the version is incomplete (files a game gets are gone from it, so the
+        game's links to them lead nowhere). `seen` keeps each version's files for the rest of one listing."""
+        version = str(details.get("optiscaler_version") or "")
+        entry, recorded = next((e for e in installed if e.id == version), None), patch_record.parse(details)
+        if entry is None or recorded is None:
+            return {"lacks_version_files": False, "version_incomplete": False}
         if version not in seen:
             seen[version] = self.library.files_of(version)
-        return not version_placement.placed_every_file(recorded, seen[version])
+        return {
+            "lacks_version_files": not version_placement.placed_every_file(recorded, seen[version]),
+            "version_incomplete": bool(version_placement.lost_files(entry, seen[version])),
+        }
 
     def patched_games(self) -> dict:
-        """Every game and directory the plugin patched, by name: what it was patched with, whether it lacks files its
-        version holds now, and whether it has settings of its own. A Steam game has its appid; a directory patched
+        """Every game and directory the plugin patched, by name: what it was patched with, what its version says of it
+        (`_against_version`), and whether it has settings of its own. A Steam game has its appid; a directory patched
         by path has none."""
         installed = self.library.installed()
         seen: dict[str, frozenset[str]] = {}
@@ -363,7 +368,7 @@ class Patcher:
                 "dll_present": (directory / dll_name).exists(),
                 "version_id": version,
                 "newer_version": library.newer_in_channel(installed, version),
-                "lacks_version_files": self._lacks_version_files(details, installed, seen),
+                **self._against_version(details, installed, seen),
                 "patched_at": details.get("patched_at"),
                 "record": patch_record.state(details),
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
@@ -510,6 +515,7 @@ class Patcher:
             "target_dir": None,
             "newer_version": None,
             "lacks_version_files": False,
+            "version_incomplete": False,
             "fsr4": None,
         }
         if game is None:
@@ -549,7 +555,7 @@ class Patcher:
             "patched_at": metadata.get("patched_at"),
             "optiscaler_version": version,
             "newer_version": library.newer_in_channel(installed, version),
-            "lacks_version_files": self._lacks_version_files(metadata, installed, {}),
+            **self._against_version(metadata, installed, {}),
             "fsr4": unpatched["fsr4"],
             "libraries": metadata.get("libraries") or [],
             "message": message,
