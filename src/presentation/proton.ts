@@ -204,10 +204,16 @@ const usedBy = (tool: InstalledProtonTool): string => {
   return tool.global_default ? `${games} · the default for all games` : games;
 };
 
-const describeTool = (tool: InstalledProtonTool): string => {
+/** Why a tool's row has no Remove: one installed for every user, or a link to a build kept elsewhere. */
+const kept = (tool: InstalledProtonTool): string | null => {
   if (tool.system) return "Installed system-wide · can't be removed here";
+  if (tool.linked) return "Linked from another folder · can't be removed here";
+  return null;
+};
+
+const describeTool = (tool: InstalledProtonTool): string => {
   const size = tool.size === null ? [] : [byteSize(tool.size)];
-  return [tool.build_label ?? "Not installed by DeckyScaler", ...size, usedBy(tool)].join(" · ");
+  return kept(tool) ?? [tool.build_label ?? "Not installed by DeckyScaler", ...size, usedBy(tool)].join(" · ");
 };
 
 /** A folder that isn't a build: what it is, and what it takes when sized. */
@@ -225,7 +231,7 @@ export const protonManageView = (state: ProtonManageState): ProtonManageView => 
     action: removable ? { label: "Remove", enabled: idle } : null,
   });
   const rows = [
-    ...(installed?.tools ?? []).map((tool) => row(tool.id, describeTool(tool), !tool.system)),
+    ...(installed?.tools ?? []).map((tool) => row(tool.id, describeTool(tool), kept(tool) === null)),
     ...(installed?.others ?? []).map((other) => row(other.id, describeOther(other.size), true)),
   ];
   const nothing = installed?.problem ? problemText(installed.problem) : installed && rows.length === 0 ? "No Proton build is installed yet." : null;

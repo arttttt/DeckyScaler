@@ -20,7 +20,7 @@ import {
 } from "./proton";
 
 const GE: InstalledProtonTool = {
-  id: "GE-Proton11-12-x86_64", build: "ge-proton", build_label: "GE-Proton", system: false, size: 1_600_000_000,
+  id: "GE-Proton11-12-x86_64", build: "ge-proton", build_label: "GE-Proton", system: false, linked: false, size: 1_600_000_000,
   games: [
     { appid: "730", name: "Counter-Strike 2", kind: "steam" },
     { appid: "1245620", name: null, kind: "unknown" },
@@ -29,10 +29,10 @@ const GE: InstalledProtonTool = {
   global_default: false,
 };
 const OTHER: InstalledProtonTool = {
-  id: "Proton-EM-10.0-37", build: null, build_label: null, system: false, size: 1_400_000_000, games: [], global_default: false,
+  id: "Proton-EM-10.0-37", build: null, build_label: null, system: false, linked: false, size: 1_400_000_000, games: [], global_default: false,
 };
 const SYSTEM: InstalledProtonTool = {
-  id: "proton-cachyos", build: null, build_label: null, system: true, size: 1_700_000_000, games: [], global_default: true,
+  id: "proton-cachyos", build: null, build_label: null, system: true, linked: false, size: 1_700_000_000, games: [], global_default: true,
 };
 const installed = (overrides: Partial<InstalledProton> = {}): InstalledProton => ({
   status: "success", problem: null, tools: [GE, OTHER, SYSTEM], others: [], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
@@ -184,6 +184,14 @@ describe("the manage dialog", () => {
     expect(unsized.message).toBeNull(); // a folder to remove is something to show
     expect(protonManageView({ installed: installed({ tools: [], others: [leftover] }), busy: leftover.id, message: null }).rows[0]).toMatchObject({
       description: "Removing…", action: { enabled: false },
+    });
+  });
+
+  it("offers no Remove for a build linked in from elsewhere, and says why", () => {
+    const linked = { ...GE, linked: true };
+
+    expect(protonManageView({ installed: installed({ tools: [linked] }), busy: null, message: null }).rows[0]).toEqual({
+      id: GE.id, label: GE.id, description: "Linked from another folder · can't be removed here", action: null,
     });
   });
 
