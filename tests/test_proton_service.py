@@ -230,6 +230,17 @@ def test_a_folder_that_isnt_a_build_is_listed_apart_and_removed_like_one(world, 
     assert proton.remove("GE-Proton9-1") == {"status": "error", "message": "GE-Proton9-1 is not installed."}
 
 
+def test_a_build_whose_name_a_folder_that_isnt_one_holds_is_refused_before_downloading(world):
+    write(world.tools / NEWEST / "proton", b"#!/bin/sh")  # what a broken install of that very build left
+    download = FakeDownload(world.archive)
+
+    assert world.proton(download).install(pb.GE_PROTON, NEWEST) == {
+        "status": "error",
+        "message": f"{NEWEST} is already in compatibilitytools.d, but it isn't a build. Remove it under Manage installed… first.",
+    }
+    assert download.urls == [] and world.tree() == [NEWEST]
+
+
 def test_a_system_build_of_the_same_name_doesnt_hide_the_devices_own_folder(world, home):
     build_tree(home.parent / "system-compatibilitytools.d", "proton-cachyos")
     write(world.tools / "proton-cachyos" / "readme.txt", b"")  # the device's own, and no build

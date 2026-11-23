@@ -178,6 +178,9 @@ class ProtonBuilds:
         tools = store.installed()
         if any(tool.known_as(tool_name) for tool in tools):
             return _error(f"{tool_name} is already installed.")
+        if any(other.folder == tool_name for other in store.others()):
+            # The build would land on that folder: say so before downloading, and leave removing it to the user.
+            return _error(f"{tool_name} is already in compatibilitytools.d, but it isn't a build. Remove it under Manage installed… first.")
         if store.free_bytes() < proton_builds.space_needed(release.size):
             needed = proton_builds.space_needed(release.size) // 1_000_000
             return _error(f"Not enough free space: installing {tool_name} needs about {needed} MB.")
