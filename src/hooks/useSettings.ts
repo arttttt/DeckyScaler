@@ -31,7 +31,7 @@ export const useSettings = (scope: string) => {
     async (section: string, key: string, picked: string) => {
       try {
         const result = await setSetting(scope, section, key, changedValue(picked));
-        const message = result.status === "success" ? skippedMessage(result.skipped ?? []) : result.message || "Couldn't save the setting.";
+        const message = result.status === "success" ? skippedMessage(result.skipped ?? [], result.away ?? []) : result.message || "Couldn't save the setting.";
         if (message) notify(message);
       } catch (err) {
         notify(err instanceof Error ? err.message : "Couldn't save the setting.");

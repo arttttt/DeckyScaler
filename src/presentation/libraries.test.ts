@@ -127,6 +127,7 @@ describe("the block on the OptiScaler page", () => {
         ],
         skipped: [],
         failed: [],
+        away: [],
       }),
     ).toEqual([{ appid: 1145350, options: "~/deckyscaler/patch %command%" }]);
     expect(launchOptionsToSet(null)).toEqual([]);
@@ -134,16 +135,21 @@ describe("the block on the OptiScaler page", () => {
 
   it("tells how applying went", () => {
     expect(applyOutcome(null)).toBe("The plugin backend did not answer.");
-    expect(applyOutcome({ status: "success", applied: [], skipped: [], failed: [] })).toBe("Nothing to apply.");
+    expect(applyOutcome({ status: "success", applied: [], skipped: [], failed: [], away: [] })).toBe("Nothing to apply.");
     expect(
       applyOutcome({
         status: "success",
         applied: [{ name: "Hades II", appid: "1145350", launch_options: null }],
         skipped: ["Cyberpunk 2077"],
         failed: [{ name: "Elden Ring", message: "Permission denied" }],
+        away: ["Hollow Knight"],
       }),
     ).toBe(
-      "Applied to Hades II. Skipped Cyberpunk 2077: it's running. Apply again once closed. Couldn't apply to Elden Ring: Permission denied",
+      "Applied to Hades II. Skipped Cyberpunk 2077: it's running. Apply again once closed. Couldn't apply to Elden Ring: Permission denied " +
+        "Hollow Knight is on a drive that isn't mounted: apply again once it's back.",
+    );
+    expect(applyOutcome({ status: "success", applied: [], skipped: [], failed: [], away: ["A", "B"] })).toBe(
+      "A, B are on a drive that isn't mounted: apply again once it's back.",
     );
   });
 });

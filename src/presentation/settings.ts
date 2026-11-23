@@ -163,11 +163,19 @@ export const searchRows = (sections: SettingsSectionView[], query: string): Sett
   );
 };
 
-/** What a global change says about the running games it didn't reach. */
-export const skippedMessage = (skipped: string[]): string | null =>
-  skipped.length === 0
-    ? null
-    : `${skipped.join(", ")} ${plural(skipped.length, "is", "are")} running and ${plural(skipped.length, "gets", "get")} the change once closed.`;
+/** What a global change says about the games it didn't reach: the running ones, and those on a drive that isn't
+ *  mounted. */
+export const skippedMessage = (skipped: string[], away: string[] = []): string | null => {
+  const lines = [
+    ...(skipped.length
+      ? [`${skipped.join(", ")} ${plural(skipped.length, "is", "are")} running and ${plural(skipped.length, "gets", "get")} the change once closed.`]
+      : []),
+    ...(away.length
+      ? [`${away.join(", ")} ${plural(away.length, "is", "are")} on a drive that isn't mounted and ${plural(away.length, "gets", "get")} the change once it's back and the game has run.`]
+      : []),
+  ];
+  return lines.length ? lines.join(" ") : null;
+};
 
 export const RESET_GAME_LABEL = "Reset to global settings";
 export const RESET_GAME_CONFIRMATION = {

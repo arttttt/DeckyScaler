@@ -236,7 +236,8 @@ class UserLibraries:
 
     def apply(self) -> dict:
         """Patch again the games a patch now would give other libraries, with their version and proxy; running ones
-        are left alone and named. A Steam game's launch options come back with it, for the frontend to set."""
+        are left alone and named, and so are those on a drive that isn't mounted, whose patch can't be read. A Steam
+        game's launch options come back with it, for the frontend to set."""
         choices, installed = self.choices.read(), self.store.installed()
         applied, skipped, failed = [], [], []
         for path, name, details in self._to_apply(self.patcher.patched_markers(), choices, installed):
@@ -255,4 +256,4 @@ class UserLibraries:
                 applied.append({"name": name, "appid": appid, "launch_options": result.get("launch_options")})
             else:
                 failed.append({"name": name, "message": result.get("message", "")})
-        return {"status": "success", "applied": applied, "skipped": skipped, "failed": failed}
+        return {"status": "success", "applied": applied, "skipped": skipped, "failed": failed, "away": self.patcher.away()}
