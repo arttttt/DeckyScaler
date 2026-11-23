@@ -198,11 +198,12 @@ describe("the manage dialog", () => {
     expect(buildsOnly.usage).toBe("Installed builds take 3.0 GB.");
   });
 
-  it("offers no Remove for a build linked in from elsewhere, and says why", () => {
+  it("offers no Remove for a build linked in from elsewhere, says why, and still says what it is and who uses it", () => {
     const linked = { ...GE, linked: true };
 
     expect(protonManageView({ installed: installed({ tools: [linked] }), busy: null, message: null }).rows[0]).toEqual({
-      id: GE.id, label: GE.id, description: "Linked from another folder · can't be removed here", action: null,
+      id: GE.id, label: GE.id,
+      description: "GE-Proton · linked from another folder, can't be removed here · 1.6 GB · used by 2 games", action: null,
     });
   });
 

@@ -209,15 +209,16 @@ const usedBy = (tool: ProtonOther): string => {
 
 const sized = (size: number | null): string[] => (size === null ? [] : [byteSize(size)]);
 
-/** Why a tool's row has no Remove: one installed for every user, or a link to a build kept elsewhere. */
-const kept = (tool: InstalledProtonTool): string | null => {
-  if (tool.system) return "Installed system-wide · can't be removed here";
-  if (tool.linked) return "Linked from another folder · can't be removed here";
-  return null;
-};
+/** Whether a tool's row offers Remove: never for one installed for every user, nor a link to a build kept
+ *  elsewhere. */
+const removable = (tool: InstalledProtonTool): boolean => !tool.system && !tool.linked;
 
-const describeTool = (tool: InstalledProtonTool): string =>
-  kept(tool) ?? [tool.build_label ?? "Not installed by DeckyScaler", ...sized(tool.size), usedBy(tool)].join(" · ");
+/** A linked build is still a build the user's games run on: its row keeps what it is, its size and its games. */
+const describeTool = (tool: InstalledProtonTool): string => {
+  if (tool.system) return "Installed system-wide · can't be removed here";
+  const linked = tool.linked ? ["linked from another folder, can't be removed here"] : [];
+  return [tool.build_label ?? "Not installed by DeckyScaler", ...linked, ...sized(tool.size), usedBy(tool)].join(" · ");
+};
 
 /** A folder that isn't a build: what it is, what it takes when sized, and the games Steam still maps to it. */
 const describeOther = (other: ProtonOther): string =>
@@ -235,7 +236,7 @@ export const protonManageView = (state: ProtonManageState): ProtonManageView => 
   });
   const others = installed?.others ?? [];
   const rows = [
-    ...(installed?.tools ?? []).map((tool) => row(tool.id, describeTool(tool), kept(tool) === null)),
+    ...(installed?.tools ?? []).map((tool) => row(tool.id, describeTool(tool), removable(tool))),
     ...others.map((other) => row(other.id, describeOther(other), true)),
   ];
   const nothing = installed?.problem ? problemText(installed.problem) : installed && rows.length === 0 ? "No Proton build is installed yet." : null;
