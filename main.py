@@ -49,6 +49,7 @@ class Plugin:
                 await asyncio.to_thread(owner().clear_interrupted)
             except OSError as exc:
                 decky.logger.error(f"Clearing what an interrupted download of {what} left failed: {exc}")
+        # After the clear: a version it brings back from a replace cut short gets its list too.
         try:
             await asyncio.to_thread(self._library().keep_file_lists)
         except OSError as exc:

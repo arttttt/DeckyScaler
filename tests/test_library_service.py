@@ -338,6 +338,17 @@ def test_loading_gives_a_version_from_before_file_lists_one_and_a_file_it_loses_
     assert read == []  # every version has its list now: loading again reads none of them
 
 
+def test_loading_lists_the_files_of_a_version_a_cut_short_replace_brings_back(plugin, plugin_home):
+    from conftest import STABLE
+
+    versions = plugin_home / "library" / "versions"
+    (versions / STABLE).rename(versions / f".{STABLE}.old")  # set aside, and the stop came before the new copy
+
+    run(plugin._main())
+
+    assert json.loads((versions / STABLE / "entry.json").read_text())["files"] is not None
+
+
 def test_github_failing_still_lists_what_is_installed(world, github_api):
     world.library().install(library.NIGHTLY, NEWEST)
     github_api.status, github_api.body = 403, b'{"message": "API rate limit exceeded"}'
