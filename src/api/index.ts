@@ -494,6 +494,8 @@ export type PatchedGame = {
   patched_at: string | null;
   /** Its marker's record: whole, stopped before the last file, or damaged (patching again repairs it). */
   record: "ok" | "incomplete" | "damaged";
+  /** Patched by the launch wrapper, at a start: it patches the game again at each one. */
+  by_wrapper: boolean;
   own_settings: boolean;
 };
 

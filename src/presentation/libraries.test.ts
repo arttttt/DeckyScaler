@@ -124,6 +124,7 @@ describe("the block on the OptiScaler page", () => {
         applied: [
           { name: "Hades II", appid: "1145350", launch_options: "~/deckyscaler/patch %command%" },
           { name: "/games/x", appid: "", launch_options: null },
+          { name: "Portal 2", appid: "620", launch_options: null },  // left as they are
         ],
         skipped: [],
         failed: [],

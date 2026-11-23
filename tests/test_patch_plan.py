@@ -152,3 +152,12 @@ def test_unpatching_takes_the_launch_wrapper_out_and_keeps_what_the_user_put_aro
     assert marker.launch_options_after_unpatch("gamemoderun ~/deckyscaler/patch %command%", "", "dxgi.dll") == "gamemoderun %command%"
     assert marker.launch_options_after_unpatch("~/deckyscaler/patch %command%", "", "dxgi.dll") == ""
     assert marker.launch_options_after_unpatch("~/deckyscaler/patch %command%", "mangohud %command%", "dxgi.dll") == "mangohud %command%"
+
+
+def test_a_game_starts_through_the_wrapper_by_its_launch_options_else_by_its_marker():
+    wrapper, panel = {"through": "wrapper"}, {}
+
+    assert marker.started_by_wrapper("gamemoderun ~/deckyscaler/patch %command%", panel)
+    assert not marker.started_by_wrapper("WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", wrapper)  # taken out since
+    assert marker.started_by_wrapper(None, wrapper)
+    assert not marker.started_by_wrapper(None, panel)

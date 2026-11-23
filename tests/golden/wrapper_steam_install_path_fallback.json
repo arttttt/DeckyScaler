@@ -50,7 +50,8 @@
             "sha256": "link:<library>/nightly-20261023/files/OptiScaler/libxess.dll"
           }
         ],
-        "target_dir": "<root>"
+        "target_dir": "<root>",
+        "through": "wrapper"
       },
       "Game.exe": "game:Game.exe",
       "OptiScaler": "<dir>",

@@ -152,6 +152,13 @@ describe("steam game view", () => {
     });
   });
 
+  it("tells a game the launch wrapper patches at each launch", () => {
+    expect(steamGameView({ ...base, status: { ...patched, by_wrapper: true } }).versionLine).toBe(
+      "stable-0.9.4. Patched at each launch by the launch wrapper.",
+    );
+    expect(steamGameView({ ...base, status: patched }).versionLine).toBe("stable-0.9.4");
+  });
+
   it("names the user's libraries a patched game has", () => {
     const withLibraries: GameStatus = { ...patched, libraries: [{ slot: "frame-generation", id: "anr", label: "ANR V.B19" }] };
 

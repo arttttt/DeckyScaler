@@ -1,6 +1,7 @@
 """Patch → unpatch round trips on a clean game must leave no trace."""
 
 import asyncio
+import json
 
 import pytest
 
@@ -132,3 +133,65 @@ def test_switching_the_proxy_takes_the_old_proxys_options_for_the_plugins_own(pl
 
     assert switched["original_launch_options"] == ""  # the dxgi options were the plugin's, not the user's
     assert asyncio.run(plugin.unpatch_game("1234", switched["launch_options"]))["launch_options"] == ""
+
+
+def test_a_steam_game_the_wrapper_patched_is_known_by_its_page_and_stays_the_wrappers(plugin, home, plugin_home, steam_library):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    root = steam_library.add_game("1234", "Test Game")
+    LaunchWrapper(home, {"SteamAppId": "1234"}).patch([str(root / "Game.exe")], "dxgi.dll")
+    marker = json.loads((root / "DECKYSCALER_PATCH").read_text())
+    assert (marker["appid"], marker["game_name"], marker["through"]) == ("1234", "Test Game", "wrapper")
+    assert run_status(plugin)["by_wrapper"] is True
+    assert [game["by_wrapper"] for game in asyncio.run(plugin.patched_games())["games"]] == [True]
+
+    wrapped = "gamemoderun ~/deckyscaler/patch %command%"
+    reinstalled = asyncio.run(plugin.patch_game("1234", "dxgi.dll", wrapped, STABLE))
+    assert reinstalled["launch_options"] is None  # the wrapper stays: nothing to set
+    assert reinstalled["message"].endswith("The launch wrapper stays in its launch options.")
+    assert json.loads((root / "DECKYSCALER_PATCH").read_text())["through"] == "wrapper"
+
+    unpatched = asyncio.run(plugin.unpatch_game("1234", wrapped))
+    assert unpatched["launch_options"] == "gamemoderun %command%"
+    assert unpatched["message"] == "Unpatched Test Game. The launch wrapper's command is out of its launch options."
+
+
+def test_a_game_patched_from_the_panel_once_its_wrapper_is_taken_out_gets_the_plugins_options(plugin, home, plugin_home, steam_library):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    root = steam_library.add_game("1234", "Test Game")
+    LaunchWrapper(home, {"SteamAppId": "1234"}).patch([str(root / "Game.exe")], "dxgi.dll")
+
+    patched = asyncio.run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))  # the user took the wrapper out
+
+    assert patched["launch_options"] == "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
+    assert "through" not in json.loads((root / "DECKYSCALER_PATCH").read_text())
+
+
+def test_unpatching_a_wrapper_game_steam_says_nothing_of_warns_it_comes_back(plugin, home, plugin_home, steam_library):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    root = steam_library.add_game("1234", "Test Game")
+    LaunchWrapper(home, {"SteamAppId": "1234"}).patch([str(root / "Game.exe")], "dxgi.dll")
+
+    unknown = asyncio.run(plugin.unpatch_game("1234", None))
+
+    assert unknown["launch_options"] is None
+    assert unknown["message"].endswith("If the launch wrapper is still in them, it patches the game again at its next start.")
+
+
+def test_unpatching_a_directory_the_wrapper_patched_says_it_comes_back(plugin, home, plugin_home, tmp_path):
+    from conftest import make_game_dir
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    game = make_game_dir(tmp_path / "games" / "Heroic Game")
+    LaunchWrapper(home, {}).patch([str(game / "Game.exe")], "dxgi.dll")
+
+    result = asyncio.run(plugin.manual_unpatch_directory(str(game)))
+
+    assert result["status"] == "success"
+    assert result["message"].endswith("take ~/deckyscaler/patch out of how the game is started to keep it unpatched.")
+
+
+def run_status(plugin) -> dict:
+    return asyncio.run(plugin.get_game_status("1234"))

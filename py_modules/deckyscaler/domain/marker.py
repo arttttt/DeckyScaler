@@ -33,6 +33,7 @@ def build(
     steam_game: SteamGame | None = None,
     libraries: tuple[dict, ...] = (),
     library_layer: settings_layers.LibraryLayer | None = None,
+    through: str | None = None,
 ) -> dict:
     """The marker's details; every patch writes one, a Steam patch also records the game.
 
@@ -47,6 +48,7 @@ def build(
         "target_dir": str(target_dir),
         "original_launch_options": steam_game.original_launch_options if steam_game else "",
         **({"launch_options": steam_game.launch_options} if steam_game else {}),
+        **({"through": through} if through else {}),
         "backed_up_files": backed_up_files,
         "optiscaler_version": optiscaler_version,
         "family": family,
@@ -54,6 +56,21 @@ def build(
         "libraries": list(libraries),
         "library_settings": settings_layers.library_layer_json(library_layer or {}),
     }
+
+
+WRAPPER = "wrapper"
+"""The route of a patch the launch wrapper made, at a game's start: it patches the game again at each one."""
+
+
+def through_wrapper(details: dict) -> bool:
+    """Whether a marker's patch was made by the launch wrapper (a marker from before routes were kept says nothing)."""
+    return details.get("through") == WRAPPER
+
+
+def started_by_wrapper(current: str | None, details: dict) -> bool:
+    """Whether a game starts through the launch wrapper: its launch options hold it, or, when Steam didn't say what they
+    are, its marker's patch was the wrapper's."""
+    return without_wrapper(current) is not None if current is not None else through_wrapper(details)
 
 
 def shown_name(details: dict, directory: Path) -> str:

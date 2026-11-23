@@ -23,6 +23,7 @@ const game = (overrides: Partial<PatchedGame>): PatchedGame => ({
   version_incomplete: false,
   patched_at: "2026-10-23T18:04:00+00:00",
   record: "ok",
+  by_wrapper: false,
   own_settings: false,
   ...overrides,
 });
@@ -82,6 +83,13 @@ describe("the Games page", () => {
     expect(rowOf(game({ newer_version: "nightly-20261024", own_settings: true })).lines.slice(1)).toEqual([
       "10.0.0-pre1 · 2026-10-24 is in the library: patch again to update.",
       "Has settings of its own.",
+    ]);
+  });
+
+  it("tells a game the launch wrapper patches at each launch", () => {
+    expect(rowOf(game({ by_wrapper: true })).lines).toEqual([
+      "OptiScaler 10.0.0-pre1 · 2026-10-23 via dxgi.dll, patched 2026-10-23",
+      "Patched at each launch by the launch wrapper.",
     ]);
   });
 

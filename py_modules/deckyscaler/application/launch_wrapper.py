@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from deckyscaler.application.patcher import Patcher
-from deckyscaler.domain import ini, launch_target
+from deckyscaler.domain import ini, launch_target, marker
 from deckyscaler.domain.patch_plan import INI_FILENAME
 from deckyscaler.infrastructure import game_directory, game_locator
 
@@ -49,6 +49,7 @@ class LaunchWrapper:
         self, command: list[str], dll_name: str, version_id: str = "", reset_ini: bool = False
     ) -> Path:
         directory = self.locate(command)
+        appid = self.environ.get("SteamAppId") or None
         # Run on every launch: a game already patched this way starts at once, untouched.
         result = self.patcher.patch_directory(
             directory,
@@ -56,8 +57,10 @@ class LaunchWrapper:
             version_id=version_id or None,
             reset_ini=reset_ini,
             unless_current=True,
-            # Steam names the game it starts; its own settings then go in on top of the global ones.
-            settings_appid=self.environ.get("SteamAppId") or None,
+            # Steam names the game it starts: its page then shows it, and its own settings go in on top of the global ones.
+            steam_game=self.patcher.wrapper_game(directory, appid),
+            through=marker.WRAPPER,
+            settings_appid=appid,
             keep_libraries=True,
         )
         if result["status"] != "success":
