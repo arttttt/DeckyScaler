@@ -120,6 +120,7 @@ class ProtonBuilds:
                 "build": build.id if build else None,
                 "build_label": build.label if build else None,
                 "system": tool.system,
+                "linked": tool.linked,
                 "size": store.size(tool) if with_sizes else None,
                 "games": name(appids),
                 "global_default": global_default,
@@ -259,6 +260,8 @@ class ProtonBuilds:
             return f"{folder} is not installed."
         if tool.system:
             return f"{folder} is installed for every user of this device; it can't be removed here."
+        if tool.linked:
+            return f"{folder} is a link to a build kept elsewhere; it can't be removed here."
         return tool
 
     def removal(self, folder: str) -> dict:

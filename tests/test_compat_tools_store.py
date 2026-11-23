@@ -157,6 +157,16 @@ def test_a_folder_steam_would_list_no_tool_for_is_listed_apart_but_never_a_link_
     assert CompatToolsStore(tmp_path / "missing").others() == []
 
 
+def test_a_build_linked_in_from_elsewhere_is_a_tool_said_to_be_linked(tmp_path):
+    tools, elsewhere = tools_dir(tmp_path), tmp_path / "sdcard"
+    build_tree(tools)
+    build_tree(elsewhere, "GE-Proton9-1")
+    os.symlink(elsewhere / "GE-Proton9-1", tools / "GE-Proton9-1")
+
+    found = {tool.folder: tool.linked for tool in CompatToolsStore(tools).installed()}
+    assert found == {"GE-Proton9-1": True, TOOL: False}
+
+
 def test_an_unreadable_compatibilitytools_d_lists_nothing(tmp_path):
     tools = tools_dir(tmp_path)
     build_tree(tools)

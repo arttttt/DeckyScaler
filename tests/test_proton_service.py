@@ -156,7 +156,7 @@ def test_installed_builds_list_every_tool_with_the_games_whose_user_chose_it(wor
 
     tools = {tool["id"]: tool for tool in listed["tools"]}
     assert tools[NEWEST] | {"size": 0} == {
-        "id": NEWEST, "build": pb.GE_PROTON, "build_label": "GE-Proton", "system": False, "size": 0,
+        "id": NEWEST, "build": pb.GE_PROTON, "build_label": "GE-Proton", "system": False, "linked": False, "size": 0,
         "games": [
             {"appid": "1245620", "name": None, "kind": "unknown"},  # uninstalled since: still the user's choice
             {"appid": SHORTCUT_APPID, "name": "Heroic", "kind": "shortcut"},
@@ -225,6 +225,20 @@ def test_a_folder_that_isnt_a_build_is_listed_apart_and_removed_like_one(world, 
     assert proton.remove("GE-Proton9-1") == {"status": "success", "message": "GE-Proton9-1 is removed."}
     assert world.tree() == [".deckyscaler-partial", NEWEST]
     assert proton.remove("GE-Proton9-1") == {"status": "error", "message": "GE-Proton9-1 is not installed."}
+
+
+def test_a_build_linked_in_from_elsewhere_is_listed_as_linked_and_never_removed(world, tmp_path):
+    sdcard = tmp_path / "sdcard"
+    build_tree(sdcard, "GE-Proton9-1")
+    world.tools.mkdir(parents=True, exist_ok=True)
+    os.symlink(sdcard / "GE-Proton9-1", world.tools / "GE-Proton9-1")
+    proton = world.proton()
+
+    assert {tool["id"]: tool["linked"] for tool in proton.installed()["tools"]} == {"GE-Proton9-1": True}
+    refused = "GE-Proton9-1 is a link to a build kept elsewhere; it can't be removed here."
+    assert proton.removal("GE-Proton9-1") == {"status": "error", "message": refused}
+    assert proton.remove("GE-Proton9-1") == {"status": "error", "message": refused}
+    assert (world.tools / "GE-Proton9-1").is_symlink() and (sdcard / "GE-Proton9-1" / "proton").is_file()
 
 
 def test_github_failing_still_lists_what_is_installed(world, github_api):

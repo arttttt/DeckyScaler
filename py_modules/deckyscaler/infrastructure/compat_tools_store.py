@@ -49,7 +49,7 @@ def _tool(folder: Path, system: bool) -> Tool | None:
     """The tool a folder is, as Steam finds one: a compatibilitytool.vdf that declares a tool. Anything else, a
     missing, unreadable or empty manifest included, is no tool Steam would list."""
     names = _declared(folder / MANIFEST)
-    return Tool(folder.name, names, system, _modified(folder)) if names else None
+    return Tool(folder.name, names, system, _modified(folder), folder.is_symlink()) if names else None
 
 
 def _scan(directory: Path, system: bool) -> list[Tool]:
