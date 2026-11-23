@@ -42,7 +42,7 @@ sys.path[:0] = [str(REPO_ROOT / "py_modules"), str(REPO_ROOT)]
 
 import main  # noqa: E402
 from deckyscaler.domain import bundle  # noqa: E402
-from deckyscaler.infrastructure import proton  # noqa: E402
+from deckyscaler.infrastructure import drives, proton  # noqa: E402
 
 
 # sha256 → label of every placeholder handed out, so snapshots can name content.
@@ -214,6 +214,68 @@ def make_game_dir(path: Path, files: dict[str, bytes] | None = None) -> Path:
     for rel, data in (files or {}).items():
         write(path / rel, data)
     return path
+
+
+@dataclass
+class Media:
+    """A fake /run/media with the kernel's mount list and udev's devices by UUID behind it: a drive put in is mounted
+    at /run/media/deck/<label> from its device, and known by its filesystem's UUID."""
+
+    base: Path
+    devices: Path
+    mounts: Path
+    by_uuid: Path
+    drawer: Path
+    """Where a drive taken out keeps its files, by its UUID, until it is put in again."""
+    mounted: dict[Path, Path] = field(default_factory=dict)
+
+    def put_in(self, label: str, uuid: str, device: str = "mmcblk0p1", filesystem: str = "ext4") -> Path:
+        point = self.base / "deck" / label
+        if (self.drawer / uuid).exists():
+            (self.drawer / uuid).rename(point)
+        else:
+            point.mkdir()
+        node = self.devices / device
+        node.touch()
+        for link in self.by_uuid.iterdir():
+            if link.resolve() == node.resolve():
+                link.unlink()  # udev renames the slot's device after the card in it
+        (self.by_uuid / uuid).symlink_to(node)
+        self.mounted[point.resolve()] = node
+        self._list(filesystem)
+        return point
+
+    def take_out(self, point: Path) -> None:
+        node = self.mounted.pop(point.resolve())
+        for link in self.by_uuid.iterdir():
+            if link.resolve() == node.resolve():
+                point.rename(self.drawer / link.name)
+                link.unlink()
+        self._list("ext4")
+
+    def _list(self, filesystem: str) -> None:
+        lines = [
+            f"{n} 1 179:{n} / {str(point).replace(' ', chr(92) + '040')} rw,relatime shared:{n} - {filesystem} {node} rw"
+            for n, (point, node) in enumerate(self.mounted.items(), start=30)
+        ]
+        self.mounts.write_text("\n".join(["22 1 0:21 / / rw - ext4 /dev/nvme0n1p8 rw", *lines]) + "\n")
+
+
+@pytest.fixture
+def media(tmp_path, monkeypatch) -> Media:
+    fake = Media(
+        tmp_path / "run" / "media", tmp_path / "dev", tmp_path / "mountinfo", tmp_path / "dev" / "disk" / "by-uuid",
+        tmp_path / "drawer",
+    )
+    (fake.base / "deck").mkdir(parents=True)
+    fake.by_uuid.mkdir(parents=True)
+    fake.drawer.mkdir()
+    fake.mounts.write_text("")
+    monkeypatch.setattr(drives, "REMOVABLE_MEDIA", (fake.base,))
+    monkeypatch.setattr(drives, "MOUNTS", fake.mounts)
+    monkeypatch.setattr(drives, "BY_UUID", fake.by_uuid)
+    monkeypatch.setattr(drives, "ismount", lambda path: Path(path).resolve() in fake.mounted)
+    return fake
 
 
 @pytest.fixture
