@@ -44,6 +44,8 @@ export const getGameStatus = callable<
     newer_version?: string | null;
     /** Its version holds files its patch didn't place (they came back since): patching again adds them. */
     lacks_version_files?: boolean;
+    /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
+    version_incomplete?: boolean;
   }
 >("get_game_status");
 
@@ -481,6 +483,8 @@ export type PatchedGame = {
   newer_version: string | null;
   /** Its version holds files its patch didn't place (they came back since): patching again adds them. */
   lacks_version_files: boolean;
+  /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
+  version_incomplete: boolean;
   patched_at: string | null;
   record: "ok" | "incomplete" | "upstream";
   own_settings: boolean;
