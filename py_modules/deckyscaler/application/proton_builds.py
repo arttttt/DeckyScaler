@@ -112,7 +112,7 @@ class ProtonBuilds:
         name = self._namer(active.root)
         tools = proton_builds.newest_first(store.installed())
 
-        def row(tool: proton_builds.Tool) -> dict:
+        def row_of(tool: proton_builds.Tool) -> dict:
             """What every row says: its folder, its size when asked, and the games whose user chose it."""
             appids, global_default = proton_builds.chosen_for(tool, forced)
             size = store.size(tool) if with_sizes else None
@@ -122,13 +122,13 @@ class ProtonBuilds:
         for tool in tools:
             build = tool.build
             rows.append({
-                **row(tool),
+                **row_of(tool),
                 "build": build.id if build else None,
                 "build_label": build.label if build else None,
                 "system": tool.system,
                 "linked": tool.linked,
             })
-        others = [row(tool) for tool in store.others()]
+        others = [row_of(tool) for tool in store.others()]
         own = (
             sum(row["size"] for row in rows if not row["system"]) + sum(row["size"] for row in others) if with_sizes else None
         )
