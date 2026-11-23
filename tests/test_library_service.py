@@ -228,12 +228,16 @@ def test_installing_twice_is_refused_and_a_version_is_removed(world):
     assert world.tree() == ["versions"]
 
 
-def test_a_library_directory_without_a_readable_entry_is_not_a_version(world):
+def test_a_library_directory_without_a_readable_entry_is_not_a_version_and_installing_it_replaces_it(world):
     write(world.plugin_home / "library" / "versions" / NEWEST / "files" / "OptiScaler.dll", b"leftover")
+    write(world.plugin_home / "library" / "versions" / NEWEST / "files" / "stray.dll", b"leftover")
 
     rows = world.library().versions(library.NIGHTLY)["versions"]
-
     assert rows[0]["id"] == NEWEST and rows[0]["state"] == "available"
+
+    assert world.library().install(library.NIGHTLY, NEWEST)["status"] == "success"
+    files = world.plugin_home / "library" / "versions" / NEWEST / "files"
+    assert (files / "OptiScaler.dll").read_bytes() == b"opti" and not (files / "stray.dll").exists()
 
 
 def test_what_isnt_a_whole_version_is_damaged_and_a_copy_set_aside_is_neither(world):

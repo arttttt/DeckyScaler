@@ -90,9 +90,12 @@ class EntryStore(Generic[E]):
         return stage
 
     def commit_entry(self, stage: Path, item_id: str, entry: dict) -> None:
-        """Write the entry inside the staged item, then move it into the store in one rename."""
+        """Write the entry inside the staged item, then move it into the store in one rename, over what is left of a
+        damaged item of that id: a rename can't land on a directory that isn't empty. Callers never commit over a
+        whole item: installing refuses an installed id, and replacing sets the old copy aside first."""
         write_json(stage / self.entry_filename, entry)
         self.items_dir.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(self.item_dir(item_id), ignore_errors=True)
         stage.replace(self.item_dir(item_id))
 
     def remove(self, item_id: str) -> None:

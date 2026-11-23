@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from deckyscaler.domain import library_choice, user_libraries
@@ -30,9 +29,7 @@ class UserLibraryStore(EntryStore[user_libraries.Library]):
         return self.item_dir(library_id) / user_libraries.FILES_DIRNAME
 
     def commit(self, stage: Path, library: user_libraries.Library) -> None:
-        """Write the library's entry inside the staged library, then move it in by one rename, over what is left of
-        a library of that id that isn't on the device any more."""
-        shutil.rmtree(self.item_dir(library.id), ignore_errors=True)
+        """Write the library's entry inside the staged library, then move it in by one rename."""
         self.commit_entry(stage, library.id, user_libraries.entry_json(library))
 
 
