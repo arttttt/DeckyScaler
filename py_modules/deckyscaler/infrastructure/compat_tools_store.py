@@ -22,8 +22,10 @@ directory would change it."""
 
 
 def _declared(manifest: Path) -> frozenset[str]:
+    """The tool names a compatibilitytool.vdf declares; a byte-order mark before it, as editors on Windows write
+    one, is no part of it."""
     try:
-        text = manifest.read_text(encoding="utf-8", errors="replace")
+        text = manifest.read_text(encoding="utf-8-sig", errors="replace")
     except OSError:
         return frozenset()
     return frozenset(compat_tools.custom_tools(keyvalues.parse(text)))

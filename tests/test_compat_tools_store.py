@@ -157,6 +157,15 @@ def test_a_folder_steam_would_list_no_tool_for_is_listed_apart_but_never_a_link_
     assert CompatToolsStore(tmp_path / "missing").others() == []
 
 
+def test_a_manifest_saved_with_a_byte_order_mark_still_declares_its_tool(tmp_path):
+    tools = tools_dir(tmp_path)
+    build_tree(tools)
+    write(tools / TOOL / "compatibilitytool.vdf", b"\xef\xbb\xbf" + manifest(TOOL))
+
+    store = CompatToolsStore(tools)
+    assert [tool.names for tool in store.installed()] == [frozenset({TOOL.lower()})] and store.others() == []
+
+
 def test_a_build_linked_in_from_elsewhere_is_a_tool_said_to_be_linked(tmp_path):
     tools, elsewhere = tools_dir(tmp_path), tmp_path / "sdcard"
     build_tree(tools)
