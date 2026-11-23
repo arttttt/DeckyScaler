@@ -52,6 +52,22 @@ def test_a_patched_games_status_finds_its_marker_through_the_index(plugin, plugi
     assert run(plugin.get_game_status("1234"))["patched"] is True
 
 
+def test_a_patch_recorded_under_the_originals_name_is_found_through_the_index(plugin, plugin_home, steam_library, monkeypatch):
+    root = steam_library.add_game("1234", "Test Game")
+    run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))
+    (root / "DECKYSCALER_PATCH").rename(root / "FRAMEGEN_PATCH")  # where an early build wrote it
+    real_rglob, library = Path.rglob, plugin_home / "library"
+
+    def no_search(self, pattern):
+        if self.is_relative_to(library):  # a version's own files, as above
+            return real_rglob(self, pattern)
+        raise AssertionError(f"searched {self} for {pattern}")
+
+    monkeypatch.setattr(Path, "rglob", no_search)
+
+    assert run(plugin.get_game_status("1234"))["record"] == "ok"
+
+
 def test_a_game_the_index_doesnt_know_is_still_found_by_searching(plugin, plugin_home, steam_library):
     root = steam_library.add_game("1234", "Test Game")
     run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))

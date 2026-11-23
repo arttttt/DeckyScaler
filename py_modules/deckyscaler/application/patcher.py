@@ -171,10 +171,14 @@ class Patcher:
                 return undone
         try:
             # What a patch left whose record is gone (the marker lost, or damaged) goes first: nothing would take it
-            # away, and a link can't be made where one is. Which version it was isn't known, so every one's folders
-            # are looked into. Its OptiScaler.ini is set aside as the game's, for a fresh one the settings reach.
-            looked_into = frozenset().union(version_files, *(self.library.files_of(item.id) for item in installed))
-            here = game_directory.links(directory, version_placement.placed_dirs(looked_into))
+            # away, and a link can't be made where one is. Which version it was, and whether the library still has
+            # it, isn't known, so every family's own folders are looked into. Its OptiScaler.ini is set aside as the
+            # game's, for a fresh one the settings reach.
+            looked_into = (
+                *version_placement.placed_dirs(version_files),
+                *sorted(game_directory.directories_under(directory, version_placement.family_dirs())),
+            )
+            here = game_directory.links(directory, looked_into)
             lost = patch_record.made_by_the_plugin(here, str(self.plugin_home.absolute()))
             repairing = previous is None and (recorded_in.exists() or bool(lost))
             left = patch_record.left_behind(lost, self._plugin_dirs() if repairing else ())
@@ -247,7 +251,7 @@ class Patcher:
             log.warning(f"Reading the version's OptiScaler.ini failed, settings left as they are: {exc}")
             return
         game = self.settings.game_layer(appid) if appid else {}
-        libraries = marker.library_layer(files.read_json(directory / bundle.MARKER_FILENAME))
+        libraries = marker.library_layer(files.read_json(_marker_of(directory)))
         values = settings_layers.to_write(schema, self.settings.global_layer(), game, libraries, released)
         game_directory.edit_ini(directory / plan.INI_FILENAME, lambda text: ini.set_values(text, values), "the user's settings")
 
@@ -295,7 +299,7 @@ class Patcher:
         """Whether a patch now would place nothing other than the directory has: the same version, proxy and
         libraries, every placed file still there, and every file the version holds now among them (one that came
         back with Download again after the game was patched without it is not)."""
-        details = files.read_json(directory / bundle.MARKER_FILENAME)
+        details = files.read_json(_marker_of(directory))
         recorded = patch_record.parse(details)
         return (
             recorded is not None
@@ -362,7 +366,7 @@ class Patcher:
         found, away = [], []
         for directory, entry in self.patches.entries().items():
             path = Path(directory)
-            marker_path = path / bundle.MARKER_FILENAME
+            marker_path = _marker_of(path)
             if marker_path.is_file():
                 found.append((path, entry.name, files.read_json(marker_path)))
                 if entry.drive is None and drives.identity(path) is not None:
@@ -559,11 +563,12 @@ class Patcher:
     def find_marker(self, install_root: Path) -> Path | None:
         """The game's patch marker: where the patch index says the plugin patched it, else by searching
         the whole install, for the plugin's marker and then the original Decky Framegen's (whose patch is
-        reset, having no record). A marker of the plugin's found by searching goes back into the index."""
+        reset, having no record). A patch of the plugin's found by searching, its record under either name, goes
+        back into the index."""
         if not install_root.exists():
             return None
         for directory in self.patches.entries():
-            marker_path = Path(directory) / bundle.MARKER_FILENAME
+            marker_path = _marker_of(Path(directory))
             if marker_path.parent.is_relative_to(install_root) and marker_path.is_file():
                 return marker_path
         try:
@@ -575,9 +580,10 @@ class Patcher:
                 return None
         except OSError:
             return None
-        if found.name == bundle.MARKER_FILENAME:
+        details = files.read_json(found)
+        if patch_record.state_of(found.name, details) != patch_record.UPSTREAM:
             # The index learns a patch of ours it didn't know, so the pages listing from it show the game again.
-            self._remember(found.parent, marker.shown_name(files.read_json(found), found.parent))
+            self._remember(found.parent, marker.shown_name(details, found.parent))
         return found
 
     def game_status(self, appid: str) -> dict:

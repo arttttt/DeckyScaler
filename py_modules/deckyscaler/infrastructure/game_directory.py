@@ -60,6 +60,19 @@ def links(directory: Path, dirs: tuple[str, ...]) -> dict[str, str]:
     return found
 
 
+def directories_under(directory: Path, roots: tuple[str, ...]) -> frozenset[str]:
+    """Every directory in each of `roots` of a game directory, the root included, by its path in the game. A
+    directory reached through a link is never looked into."""
+    found: set[str] = set()
+    for root in roots:
+        top = directory / root
+        if top.is_symlink() or not top.is_dir():
+            continue
+        for current, _, _ in os.walk(top):  # a linked directory is listed by its parent, never walked into
+            found.add(Path(current).relative_to(directory).as_posix())
+    return frozenset(found)
+
+
 def listing(directory: Path) -> tuple[frozenset[str], frozenset[str]]:
     """The names in a game directory and in its plugins/ subdirectory (empty when there is none)."""
     entries = frozenset(entry.name for entry in directory.iterdir())

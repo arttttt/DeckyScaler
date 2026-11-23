@@ -14,9 +14,9 @@ from pathlib import PurePosixPath
 
 from . import fsr4
 from .bundle import VALID_DLL_NAMES
-from .library import Family, Installed
+from .library import FAMILIES, Family, Installed
 from .patch_record import PatchRecord, covers
-from .patch_plan import BACKUP_SUFFIX, INI_FILENAME, Copy, Link, Move, Operation, PlanError, preserving_existing
+from .patch_plan import BACKUP_SUFFIX, D3D12_DIR, INI_FILENAME, Copy, Link, Move, Operation, PlanError, preserving_existing
 
 INJECTOR = "OptiScaler.dll"
 
@@ -53,6 +53,12 @@ def placed_dirs(files: frozenset[str]) -> tuple[str, ...]:
     and the game's own ("") last."""
     dirs = {str(parent) for path in linked_files(files) for parent in PurePosixPath(path).parents if str(parent) != "."}
     return (*sorted(dirs, key=lambda path: (-path.count("/"), path)), "")
+
+
+def family_dirs() -> tuple[str, ...]:
+    """The folders a version of any family keeps its own files in, whatever the library holds now: OptiScaler 10's
+    OptiScaler/, 0.9's D3D12_Optiscaler/."""
+    return tuple(sorted({family.main_dir for family in FAMILIES.values() if family.main_dir} | {D3D12_DIR}))
 
 
 def lost_files(installed: Installed, present: frozenset[str]) -> frozenset[str]:

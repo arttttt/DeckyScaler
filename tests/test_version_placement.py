@@ -8,6 +8,7 @@ from deckyscaler.domain import library
 from deckyscaler.domain.patch_plan import Copy, Link, Move, PlanError
 from deckyscaler.domain.patch_record import PatchRecord, Placed
 from deckyscaler.domain.version_placement import (
+    family_dirs,
     placed_dirs,
     Request, is_for_the_game, linked_files, lost_files, placed_every_file, plan_patch,
 )
@@ -183,3 +184,7 @@ def test_the_directories_a_version_is_linked_into_go_deepest_first_and_the_games
     assert placed_dirs(frozenset({"OptiScaler.dll"})) == ("",)  # nothing it links but what the game's own holds
     # A directory holding only directories is looked into too: another version may have linked files right in it.
     assert placed_dirs(frozenset({"OptiScaler/D3D12_OptiScaler/D3D12Core.dll"})) == ("OptiScaler/D3D12_OptiScaler", "OptiScaler", "")
+
+
+def test_every_familys_own_folders_are_known_whatever_the_library_holds():
+    assert family_dirs() == ("D3D12_Optiscaler", "OptiScaler")

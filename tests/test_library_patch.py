@@ -275,3 +275,18 @@ def test_a_repaired_game_keeps_no_folder_of_the_lost_patchs_libraries(plugin, pl
 
     after = snapshot(game)
     assert {path: sha for path, sha in after.items() if path != "OptiScaler.ini"} == before  # no folder of OptiScaler/ left
+
+
+def test_a_game_recorded_under_the_originals_name_keeps_its_libraries_keys_and_starts_untouched(plugin, plugin_home, home, tmp_path):
+    anr(plugin_home)
+    assert run(plugin.set_setting("global", "FrameGen", "FGInput", "fsrfg"))["status"] == "success"  # the user's own
+    choose(plugin_home, library_choice.GLOBAL, FG, "anr")
+    game = make_game_dir(tmp_path / "games" / "Game")
+    wrapper_patch(home, game)
+    (game / "DECKYSCALER_PATCH").rename(game / "FRAMEGEN_PATCH")  # where an early build wrote it
+
+    assert run(plugin.set_setting("global", "FSR", "Fsr4Model", "1"))["status"] == "success"
+    assert {"Fsr4Model=1", "FGInput=nvngxfg"} <= set(ini_of(game).splitlines())  # the library's keys stay its own
+
+    wrapper_patch(home, game)  # patched as the wrapper would patch it: started as it is
+    assert (game / "FRAMEGEN_PATCH").is_file() and not (game / "DECKYSCALER_PATCH").exists()

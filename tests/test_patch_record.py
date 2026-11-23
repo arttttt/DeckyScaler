@@ -419,6 +419,52 @@ def test_a_repair_with_another_family_clears_the_lost_patchs_links_too(plugin, p
     assert as_before_but_the_ini(snapshot(game), before)
 
 
+def test_a_patch_recorded_under_the_originals_name_is_listed_and_keeps_its_version(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "DECKYSCALER_PATCH").rename(game / "FRAMEGEN_PATCH")
+
+    assert [listed["name"] for listed in run(plugin.patched_games())["games"]] == [str(game)]
+    assert run(plugin.library_remove(NIGHTLY))["status"] == "error"
+
+
+def test_a_steam_game_recorded_under_the_originals_name_goes_back_into_the_index_when_found(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("910", "Early Game")
+    run(plugin.patch_game("910", "dxgi.dll", "", NIGHTLY))
+    (root / "DECKYSCALER_PATCH").rename(root / "FRAMEGEN_PATCH")
+    (plugin_home / "patched.json").write_text("{}")
+
+    assert run(plugin.get_game_status("910"))["record"] == "ok"
+    assert [listed["name"] for listed in run(plugin.patched_games())["games"]] == ["Early Game"]
+
+
+def test_a_repair_clears_the_links_of_a_version_no_longer_in_the_library(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "DECKYSCALER_PATCH").unlink()
+    assert run(plugin.library_remove(NIGHTLY))["status"] == "success"  # nothing records a game using it now
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+    assert not (game / "OptiScaler").exists()
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert as_before_but_the_ini(snapshot(game), before)
+
+
+def test_every_directory_in_a_familys_folder_is_walked_but_none_through_a_link(tmp_path):
+    game = tmp_path / "Game"
+    (game / "OptiScaler" / "D3D12_OptiScaler").mkdir(parents=True)
+    (game / "OptiScaler" / "custom" / "Provider").mkdir(parents=True)
+    (tmp_path / "elsewhere" / "inside").mkdir(parents=True)
+    (game / "OptiScaler" / "linked").symlink_to(tmp_path / "elsewhere")
+    (game / "D3D12_Optiscaler").symlink_to(tmp_path / "elsewhere")
+    (game / "Content" / "Paks").mkdir(parents=True)
+
+    assert game_directory.directories_under(game, ("D3D12_Optiscaler", "OptiScaler", "Missing")) == {
+        "OptiScaler", "OptiScaler/D3D12_OptiScaler", "OptiScaler/custom", "OptiScaler/custom/Provider",
+    }
+
+
 def test_links_are_looked_for_only_where_a_version_links_and_never_through_a_link(tmp_path):
     game = tmp_path / "Game"
     write(game / "OptiScaler" / "keep.txt", b"game")
