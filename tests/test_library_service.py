@@ -73,6 +73,14 @@ def test_a_version_keeps_the_files_it_was_unpacked_with():
     assert library.parse_entry({**data, "files": "not a list"}).files is None
 
 
+def test_a_version_without_a_list_gets_one_of_what_it_holds_and_one_with_a_list_keeps_it():
+    present = frozenset({"OptiScaler.dll", "libxess.dll"})
+
+    assert library.listing_files(installed_entry(), present).files == ("OptiScaler.dll", "libxess.dll")
+    listed = library.Installed(**{**installed_entry().__dict__, "files": ("OptiScaler.dll",)})
+    assert library.listing_files(listed, present) is None
+
+
 def test_whats_left_of_a_damaged_version_is_listed_by_its_directory_and_size():
     assert library.damaged_json("stable-0.9.4", 12) == {"id": "stable-0.9.4", "size": 12}
 
@@ -308,6 +316,21 @@ def test_a_version_that_lost_a_file_is_listed_as_incomplete_until_downloaded_aga
 
     assert world.library().reinstall(NEWEST)["status"] == "success"
     assert world.library().installed()["versions"][0]["incomplete"] is False
+
+
+def test_loading_gives_a_version_from_before_file_lists_one_and_a_file_it_loses_later_is_seen(plugin, plugin_home):
+    from conftest import STABLE
+
+    version = plugin_home / "library" / "versions" / STABLE
+    assert json.loads((version / "entry.json").read_text()).get("files") is None  # no list, as before lists were kept
+
+    run(plugin._main())
+
+    assert json.loads((version / "entry.json").read_text())["files"] == sorted(
+        p.relative_to(version / "files").as_posix() for p in (version / "files").rglob("*") if p.is_file()
+    )
+    (version / "files" / "libxess.dll").unlink()
+    assert {v["id"]: v["incomplete"] for v in run(plugin.library_installed())["versions"]}[STABLE] is True
 
 
 def test_github_failing_still_lists_what_is_installed(world, github_api):

@@ -11,7 +11,7 @@ unsupported and never downloaded.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from . import release_assets
 
@@ -211,6 +211,12 @@ def entry(version: Available, installed_at: str, files: frozenset[str]) -> Insta
         version.id, version.channel, version.version, version.date, version.family, version.url, version.sha256,
         installed_at, tuple(sorted(files)),
     )
+
+
+def listing_files(installed: Installed, present: frozenset[str]) -> Installed | None:
+    """A version installed before the library kept file lists, with the list of what it holds now (`present`), so a
+    file it loses from now on is seen; what it lost already can't be told. None for a version that has a list."""
+    return replace(installed, files=tuple(sorted(present))) if installed.files is None else None
 
 
 def entry_json(installed: Installed) -> dict:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from deckyscaler.domain import library
 from deckyscaler.infrastructure.entry_store import EntryStore
-from deckyscaler.infrastructure.files import files_under
+from deckyscaler.infrastructure.files import files_under, replace_json
 
 
 class LibraryStore(EntryStore[library.Installed]):
@@ -19,6 +19,10 @@ class LibraryStore(EntryStore[library.Installed]):
 
     def version_dir(self, version_id: str) -> Path:
         return self.item_dir(version_id)
+
+    def rewrite_entry(self, installed: library.Installed) -> None:
+        """Write a version's entry again, in one step, as `installed` describes it."""
+        replace_json(self.item_dir(installed.id) / self.entry_filename, library.entry_json(installed))
 
     def files_of(self, version_id: str) -> frozenset[str]:
         """Every file a version holds now, relative to its files' directory."""

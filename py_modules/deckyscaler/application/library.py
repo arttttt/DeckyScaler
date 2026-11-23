@@ -45,6 +45,13 @@ class Library:
     def _published(self, channel: str) -> list[library.Available]:
         return library.available(channel, self.list_releases(library.CHANNELS[channel].repository))
 
+    def keep_file_lists(self) -> None:
+        """Give each version installed before the library kept file lists the list of what it holds now."""
+        for entry in self.store.installed():
+            listed = library.listing_files(entry, self.store.files_of(entry.id))
+            if listed is not None:
+                self.store.rewrite_entry(listed)
+
     def installed(self) -> dict:
         """The versions games can be patched with, newest first; what is left of the damaged ones, to remove; and
         what all of it takes on disk."""
