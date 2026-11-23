@@ -41,6 +41,15 @@ class Plugin:
             await asyncio.to_thread(self._refresh_core)
         except OSError as exc:
             decky.logger.error(f"Updating the core and launch scripts in ~/deckyscaler failed: {exc}")
+        # Nothing of the plugin installs by itself as it loads: what a download its last stop cut short staged is a
+        # leftover. Each store is cleared on its own, so one that fails leaves the others cleared.
+        stores = (("OptiScaler versions", self._library), ("libraries", self._user_libraries), ("Proton builds", self._proton))
+        for what, owner in stores:
+            try:
+                await asyncio.to_thread(owner().clear_interrupted)
+            except OSError as exc:
+                decky.logger.error(f"Clearing what an interrupted download of {what} left failed: {exc}")
+        # After the clear: a version it brings back from a replace cut short gets its list too.
         try:
             await asyncio.to_thread(self._library().keep_file_lists)
         except OSError as exc:

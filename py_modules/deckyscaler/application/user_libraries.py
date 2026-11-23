@@ -35,6 +35,10 @@ class UserLibraries:
 
     # ── what is on the device ────────────────────────────────────────────────
 
+    def clear_interrupted(self) -> None:
+        """Remove what a download or an add the plugin's stop cut short left."""
+        self.store.clear_partial()
+
     def installed(self) -> dict:
         """The libraries, by name, with what they serve and take and the games that have them; what is left of the
         damaged ones, to remove; the slots, the global choice and its slots that can't go in (left out, or naming a
