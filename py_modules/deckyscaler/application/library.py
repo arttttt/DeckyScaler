@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
-from deckyscaler.domain import library
+from deckyscaler.domain import library, version_placement
 from deckyscaler.infrastructure import archive
 from deckyscaler.infrastructure.files import files_under, sha256
 from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
@@ -53,7 +53,7 @@ class Library:
         damaged = [library.damaged_json(name, self.store.size(name)) for name, _ in self.store.damaged()]
         return {
             "versions": [
-                library.choice_json(entry, sizes[entry.id], bool(library.lost_files(entry, self.store.files_of(entry.id))))
+                library.choice_json(entry, sizes[entry.id], bool(version_placement.lost_files(entry, self.store.files_of(entry.id))))
                 for entry in entries
             ],
             "damaged": damaged,

@@ -264,7 +264,7 @@ class Patcher:
             recorded is not None
             and marker.describes(details, version_id, dll_name, placed)
             and patch_record.intact(recorded, game_directory.current_state(directory, recorded))
-            and patch_record.covers(recorded, version_placement.linked_files(version_files))
+            and version_placement.placed_every_file(recorded, version_files)
         )
 
     def _is_bundle(self, directory: Path) -> bool:
@@ -341,8 +341,8 @@ class Patcher:
         if recorded is None or not any(entry.id == version for entry in installed):
             return False
         if version not in seen:
-            seen[version] = version_placement.linked_files(self.library.files_of(version))
-        return not patch_record.covers(recorded, seen[version])
+            seen[version] = self.library.files_of(version)
+        return not version_placement.placed_every_file(recorded, seen[version])
 
     def patched_games(self) -> dict:
         """Every game and directory the plugin patched, by name: what it was patched with, whether it lacks files its

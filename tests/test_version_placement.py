@@ -6,7 +6,10 @@ import pytest
 
 from deckyscaler.domain import library
 from deckyscaler.domain.patch_plan import Copy, Link, Move, PlanError
-from deckyscaler.domain.version_placement import Request, is_for_the_game, linked_files, plan_patch
+from deckyscaler.domain.patch_record import PatchRecord, Placed
+from deckyscaler.domain.version_placement import (
+    Request, is_for_the_game, linked_files, lost_files, placed_every_file, plan_patch,
+)
 
 # The files of the real OptiScaler 0.9.4 and nightly-20261023 archives (7zzs l).
 V094 = frozenset({
@@ -101,6 +104,26 @@ def test_the_files_linked_at_their_own_paths_are_those_for_the_game_but_the_inje
         destination for destination, source in placed(plan_patch(frozenset(), V094, library.FAMILIES["0.9"], Request("dxgi.dll"))).items()
         if destination == source and destination != "OptiScaler.ini"
     }
+
+
+def _installed(files: tuple[str, ...] | None) -> library.Installed:
+    return library.Installed("stable-0.9.4", library.STABLE, "0.9.4", "20260718", "0.9", "u", "0" * 64, "t", files)
+
+
+def test_a_version_has_lost_the_files_a_game_gets_that_are_gone_from_it():
+    unpacked = _installed(("OptiScaler.dll", "libxess.dll", "Licenses/XeSS_LICENSE.txt", "!!.txt"))
+
+    assert lost_files(unpacked, frozenset(unpacked.files)) == frozenset()
+    assert lost_files(unpacked, frozenset({"Licenses/XeSS_LICENSE.txt", "!!.txt"})) == {"OptiScaler.dll", "libxess.dll"}
+    assert lost_files(unpacked, frozenset({"OptiScaler.dll", "libxess.dll"})) == frozenset()  # a licence is no loss to a game
+    assert lost_files(_installed(None), frozenset({"OptiScaler.dll"})) == frozenset()  # no list to check against
+
+
+def test_a_patch_placed_every_file_its_version_links_or_lacks_one_that_came_back():
+    patch = PatchRecord((Placed("dxgi.dll", "l"), Placed("libxess.dll", "l"), Placed("OptiScaler.ini", None)), (), ())
+
+    assert placed_every_file(patch, frozenset({"OptiScaler.dll", "OptiScaler.ini", "libxess.dll", "!!.txt"}))
+    assert not placed_every_file(patch, frozenset({"OptiScaler.dll", "libxess.dll", "libxess_dx11.dll"}))
 
 
 def test_everything_but_the_ini_is_a_symlink_into_the_library():

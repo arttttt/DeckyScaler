@@ -236,11 +236,6 @@ def parse_entry(data: object) -> Installed | None:
     return installed if installed.family in FAMILIES and installed.channel in CHANNELS else None
 
 
-def lost_files(installed: Installed, present: frozenset[str]) -> frozenset[str]:
-    """The files a version was unpacked with that are gone from it: it is incomplete, and downloading it again
-    brings them back. Nothing for a version that keeps no list."""
-    return frozenset() if installed.files is None else frozenset(installed.files) - present
-
 
 def newest_first(installed: list[Installed]) -> list[Installed]:
     return sorted(installed, key=lambda entry: (entry.date, entry.id), reverse=True)
@@ -258,7 +253,7 @@ def version_to_patch_with(installed: list[Installed], patched_with: str | None) 
 
 def choice_json(installed: Installed, size: int, incomplete: bool) -> dict:
     """An installed version as patching offers it and the library lists it; `size` is its bytes on disk,
-    `incomplete` whether files it was unpacked with are gone from it (`lost_files`)."""
+    `incomplete` whether files a game gets from it are gone (version_placement.lost_files)."""
     return {
         "id": installed.id,
         "version": installed.version,

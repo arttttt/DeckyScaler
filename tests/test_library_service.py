@@ -63,16 +63,13 @@ def test_a_patch_naming_no_version_keeps_the_games_else_takes_the_newest():
     assert library.version_to_patch_with([], None) is None
 
 
-def test_a_version_keeps_the_files_it_was_unpacked_with_and_says_which_are_gone():
+def test_a_version_keeps_the_files_it_was_unpacked_with():
     listed = library.Installed(**{**installed_entry().__dict__, "files": ("OptiScaler.dll", "OptiScaler/libxess.dll")})
     data = library.entry_json(listed)
 
     assert data["files"] == ["OptiScaler.dll", "OptiScaler/libxess.dll"] and library.parse_entry(data) == listed
-    assert library.lost_files(listed, frozenset({"OptiScaler.dll", "OptiScaler/libxess.dll"})) == frozenset()
-    assert library.lost_files(listed, frozenset({"OptiScaler.dll"})) == {"OptiScaler/libxess.dll"}
     old = {key: value for key, value in data.items() if key != "files"}  # installed before the list was kept
     assert library.parse_entry(old) == installed_entry()
-    assert library.lost_files(installed_entry(), frozenset({"OptiScaler.dll"})) == frozenset()  # nothing to check against
     assert library.parse_entry({**data, "files": "not a list"}).files is None
 
 
