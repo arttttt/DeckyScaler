@@ -73,8 +73,10 @@ export const patchGame = callable<
   }
 >("patch_game");
 
+/** current_launch_options is null when Steam didn't say what they are; launch_options in the answer is what Steam is
+ *  to set, null to leave them. */
 export const unpatchGame = callable<
-  [appid: string, current_launch_options: string, confirmed_reset: boolean],
+  [appid: string, current_launch_options: string | null, confirmed_reset: boolean],
   UnpatchResult
 >("unpatch_game");
 
@@ -411,7 +413,8 @@ export type UnpatchResult =
   | { status: "success"; message?: string; launch_options?: string | null }
   | { status: "error"; message: string };
 
-export const previewUnpatchGame = callable<[appid: string, current_launch_options: string], UnpatchPreview>(
+/** current_launch_options is null when Steam didn't say what they are: then they are left as they are. */
+export const previewUnpatchGame = callable<[appid: string, current_launch_options: string | null], UnpatchPreview>(
   "preview_unpatch_game"
 );
 export const previewUnpatchDirectory = callable<[directory: string], UnpatchPreview>("preview_unpatch_directory");

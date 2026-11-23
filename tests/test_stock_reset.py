@@ -97,7 +97,9 @@ def test_a_file_restored_from_its_backup_is_not_reported_as_removed():
     ],
 )
 def test_launch_options_go_back_to_the_users_own_only_when_the_plugin_wrote_them(current, stored, expected):
-    assert stock_reset.launch_options_after_reset(current, stored) == expected
+    from deckyscaler.domain import marker
+
+    assert marker.launch_options_after_unpatch(current, stored, None) == expected
 
 
 # ── integration: the plugin, on one game the user picked ─────────────────────

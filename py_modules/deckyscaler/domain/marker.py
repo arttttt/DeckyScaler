@@ -90,3 +90,11 @@ def original_launch_options(current: str | None, stored: str | None, patched_wit
         return None if stored is None else ""
     return "" if is_managed(current, patched_with) else current
 
+
+def launch_options_after_unpatch(current: str | None, stored: str | None, patched_with: str | None) -> str | None:
+    """A game's launch options once it is unpatched, or None to leave them as they are: the user's own come back, or
+    none, while the current ones are still exactly the plugin's for its proxy (`patched_with`, any when unknown); ones
+    the user changed since aren't the plugin's to touch, nor ones Steam didn't say."""
+    if current is None or not is_managed(current, patched_with):
+        return None
+    return stored if stored and not is_managed(stored, patched_with) else ""

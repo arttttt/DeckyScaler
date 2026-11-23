@@ -79,6 +79,20 @@ def test_a_repatch_without_the_games_launch_options_keeps_the_stored_ones(plugin
     assert unpatched["launch_options"] == "mangohud %command%"
 
 
+def test_unpatching_leaves_launch_options_the_user_changed_since_the_patch_or_steam_didnt_say(plugin, plugin_home, steam_library):
+    steam_library.add_game("1234", "Test Game")
+    asyncio.run(plugin.patch_game("1234", "dxgi.dll", "mangohud %command%", STABLE))
+
+    changed = asyncio.run(plugin.unpatch_game("1234", "gamemoderun %command%"))
+    assert changed["launch_options"] is None  # the frontend leaves them
+    assert changed["message"] == "Unpatched Test Game. Its launch options were changed since it was patched, so they were left as they are."
+
+    asyncio.run(plugin.patch_game("1234", "dxgi.dll", "mangohud %command%", STABLE))
+    unknown = asyncio.run(plugin.unpatch_game("1234", None))
+    assert unknown["launch_options"] is None
+    assert unknown["message"] == "Unpatched Test Game. Steam didn't say what its launch options are, so they were left as they are."
+
+
 @pytest.mark.parametrize("users", ["SteamDeck=0 %command%", "PROTON_FSR4_UPGRADE=1 gamemoderun %command%"])
 def test_a_users_own_options_that_look_like_the_plugins_come_back_after_unpatching(plugin, plugin_home, steam_library, users):
     steam_library.add_game("1234", "Test Game")
