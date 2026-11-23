@@ -41,6 +41,11 @@ class Plugin:
             await asyncio.to_thread(self._refresh_core)
         except OSError as exc:
             decky.logger.error(f"Updating the core and launch scripts in ~/deckyscaler failed: {exc}")
+        # Nothing installs while the plugin loads: a download its last stop cut short left only leftovers.
+        try:
+            await asyncio.to_thread(self._clear_interrupted)
+        except OSError as exc:
+            decky.logger.error(f"Clearing what interrupted downloads left failed: {exc}")
 
     async def _unload(self):
         decky.logger.info("DeckyScaler unloaded.")
@@ -50,6 +55,11 @@ class Plugin:
 
     def _patcher(self) -> Patcher:
         return Patcher(self._home_path())
+
+    def _clear_interrupted(self) -> None:
+        self._library().clear_interrupted()
+        self._user_libraries().clear_interrupted()
+        self._proton().clear_interrupted()
 
     def _refresh_core(self) -> None:
         core_install.refresh_core(self._home_path() / bundle.HOME_DIRNAME, Path(decky.DECKY_PLUGIN_DIR) / "assets")

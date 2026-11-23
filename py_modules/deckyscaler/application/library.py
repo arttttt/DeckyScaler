@@ -45,6 +45,11 @@ class Library:
     def _published(self, channel: str) -> list[library.Available]:
         return library.available(channel, self.list_releases(library.CHANNELS[channel].repository))
 
+    def clear_interrupted(self) -> None:
+        """Remove what an install the plugin's stop cut short left in the library, and settle a replace it cut
+        short: the old copy comes back when no new one took its place."""
+        self.store.clear_partial()
+
     def installed(self) -> dict:
         """The versions games can be patched with, newest first; what is left of the damaged ones, to remove; and
         what all of it takes on disk."""

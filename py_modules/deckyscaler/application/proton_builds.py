@@ -98,6 +98,13 @@ class ProtonBuilds:
                 })
         return offers
 
+    def clear_interrupted(self) -> None:
+        """Remove what an install the plugin's stop cut short left in the active Steam's compatibilitytools.d. Its
+        staging directory itself stays, so Steam needs no restart for it."""
+        active = self._active()
+        if active.root is not None:
+            self._store(active.root).clear_partial()
+
     def installed(self, with_sizes: bool = False) -> dict:
         """Every build Steam would find, newest first, with the games whose user chose it; the device's own folders
         in compatibilitytools.d that aren't builds, to remove; and whether Steam must restart to see the builds as

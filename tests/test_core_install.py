@@ -4,7 +4,7 @@ import shutil
 
 from conftest import REPO_ROOT, run, write
 from deckyscaler.domain import bundle
-from deckyscaler.infrastructure import core_install
+from deckyscaler.infrastructure import core_install, processes
 
 
 def test_refreshing_replaces_the_core_and_scripts_and_leaves_the_rest(tmp_path):
@@ -40,5 +40,33 @@ def test_a_failed_refresh_doesnt_stop_the_plugin_loading(plugin, home, monkeypat
         raise OSError("No space left on device")
 
     monkeypatch.setattr(core_install, "refresh_core", refresh)
+
+    run(plugin._main())  # logged, not raised
+
+
+def test_loading_clears_what_downloads_the_last_stop_cut_short_left(plugin, home, steam_library, monkeypatch):
+    monkeypatch.setattr(processes, "started_processes", lambda: [])  # no Steam client running
+    steam_library.set_compat_tools({})  # a Steam that has run: the one builds go into
+    write(home / "deckyscaler" / "library" / ".partial" / "nightly-20261023" / "files" / "OptiScaler.dll", b"half")
+    write(home / "deckyscaler" / "library" / "versions" / ".stable-0.9.4.old" / "entry.json", b"{}")  # a replace cut short
+    write(home / "deckyscaler" / "libraries" / ".partial" / "anr-v-b19.zip", b"half")
+    tools = steam_library.root / "compatibilitytools.d"
+    write(tools / ".deckyscaler-partial" / "GE-Proton11-12-x86_64" / "archive.tar.gz", b"half")
+
+    run(plugin._main())
+
+    assert not (home / "deckyscaler" / "library" / ".partial").exists()
+    assert (home / "deckyscaler" / "library" / "versions" / "stable-0.9.4").is_dir()  # the old copy came back
+    assert not (home / "deckyscaler" / "libraries" / ".partial").exists()
+    assert list((tools / ".deckyscaler-partial").iterdir()) == []  # kept itself: Steam needs no restart for it
+
+
+def test_a_failed_clearing_doesnt_stop_the_plugin_loading(plugin, home, monkeypatch):
+    from deckyscaler.application.library import Library
+
+    def clear(_self):
+        raise OSError("Read-only file system")
+
+    monkeypatch.setattr(Library, "clear_interrupted", clear)
 
     run(plugin._main())  # logged, not raised
