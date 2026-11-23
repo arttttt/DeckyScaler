@@ -35,7 +35,7 @@ const SYSTEM: InstalledProtonTool = {
   id: "proton-cachyos", build: null, build_label: null, system: true, size: 1_700_000_000, games: [], global_default: true,
 };
 const installed = (overrides: Partial<InstalledProton> = {}): InstalledProton => ({
-  status: "success", problem: null, tools: [GE, OTHER, SYSTEM], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
+  status: "success", problem: null, tools: [GE, OTHER, SYSTEM], others: [], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
   ...overrides,
 });
 
@@ -169,6 +169,22 @@ describe("the manage dialog", () => {
     expect(protonManageView({ installed: installed(), busy: null, message: removeDone(GE.id) }).message).toBe(
       "GE-Proton11-12-x86_64 is removed.",
     );
+  });
+
+  it("lists a folder that isn't a build after the builds, to remove, and sizes it only when asked", () => {
+    const leftover = { id: "GE-Proton9-1", size: 400_000_000 };
+    const view = protonManageView({ installed: installed({ tools: [GE], others: [leftover] }), busy: null, message: null });
+
+    expect(view.rows[1]).toEqual({
+      id: "GE-Proton9-1", label: "GE-Proton9-1", description: "Not a Proton build: Steam can't use it · 400 MB",
+      action: { label: "Remove", enabled: true },
+    });
+    const unsized = protonManageView({ installed: installed({ tools: [], others: [{ ...leftover, size: null }] }), busy: null, message: null });
+    expect(unsized.rows[0].description).toBe("Not a Proton build: Steam can't use it");
+    expect(unsized.message).toBeNull(); // a folder to remove is something to show
+    expect(protonManageView({ installed: installed({ tools: [], others: [leftover] }), busy: leftover.id, message: null }).rows[0]).toMatchObject({
+      description: "Removing…", action: { enabled: false },
+    });
   });
 
   it("says when nothing is installed or there is no Steam", () => {

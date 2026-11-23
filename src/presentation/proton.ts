@@ -210,19 +210,27 @@ const describeTool = (tool: InstalledProtonTool): string => {
   return [tool.build_label ?? "Not installed by DeckyScaler", ...size, usedBy(tool)].join(" · ");
 };
 
+/** A folder that isn't a build: what it is, and what it takes when sized. */
+const describeOther = (size: number | null): string =>
+  ["Not a Proton build: Steam can't use it", ...(size === null ? [] : [byteSize(size)])].join(" · ");
+
 export const protonManageView = (state: ProtonManageState): ProtonManageView => {
   const { installed, busy } = state;
-  const tools = installed?.tools ?? [];
   const idle = busy === null;
-  const nothing = installed?.problem ? problemText(installed.problem) : installed && tools.length === 0 ? "No Proton build is installed yet." : null;
+  const row = (id: string, description: string, removable: boolean): ReleaseRowView => ({
+    id,
+    label: id,
+    description: busy === id ? "Removing…" : description,
+    // Removing is all there is to do with a build: the row's button asks right away, no menu of one item.
+    action: removable ? { label: "Remove", enabled: idle } : null,
+  });
+  const rows = [
+    ...(installed?.tools ?? []).map((tool) => row(tool.id, describeTool(tool), !tool.system)),
+    ...(installed?.others ?? []).map((other) => row(other.id, describeOther(other.size), true)),
+  ];
+  const nothing = installed?.problem ? problemText(installed.problem) : installed && rows.length === 0 ? "No Proton build is installed yet." : null;
   return {
-    rows: tools.map((tool) => ({
-      id: tool.id,
-      label: tool.id,
-      description: busy === tool.id ? "Removing…" : describeTool(tool),
-      // Removing is all there is to do with a build: the row's button asks right away, no menu of one item.
-      action: tool.system ? null : { label: "Remove", enabled: idle },
-    })),
+    rows,
     usage: installed?.installed_bytes ? `Installed builds take ${byteSize(installed.installed_bytes)}.` : null,
     message: state.message ?? nothing,
   };

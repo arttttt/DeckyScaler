@@ -167,6 +167,9 @@ export type InstalledProton = {
   problem: ProtonProblem | null;
   /** The device's own newest first, then the system's. */
   tools: InstalledProtonTool[];
+  /** The device's own folders in compatibilitytools.d that aren't builds Steam would find (no
+   *  compatibilitytool.vdf), listed to remove; sized only when asked, as builds are. */
+  others: { id: string; size: number | null }[];
   installed_bytes: number | null;
   /** Builds came or went since Steam started: it lists them only after a restart. */
   restart_needed: boolean;
