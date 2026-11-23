@@ -89,6 +89,7 @@
   {
     "result": {
       "appid": "100",
+      "changed_files": [],
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,
@@ -250,6 +251,7 @@
   {
     "result": {
       "appid": "100",
+      "changed_files": [],
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,

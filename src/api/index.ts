@@ -490,6 +490,8 @@ export type PatchedGame = {
   patched_at: string | null;
   /** Its marker's record: whole, stopped before the last file, or damaged (patching again repairs it). */
   record: "ok" | "incomplete" | "damaged";
+  /** Files its patch placed, other than the proxy, that are gone or not as placed: patching again puts them back. */
+  changed_files: string[];
   own_settings: boolean;
 };
 

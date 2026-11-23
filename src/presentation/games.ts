@@ -28,6 +28,7 @@ const problem = (game: PatchedGame): string | null => {
   if (game.record === "damaged") return "Its patch record is damaged: patch it again to repair it.";
   if (game.record === "incomplete") return "The patch didn't finish: unpatch it, then patch again.";
   if (!game.dll_present) return `${game.dll_name} is missing: patch it again.`;
+  if (game.changed_files.length) return "Some of its files are gone or changed since the patch: patch it again.";
   if (game.version_incomplete) return "Its OptiScaler version is missing files: download it again from the OptiScaler page.";
   if (game.lacks_version_files) return "Its OptiScaler version has files this patch lacks: patch it again.";
   return null;

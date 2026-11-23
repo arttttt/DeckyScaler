@@ -73,6 +73,19 @@ def directories_under(directory: Path, roots: tuple[str, ...]) -> frozenset[str]
     return frozenset(found)
 
 
+def placed_kinds(directory: Path, patch: patch_record.PatchRecord) -> dict[str, str | None]:
+    """What each file a recorded patch placed is now, without reading any: a link by where it points while that is
+    there, patch_record.FILE for a file, None when it is gone or a link leads nowhere."""
+    kinds: dict[str, str | None] = {}
+    for item in patch.placed:
+        full = directory / item.path
+        if full.is_symlink():
+            kinds[item.path] = _link_identity(os.readlink(full)) if full.exists() else None
+        else:
+            kinds[item.path] = patch_record.FILE if full.is_file() else None
+    return kinds
+
+
 def listing(directory: Path) -> tuple[frozenset[str], frozenset[str]]:
     """The names in a game directory and in its plugins/ subdirectory (empty when there is none)."""
     entries = frozenset(entry.name for entry in directory.iterdir())
