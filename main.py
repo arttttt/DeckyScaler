@@ -46,7 +46,7 @@ class Plugin:
         stores = (("OptiScaler versions", self._library), ("libraries", self._user_libraries), ("Proton builds", self._proton))
         for what, owner in stores:
             try:
-                await asyncio.to_thread(lambda owner=owner: owner().clear_interrupted())
+                await asyncio.to_thread(owner().clear_interrupted)
             except OSError as exc:
                 decky.logger.error(f"Clearing what an interrupted download of {what} left failed: {exc}")
 
