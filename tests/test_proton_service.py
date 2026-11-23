@@ -215,11 +215,14 @@ def test_a_folder_that_isnt_a_build_is_listed_apart_and_removed_like_one(world, 
     listed = proton.installed(with_sizes=True)
     assert [tool["id"] for tool in listed["tools"]] == [NEWEST]
     size = listed["others"][0]["size"]
-    assert listed["others"] == [{"id": "GE-Proton9-1", "size": size}] and size > 0
+    assert listed["others"] == [{  # Steam still names it for a game: say so
+        "id": "GE-Proton9-1", "size": size, "games": [{"appid": "730", "name": "Counter-Strike 2", "kind": "steam"}],
+        "global_default": False,
+    }] and size > 0
     assert listed["installed_bytes"] == listed["tools"][0]["size"] + size
-    assert proton.installed()["others"] == [{"id": "GE-Proton9-1", "size": None}]  # sizing is the manage dialog's
+    assert proton.installed()["others"][0]["size"] is None  # sizing is the manage dialog's
 
-    assert proton.removal("GE-Proton9-1") == {  # Steam still names it for a game: say so
+    assert proton.removal("GE-Proton9-1") == {
         "status": "success", "games": [{"appid": "730", "name": "Counter-Strike 2", "kind": "steam"}], "global_default": False,
     }
     assert proton.remove("GE-Proton9-1") == {"status": "success", "message": "GE-Proton9-1 is removed."}

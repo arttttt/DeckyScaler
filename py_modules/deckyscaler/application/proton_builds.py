@@ -111,21 +111,24 @@ class ProtonBuilds:
         forced = proton.forced_mappings(active.root)
         name = self._namer(active.root)
         tools = proton_builds.newest_first(store.installed())
+
+        def row(tool: proton_builds.Tool) -> dict:
+            """What every row says: its folder, its size when asked, and the games whose user chose it."""
+            appids, global_default = proton_builds.chosen_for(tool, forced)
+            size = store.size(tool) if with_sizes else None
+            return {"id": tool.folder, "size": size, "games": name(appids), "global_default": global_default}
+
         rows = []
         for tool in tools:
-            appids, global_default = proton_builds.chosen_for(tool, forced)
             build = tool.build
             rows.append({
-                "id": tool.folder,
+                **row(tool),
                 "build": build.id if build else None,
                 "build_label": build.label if build else None,
                 "system": tool.system,
                 "linked": tool.linked,
-                "size": store.size(tool) if with_sizes else None,
-                "games": name(appids),
-                "global_default": global_default,
             })
-        others = [{"id": tool.folder, "size": store.size(tool) if with_sizes else None} for tool in store.others()]
+        others = [row(tool) for tool in store.others()]
         own = (
             sum(row["size"] for row in rows if not row["system"]) + sum(row["size"] for row in others) if with_sizes else None
         )
