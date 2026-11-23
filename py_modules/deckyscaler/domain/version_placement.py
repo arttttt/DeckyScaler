@@ -41,6 +41,12 @@ def is_for_the_game(path: str) -> bool:
     return not (len(parts) == 1 and name.endswith(".txt"))
 
 
+def linked_files(files: frozenset[str]) -> frozenset[str]:
+    """The files of a version's archive (`files`) a patch links into a game at their own paths: all those for the
+    game, but the injector (linked as the proxy DLL) and OptiScaler.ini (copied)."""
+    return frozenset(path for path in files if path not in (INJECTOR, INI_FILENAME) and is_for_the_game(path))
+
+
 def plan_patch(entries: frozenset[str], files: frozenset[str], family: Family, request: Request) -> tuple[Operation, ...]:
     """The operations that patch a directory holding `entries` with a version whose archive holds `files`.
 
@@ -64,9 +70,7 @@ def plan_patch(entries: frozenset[str], files: frozenset[str], family: Family, r
         # The user's settings go into it after placing (Patcher, domain settings_layers).
         operations.append(Copy(INI_FILENAME, INI_FILENAME))
 
-    for path in sorted(files):
-        if path not in (INJECTOR, INI_FILENAME) and is_for_the_game(path):
-            operations.append(Link(path, path))
+    operations += [Link(path, path) for path in sorted(linked_files(files))]
 
     driver = driver_path(family)
     # A DLL already there is the user's own choice of FSR 4: it stays, and nothing is linked over it.

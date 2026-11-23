@@ -132,7 +132,8 @@ class Patcher:
         had = library_choice.recorded_picks(previous_details.get("libraries")) if marker_path.exists() else None
         to_place = self._libraries_to_place(settings_appid, had if keep_libraries else None, family)
         placed = library_choice.placed(to_place)
-        if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name, placed):
+        version_files = files.files_under(source)
+        if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name, placed, version_files):
             log.info(f"{directory} is already patched with OptiScaler {entry.id}, {dll_name}")
             if patch_record.placed_by(patch_record.parse(files.read_json(marker_path)), plan.INI_FILENAME):
                 self.apply_settings(directory, source, settings_appid)
@@ -160,9 +161,7 @@ class Patcher:
             request = version_placement.Request(
                 dll_name, reset_ini, str(fsr4_driver) if fsr4_driver else None, placement.copies
             )
-            operations = version_placement.plan_patch(
-                entries, files.files_under(source), family, request
-            )
+            operations = version_placement.plan_patch(entries, version_files, family, request)
             log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(placed)}")
             recorded = patch_record.record(
                 operations,
@@ -249,14 +248,23 @@ class Patcher:
         return library_choice.users(library_id, [(name, details.get("libraries")) for _, name, details in self.patched_markers()])
 
     def _patched_as(
-        self, directory: Path, version_id: str, dll_name: str, placed: tuple[library_choice.Placed, ...]
+        self,
+        directory: Path,
+        version_id: str,
+        dll_name: str,
+        placed: tuple[library_choice.Placed, ...],
+        version_files: frozenset[str],
     ) -> bool:
+        """Whether a patch now would place nothing other than the directory has: the same version, proxy and
+        libraries, every placed file still there, and every file the version holds now among them (one that came
+        back with Download again after the game was patched without it is not)."""
         details = files.read_json(directory / bundle.MARKER_FILENAME)
         recorded = patch_record.parse(details)
         return (
             recorded is not None
             and marker.describes(details, version_id, dll_name, placed)
             and patch_record.intact(recorded, game_directory.current_state(directory, recorded))
+            and patch_record.covers(recorded, version_placement.linked_files(version_files))
         )
 
     def _is_bundle(self, directory: Path) -> bool:

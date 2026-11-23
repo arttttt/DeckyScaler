@@ -6,7 +6,7 @@ import pytest
 
 from deckyscaler.domain import library
 from deckyscaler.domain.patch_plan import Copy, Link, Move, PlanError
-from deckyscaler.domain.version_placement import Request, is_for_the_game, plan_patch
+from deckyscaler.domain.version_placement import Request, is_for_the_game, linked_files, plan_patch
 
 # The files of the real OptiScaler 0.9.4 and nightly-20261023 archives (7zzs l).
 V094 = frozenset({
@@ -91,6 +91,16 @@ def test_asking_to_reset_the_ini_backs_up_the_games_and_places_the_versions():
 def test_what_cannot_be_placed_is_refused(files, request_, message):
     with pytest.raises(PlanError, match=message):
         plan_patch(frozenset(), files, library.FAMILIES["10"], request_)
+
+
+def test_the_files_linked_at_their_own_paths_are_those_for_the_game_but_the_injector_and_the_ini():
+    files = frozenset({"OptiScaler.dll", "OptiScaler.ini", "libxess.dll", "OptiScaler/D3D12Core.dll", "!!.txt"})
+
+    assert linked_files(files) == {"libxess.dll", "OptiScaler/D3D12Core.dll"}
+    assert linked_files(V094) == {  # what a patch links at its own path: the rule plan_patch follows
+        destination for destination, source in placed(plan_patch(frozenset(), V094, library.FAMILIES["0.9"], Request("dxgi.dll"))).items()
+        if destination == source and destination != "OptiScaler.ini"
+    }
 
 
 def test_everything_but_the_ini_is_a_symlink_into_the_library():
