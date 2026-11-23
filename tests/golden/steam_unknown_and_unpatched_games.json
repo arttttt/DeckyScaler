@@ -12,6 +12,7 @@
     "dll_name": null,
     "fsr4": null,
     "install_found": false,
+    "lacks_version_files": false,
     "message": "Game not found in Steam library.",
     "newer_version": null,
     "patched": false,
