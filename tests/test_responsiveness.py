@@ -66,7 +66,7 @@ def test_only_the_plugins_own_marker_goes_back_into_the_index(plugin, plugin_hom
     (root / "FRAMEGEN_PATCH").write_text("")  # patched by the original Decky Framegen
 
     assert run(plugin.get_game_status("1234"))["patched"] is True
-    assert PatchIndex(plugin_home / "patched.json").directories() == {}
+    assert PatchIndex(plugin_home / "patched.json").entries() == {}
 
 
 def test_patching_scans_the_games_executables_and_processes_once(plugin, plugin_home, steam_library, monkeypatch):

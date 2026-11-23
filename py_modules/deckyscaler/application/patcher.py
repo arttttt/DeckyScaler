@@ -317,7 +317,7 @@ class Patcher:
 
     def _remember(self, directory: Path, name: str) -> None:
         try:
-            self.patches.add(directory, name)
+            self.patches.add(directory, name, drives.identity(directory))
         except OSError as exc:
             log.warning(f"Updating the index of patched directories failed: {exc}")
 
@@ -333,13 +333,15 @@ class Patcher:
         marker is gone from where it can be read (the game was removed, or the marker by hand) is dropped from the
         index."""
         found, away = [], []
-        for directory, name in self.patches.directories().items():
+        for directory, entry in self.patches.entries().items():
             path = Path(directory)
             marker_path = path / bundle.MARKER_FILENAME
             if marker_path.is_file():
-                found.append((path, name, files.read_json(marker_path)))
-            elif drives.on_unmounted_drive(path):
-                away.append((path, name))
+                found.append((path, entry.name, files.read_json(marker_path)))
+                if entry.drive is None and drives.identity(path) is not None:
+                    self._remember(path, entry.name)  # indexed before drives were kept: its drive is known now
+            elif drives.on_unmounted_drive(path, entry.drive):
+                away.append((path, entry.name))
             else:
                 self._forget(path)
         return found, away
@@ -406,7 +408,7 @@ class Patcher:
         then be removed. Should it come back after all, a Steam game's page finds its patch again."""
         name = next((name for path, name in self._indexed()[1] if str(path) == directory), None)
         if name is None:
-            known = self.patches.directories().get(directory, directory)
+            known = entry.name if (entry := self.patches.entries().get(directory)) else directory
             return _error(f"{known} isn't on a drive that isn't mounted: unpatch it rather than forget it.")
         try:
             self.patches.remove(Path(directory))
@@ -533,7 +535,7 @@ class Patcher:
         reset, having no record). A marker of the plugin's found by searching goes back into the index."""
         if not install_root.exists():
             return None
-        for directory in self.patches.directories():
+        for directory in self.patches.entries():
             marker_path = Path(directory) / bundle.MARKER_FILENAME
             if marker_path.parent.is_relative_to(install_root) and marker_path.is_file():
                 return marker_path
