@@ -677,7 +677,9 @@ class Patcher:
         existing_marker = self.find_marker(game.install_path)
         existing = files.read_json(existing_marker) if existing_marker else {}
         stored = str(existing.get("original_launch_options") or "") if existing_marker else None
-        original_options = marker.original_launch_options(current_launch_options, stored)
+        # Ours are told by the proxy the game is patched with, else the one it is about to be.
+        patched_with = str(existing.get("dll_name") or dll_name)
+        original_options = marker.original_launch_options(current_launch_options, stored, patched_with)
         if original_options is None:
             return _error(LAUNCH_OPTIONS_UNKNOWN)
 

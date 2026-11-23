@@ -88,6 +88,7 @@ def test_a_file_restored_from_its_backup_is_not_reported_as_removed():
     [
         (OURS, "mangohud %command%", "mangohud %command%"),
         (OURS, "", ""),
+        (OURS, OURS, ""),  # an older build stored ours as the user's: none are
         ('WINEDLLOVERRIDES="dxgi=n,b" SteamDeck=0 %command%', "", ""),
         ("~/fgmod/fgmod %command%", "", ""),
         # The user changed them since: not the plugin's to touch.

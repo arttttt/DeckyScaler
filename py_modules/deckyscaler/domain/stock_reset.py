@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import bundle, launch_options, marker
+from . import bundle, launch_options
 from .patch_plan import (
     BACKUP_SUFFIX,
     UPSTREAM_UNINSTALLER_FILENAME,
@@ -86,4 +86,4 @@ def launch_options_after_reset(current: str, stored_original: str) -> str | None
     """
     if not launch_options.is_managed(current):
         return None
-    return marker.original_launch_options(current, stored_original)
+    return stored_original if stored_original and not launch_options.is_managed(stored_original) else ""
