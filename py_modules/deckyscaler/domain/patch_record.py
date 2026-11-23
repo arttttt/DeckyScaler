@@ -158,9 +158,12 @@ def state(marker: dict) -> str:
 
 
 def state_of(name: str, marker: dict) -> str:
-    """What a game's marker says, by the file it is: the original Decky Framegen's (FRAMEGEN_PATCH) is UPSTREAM,
-    undone by a reset; the plugin's goes by its record."""
-    return UPSTREAM if name == bundle.UPSTREAM_MARKER_FILENAME else state(marker)
+    """What a game's marker says: a record that reads goes by itself, whatever the file is called (a few early builds
+    wrote theirs under the original's name, FRAMEGEN_PATCH, and it undoes their patch exactly); with none, the
+    original Decky Framegen's marker is UPSTREAM, undone by a reset, and the plugin's own is DAMAGED."""
+    if parse(marker) is None and name == bundle.UPSTREAM_MARKER_FILENAME:
+        return UPSTREAM
+    return state(marker)
 
 
 def placed_by(patch: PatchRecord | None, path: str) -> bool:
@@ -183,7 +186,7 @@ def covers(patch: PatchRecord, paths: frozenset[str]) -> bool:
 
 
 def plan_unpatch(
-    patch: PatchRecord, current: dict[str, str | None], keep: frozenset[str] = frozenset()
+    patch: PatchRecord, current: dict[str, str | None], keep: frozenset[str] = frozenset(), marker: str = bundle.MARKER_FILENAME
 ) -> tuple[Operation | RemoveDirIfEmpty, ...]:
     """Undo a recorded patch. `current` maps every placed path and backup still present to its sha256 now.
     Directories the patch owns go whole, with what their programs wrote into them since.
@@ -191,7 +194,8 @@ def plan_unpatch(
     A placed file someone replaced since stays when nothing was backed up for it. When something was,
     the backup comes back over it: Unpatch returns the directory to how it was before the patch, and
     a file put over a patched one after patching is its owner's to keep track of.
-    `keep` names placed files to leave where they are, for a repatch that carries them over.
+    `keep` names placed files to leave where they are, for a repatch that carries them over. `marker` is the file
+    the record is in, taken last.
     """
     operations: list[Operation | RemoveDirIfEmpty] = []
     backed_up = {backup.original for backup in patch.backups if backup.backup in current}
@@ -207,5 +211,5 @@ def plan_unpatch(
             operations.append(Move(backup.backup, backup.original))
     operations += [RemoveTree(path) for path in patch.owned_dirs]
     operations += [RemoveDirIfEmpty(path) for path in patch.created_dirs]
-    operations.append(DeleteFile(bundle.MARKER_FILENAME))
+    operations.append(DeleteFile(marker))
     return tuple(operations)

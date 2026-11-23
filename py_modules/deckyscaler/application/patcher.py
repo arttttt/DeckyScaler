@@ -59,10 +59,21 @@ REPAIR = "repair"
 """A directory whose record is damaged isn't unpatched: patching it again repairs the record first."""
 
 
+def _marker_of(directory: Path) -> Path:
+    """The file a directory's patch is recorded in: the plugin's marker, or the original's name when an early build
+    recorded its patch there; where the plugin's marker goes when there is neither."""
+    upstream = directory / bundle.UPSTREAM_MARKER_FILENAME
+    if not (directory / bundle.MARKER_FILENAME).is_file() and upstream.is_file():
+        if patch_record.state_of(upstream.name, files.read_json(upstream)) != patch_record.UPSTREAM:
+            return upstream
+    return directory / bundle.MARKER_FILENAME
+
+
 def _patched_by_upstream(directory: Path) -> bool:
     """Whether the original Decky Framegen patched a directory (and this plugin didn't since): its patch has
     no record, so it is reset after the user confirms, never patched over or unpatched by a record."""
-    return (directory / bundle.UPSTREAM_MARKER_FILENAME).is_file() and not (directory / bundle.MARKER_FILENAME).is_file()
+    upstream = directory / bundle.UPSTREAM_MARKER_FILENAME
+    return upstream.is_file() and _marker_of(directory) != upstream and not (directory / bundle.MARKER_FILENAME).is_file()
 
 
 def _error(message: str) -> dict:
@@ -121,20 +132,21 @@ class Patcher:
         if _patched_by_upstream(directory):
             return _error(PATCHED_BY_DECKY_FRAMEGEN)
         marker_path = directory / bundle.MARKER_FILENAME
+        recorded_in = _marker_of(directory)
         installed = self.library.installed()
         if version_id:
             entry = next((e for e in installed if e.id == version_id), None)
             if entry is None:
                 return _error(f"OptiScaler {version_id} is not in the library.")
         else:
-            entry = library.version_to_patch_with(installed, files.read_json(marker_path).get("optiscaler_version"))
+            entry = library.version_to_patch_with(installed, files.read_json(recorded_in).get("optiscaler_version"))
             if entry is None:
                 return _error(NO_VERSION)
         family = library.FAMILIES[entry.family]
         source = self.library.version_dir(entry.id) / library.FILES_DIRNAME
         settings_appid = steam_game.appid if steam_game else settings_appid
-        previous_details = files.read_json(marker_path)
-        had = library_choice.recorded_picks(previous_details.get("libraries")) if marker_path.exists() else None
+        previous_details = files.read_json(recorded_in)
+        had = library_choice.recorded_picks(previous_details.get("libraries")) if recorded_in.exists() else None
         to_place = self._libraries_to_place(settings_appid, had if keep_libraries else None, family)
         placed = library_choice.placed(to_place)
         version_files = files.files_under(source)
@@ -289,7 +301,7 @@ class Patcher:
         """
         if self._is_bundle(directory):
             return _error(BUNDLE_IS_NOT_A_GAME)
-        marker_path = directory / bundle.MARKER_FILENAME
+        marker_path = _marker_of(directory)
         if _patched_by_upstream(directory):
             return _error(PATCHED_BY_DECKY_FRAMEGEN)
         if not marker_path.exists():
@@ -299,7 +311,8 @@ class Patcher:
         if recorded is None:
             return _error(DAMAGED_RECORD)
         try:
-            operations = patch_record.plan_unpatch(recorded, game_directory.current_state(directory, recorded), keep)
+            current = game_directory.current_state(directory, recorded)
+            operations = patch_record.plan_unpatch(recorded, current, keep, marker_path.name)
             game_directory.execute(operations, directory, self.plugin_home)
         except PermissionError as exc:
             log.error(f"Unpatch permission error: {exc}")
@@ -308,7 +321,7 @@ class Patcher:
             log.error(f"Unpatch failed: {exc}")
             return _error(f"Unpatch failed: {exc}")
         # What a marker write cut short staged goes with the marker.
-        files.staged(marker_path).unlink(missing_ok=True)
+        files.staged(directory / bundle.MARKER_FILENAME).unlink(missing_ok=True)
         self._forget(directory)
         return {"status": "success", "message": f"OptiScaler files removed from {directory}"}
 
@@ -444,7 +457,7 @@ class Patcher:
         except (FileNotFoundError, NotADirectoryError, PermissionError) as exc:
             log.error(f"Manual unpatch validation failed: {exc}")
             return _error(str(exc))
-        if confirmed_reset and self._unpatch_mode(target / bundle.MARKER_FILENAME) == RESET:
+        if confirmed_reset and self._unpatch_mode(_marker_of(target)) == RESET:
             return self._reset_directory(target)
         # Decky Framegen's marker is refused there: its patch needs the confirmed reset.
         return self.unpatch_directory(target)
@@ -452,7 +465,7 @@ class Patcher:
     def preview_unpatch_directory(self, directory: str) -> dict:
         try:
             target = self.resolve_directory(directory)
-            mode = self._unpatch_mode(target / bundle.MARKER_FILENAME)
+            mode = self._unpatch_mode(_marker_of(target))
             if mode == RECORD:
                 return {"status": "success", "mode": RECORD, "target_dir": str(target)}
             if mode == REPAIR:

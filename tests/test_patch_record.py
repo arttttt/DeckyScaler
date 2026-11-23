@@ -328,6 +328,39 @@ def test_the_launch_wrapper_repairs_a_damaged_record_as_the_game_starts(plugin, 
     assert patch_record.state(json.loads((game / "DECKYSCALER_PATCH").read_text())) == patch_record.OK
 
 
+@pytest.mark.parametrize("version", [STABLE, NIGHTLY])
+def test_a_patch_an_early_build_recorded_under_the_originals_name_is_undone_by_its_record(plugin, plugin_home, tmp_path, version):
+    game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", version))
+    (game / "DECKYSCALER_PATCH").rename(game / "FRAMEGEN_PATCH")  # where those builds wrote it
+
+    assert run(plugin.preview_unpatch_directory(str(game)))["mode"] == "record"
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before  # exactly: OptiScaler 10's links under OptiScaler/ included
+
+
+def test_patching_over_a_patch_recorded_under_the_originals_name_undoes_it_first(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    before = snapshot(game)
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "DECKYSCALER_PATCH").rename(game / "FRAMEGEN_PATCH")
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+    assert not (game / "FRAMEGEN_PATCH").exists() and (game / "DECKYSCALER_PATCH").is_file()
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before
+
+
+def test_the_plugins_own_marker_wins_over_a_record_under_the_originals_name(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game")
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))
+    (game / "FRAMEGEN_PATCH").write_text((game / "DECKYSCALER_PATCH").read_text())  # an early build's, left beside
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert not (game / "DECKYSCALER_PATCH").exists()  # undone by its own record
+
+
 def test_links_are_looked_for_only_where_a_version_links_and_never_through_a_link(tmp_path):
     game = tmp_path / "Game"
     write(game / "OptiScaler" / "keep.txt", b"game")
