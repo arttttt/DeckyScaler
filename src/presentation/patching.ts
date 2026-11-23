@@ -54,10 +54,14 @@ export const gameVersionLine = (status: {
   patched?: boolean;
   optiscaler_version?: string | null;
   newer_version?: string | null;
+  lacks_version_files?: boolean;
 } | null): string | null => {
   if (!status?.patched) return null;
-  const line = status.optiscaler_version ?? "Unknown version";
-  return status.newer_version ? `${line}. ${status.newer_version} is in the library; choose it and patch again to update.` : line;
+  const notes = [
+    ...(status.newer_version ? [`${status.newer_version} is in the library; choose it and patch again to update.`] : []),
+    ...(status.lacks_version_files ? ["This version has files the patch lacks; patch again to add them."] : []),
+  ];
+  return [`${status.optiscaler_version ?? "Unknown version"}${notes.length ? "." : ""}`, ...notes].join(" ");
 };
 
 /** What a game's patch uses: the proxy, the version id ("" lets the backend keep the game's version,
@@ -94,6 +98,8 @@ export type GameStatus = {
   dll_name?: string | null;
   optiscaler_version?: string | null;
   newer_version?: string | null;
+  /** Its version holds files its patch didn't place: patching again adds them. */
+  lacks_version_files?: boolean;
   fsr4?: Fsr4State | null;
   /** The user's libraries its patch placed. */
   libraries?: PlacedLibrary[];

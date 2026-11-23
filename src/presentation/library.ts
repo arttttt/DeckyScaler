@@ -98,7 +98,11 @@ export type ManageMenuItem = {
 };
 
 const describeInstalled = (version: InstalledVersion): string =>
-  `${version.channel === "nightly" ? "Nightly" : "Stable"} · ${byteSize(version.size)}`;
+  [
+    version.channel === "nightly" ? "Nightly" : "Stable",
+    byteSize(version.size),
+    ...(version.incomplete ? ["incomplete: some of its files are gone, download it again"] : []),
+  ].join(" · ");
 
 const busyDescription = (action: ManageAction, download: ReleaseDownload | null): string =>
   action === "reinstall" ? downloadProgress(download) : "Removing…";

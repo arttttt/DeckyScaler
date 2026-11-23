@@ -25,6 +25,7 @@ const problem = (game: PatchedGame): string | null => {
   if (game.record === "upstream") return "Patched by Decky Framegen: Unpatch resets it to the game's own files.";
   if (game.record === "incomplete") return "The patch didn't finish: unpatch it, then patch again.";
   if (!game.dll_present) return `${game.dll_name} is missing: patch it again.`;
+  if (game.lacks_version_files) return "Its OptiScaler version has files this patch lacks: patch it again.";
   return null;
 };
 

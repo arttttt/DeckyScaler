@@ -13,6 +13,7 @@ const LIBRARY: InstalledLibrary = {
       date: "20261023",
       size: 300_000_000,
       libraries: true,
+      incomplete: false,
     },
     {
       id: "stable-0.9.4",
@@ -21,6 +22,7 @@ const LIBRARY: InstalledLibrary = {
       date: "20260718",
       size: 200_000_000,
       libraries: false,
+      incomplete: false,
     },
   ],
 };
@@ -87,6 +89,13 @@ describe("game version line", () => {
     expect(gameVersionLine(patched)).toBe("nightly-20261023");
     expect(gameVersionLine({ ...patched, newer_version: "nightly-20261101" })).toBe(
       "nightly-20261023. nightly-20261101 is in the library; choose it and patch again to update.",
+    );
+    expect(gameVersionLine({ ...patched, lacks_version_files: true })).toBe(
+      "nightly-20261023. This version has files the patch lacks; patch again to add them.",
+    );
+    expect(gameVersionLine({ ...patched, newer_version: "nightly-20261101", lacks_version_files: true })).toBe(
+      "nightly-20261023. nightly-20261101 is in the library; choose it and patch again to update. " +
+        "This version has files the patch lacks; patch again to add them.",
     );
     expect(gameVersionLine({ patched: true })).toBe("Unknown version");
     expect(gameVersionLine({ patched: false })).toBeNull();
