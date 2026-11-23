@@ -227,6 +227,17 @@ def test_a_folder_that_isnt_a_build_is_listed_apart_and_removed_like_one(world, 
     assert proton.remove("GE-Proton9-1") == {"status": "error", "message": "GE-Proton9-1 is not installed."}
 
 
+def test_a_system_build_of_the_same_name_doesnt_hide_the_devices_own_folder(world, home):
+    build_tree(home.parent / "system-compatibilitytools.d", "proton-cachyos")
+    write(world.tools / "proton-cachyos" / "readme.txt", b"")  # the device's own, and no build
+    proton = world.proton()
+
+    assert [other["id"] for other in proton.installed()["others"]] == ["proton-cachyos"]
+    assert proton.remove("proton-cachyos") == {"status": "success", "message": "proton-cachyos is removed."}
+    assert not (world.tools / "proton-cachyos").exists()
+    assert (home.parent / "system-compatibilitytools.d" / "proton-cachyos").is_dir()
+
+
 def test_a_build_linked_in_from_elsewhere_is_listed_as_linked_and_never_removed(world, tmp_path):
     sdcard = tmp_path / "sdcard"
     build_tree(sdcard, "GE-Proton9-1")

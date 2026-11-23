@@ -250,19 +250,17 @@ class ProtonBuilds:
         return {"status": "success", "games": self._namer(active.root)(appids)}
 
     def _own_tool(self, root: Path, folder: str) -> proton_builds.Tool | str:
-        """A tool in compatibilitytools.d to remove: a build, or a folder there that isn't one (it declares no
-        names, so only a mapping naming its folder can name it)."""
+        """A tool of the device's own to remove: a build, or a folder there that isn't one (it declares no names, so
+        only a mapping naming its folder can name it); never a tool installed for every user, nor a link to a build
+        kept elsewhere. A system tool of the same name doesn't hide the device's own."""
         store = self._store(root)
-        tool = next((t for t in store.installed() if t.folder == folder), None)
-        if tool is None:
-            tool = next((t for t in store.others() if t.folder == folder), None)
-        if tool is None:
-            return f"{folder} is not installed."
-        if tool.system:
+        tools = store.installed()
+        own = next((t for t in [*tools, *store.others()] if t.folder == folder and not t.system), None)
+        if own is not None:
+            return f"{folder} is a link to a build kept elsewhere; it can't be removed here." if own.linked else own
+        if any(t.folder == folder for t in tools):
             return f"{folder} is installed for every user of this device; it can't be removed here."
-        if tool.linked:
-            return f"{folder} is a link to a build kept elsewhere; it can't be removed here."
-        return tool
+        return f"{folder} is not installed."
 
     def removal(self, folder: str) -> dict:
         """The games whose user chose a build, asked before removing it: removing warns, it doesn't refuse."""
