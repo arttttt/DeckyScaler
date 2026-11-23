@@ -183,10 +183,10 @@ class Patcher:
                 library_layer=placement.layer,
             )
             # The record lands before the first file does, so even an interrupted patch can be undone.
-            files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
+            files.replace_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
             self._remember(directory, marker.shown_name(details, directory))
             game_directory.execute(operations, directory, source)
-            files.write_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
+            files.replace_json(marker_path, {**details, **patch_record.to_json(recorded, complete=True)})
             if patch_record.placed_by(recorded, plan.INI_FILENAME):
                 # Keys the previous patch's libraries set and these don't are written back once, in a kept ini; a
                 # fresh one holds none of them.
@@ -296,6 +296,8 @@ class Patcher:
         except Exception as exc:
             log.error(f"Unpatch failed: {exc}")
             return _error(f"Unpatch failed: {exc}")
+        # What a marker write cut short staged goes with the marker.
+        files.staged(marker_path).unlink(missing_ok=True)
         self._forget(directory)
         return {"status": "success", "message": f"OptiScaler files removed from {directory}"}
 

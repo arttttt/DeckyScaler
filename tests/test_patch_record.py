@@ -188,6 +188,32 @@ def test_an_interrupted_patch_can_still_be_undone(plugin, plugin_home, tmp_path,
     assert snapshot(game) == before
 
 
+def test_a_marker_write_cut_short_leaves_the_record_whole_and_unpatching_takes_what_it_staged(plugin, plugin_home, tmp_path, monkeypatch):
+    from deckyscaler.infrastructure import files
+
+    game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
+    before = snapshot(game)
+    real_write = files.write_json
+    marker_writes: list[Path] = []
+
+    def stop_in_the_second(path, payload):
+        if path.name.startswith("DECKYSCALER_PATCH"):
+            marker_writes.append(path)
+        if len(marker_writes) == 2 and path == marker_writes[-1]:
+            path.write_text(json.dumps(payload)[:17])  # the stop comes in the middle of the write
+            raise OSError("device went to sleep")
+        real_write(path, payload)
+
+    monkeypatch.setattr(files, "write_json", stop_in_the_second)
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "error"
+    monkeypatch.setattr(files, "write_json", real_write)
+
+    assert json.loads((game / "DECKYSCALER_PATCH").read_text())["complete"] is False  # the record before the stop
+    assert (game / "DECKYSCALER_PATCH.new").exists()
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before
+
+
 def test_unpatching_restores_the_backup_over_a_file_put_there_after_patching(plugin, plugin_home, tmp_path):
     game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
     run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))

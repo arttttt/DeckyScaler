@@ -55,13 +55,17 @@ def write_json(path: Path, payload: dict) -> None:
         json.dump(payload, f, indent=2)
 
 
+def staged(path: Path) -> Path:
+    """Where replace_json writes a file before moving it over the old one; a stop in between leaves it there."""
+    return path.with_name(path.name + ".new")
+
+
 def replace_json(path: Path, payload: dict) -> None:
-    """Write a JSON file the plugin keeps (settings, indexes) in one step: written beside it, then moved over it,
-    so an interrupted write leaves the old content rather than half a file."""
+    """Write a JSON file the plugin keeps (settings, indexes, a game's patch marker) in one step: written beside it,
+    then moved over it, so an interrupted write leaves the old content rather than half a file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    staged = path.with_name(path.name + ".new")
-    write_json(staged, payload)
-    staged.replace(path)
+    write_json(staged(path), payload)
+    staged(path).replace(path)
 
 
 @contextmanager
