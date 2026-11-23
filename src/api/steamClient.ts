@@ -89,5 +89,6 @@ export const withSteamNames = (games: ProtonGame[]): ProtonGame[] =>
 export const installedWithSteamNames = (installed: InstalledProton): InstalledProton => ({
   ...installed,
   tools: installed.tools.map((tool) => ({ ...tool, games: withSteamNames(tool.games) })),
+  others: installed.others.map((other) => ({ ...other, games: withSteamNames(other.games) })),
   moves: installed.moves.map((move) => ({ ...move, games: withSteamNames(move.games) })),
 });

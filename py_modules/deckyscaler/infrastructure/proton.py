@@ -72,8 +72,8 @@ def tool_directory(home: Path, name: str) -> Path | None:
         if not tools.is_dir():
             continue
         for manifest in sorted(tools.glob("*/compatibilitytool.vdf")):
-            tools = _cached("tools", manifest, lambda manifest=manifest: compat_tools.custom_tools(keyvalues.parse(_read(manifest))))
-            install_path = tools.get(name.lower())
+            declared = _cached("tools", manifest, lambda manifest=manifest: compat_tools.custom_tools(keyvalues.parse(_read(manifest))))
+            install_path = declared.get(name.lower())
             if install_path is not None:
                 return (manifest.parent / install_path).resolve()
     return None

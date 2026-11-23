@@ -36,14 +36,25 @@ def _modified(directory: Path) -> float:
         return 0.0
 
 
-def _scan(directory: Path, system: bool) -> list[Tool]:
-    if not directory.is_dir():
+def _folders(directory: Path) -> list[Path]:
+    """The folders in a compatibilitytools.d, by name, linked ones too (a build kept elsewhere, as on an SD card, is
+    linked in: it is listed, never removed); none named with a dot (the plugin's own staging), and none when the
+    directory can't be read."""
+    try:
+        return sorted(path for path in directory.iterdir() if path.is_dir() and not path.name.startswith("."))
+    except OSError:
         return []
-    return [
-        Tool(manifest.parent.name, _declared(manifest), system, _modified(manifest.parent))
-        for manifest in sorted(directory.glob(f"*/{MANIFEST}"))
-        if not manifest.parent.name.startswith(".")
-    ]
+
+
+def _tool(folder: Path, system: bool) -> Tool | None:
+    """The tool a folder is, as Steam finds one: a compatibilitytool.vdf that declares a tool. Anything else, a
+    missing, unreadable or empty manifest included, is no tool Steam would list."""
+    names = _declared(folder / MANIFEST)
+    return Tool(folder.name, names, system, _modified(folder), folder.is_symlink()) if names else None
+
+
+def _scan(directory: Path, system: bool) -> list[Tool]:
+    return [tool for folder in _folders(directory) if (tool := _tool(folder, system)) is not None]
 
 
 class CompatToolsStore:
@@ -56,6 +67,16 @@ class CompatToolsStore:
     def installed(self) -> list[Tool]:
         """Every tool Steam would find, whoever put it there: this install's own, then the system's."""
         return _scan(self.tools_dir, system=False) + (_scan(self.system_dir, system=True) if self.system_dir else [])
+
+    def others(self) -> list[Tool]:
+        """The device's own folders in compatibilitytools.d that aren't tools Steam would find (`_tool`): what a
+        broken install or a folder copied by hand leaves. They are listed so that they can be removed, as tools that
+        declare no names. A link never counts: it isn't removed here."""
+        return [
+            Tool(folder.name, frozenset(), modified=_modified(folder))
+            for folder in _folders(self.tools_dir)
+            if not folder.is_symlink() and _tool(folder, system=False) is None
+        ]
 
     def _own(self, folder: str) -> Path:
         """A tool's directory in compatibilitytools.d; anything that would point elsewhere is refused."""
@@ -117,12 +138,17 @@ class CompatToolsStore:
         manifest = tool_dir / MANIFEST
         return manifest.is_file(), (tool_dir / TOOL_MANIFEST).is_file(), _declared(manifest)
 
-    def commit(self, unpacked: Path, folder: str) -> None:
-        """Move an unpacked tool into compatibilitytools.d in one rename; a tool already there is never replaced."""
+    def taken(self, folder: str) -> bool:
+        """Whether something already holds a tool's name in compatibilitytools.d, a folder, a link or a file: a tool
+        moved in can't land there."""
         target = self._own(folder)
-        if target.exists() or target.is_symlink():
+        return target.exists() or target.is_symlink()
+
+    def commit(self, unpacked: Path, folder: str) -> None:
+        """Move an unpacked tool into compatibilitytools.d in one rename; whatever holds its name is never replaced."""
+        if self.taken(folder):
             raise FileExistsError(f"{folder} is already in {self.tools_dir}")
-        unpacked.rename(target)
+        unpacked.rename(self._own(folder))
 
     def remove(self, folder: str) -> None:
         """Delete a tool from compatibilitytools.d; a link, or anything outside it, is refused."""

@@ -156,12 +156,17 @@ export type InstalledProtonTool = {
   build_label: string | null;
   /** Installed for every user of the device: listed, never removed here. */
   system: boolean;
+  /** A link to a build kept elsewhere (an SD card): listed as a build, never removed here. */
+  linked: boolean;
   /** Bytes on disk, when asked for (sizing walks thousands of files). */
   size: number | null;
   games: ProtonGame[];
   /** The tool Steam uses for every game the user didn't pick one for. */
   global_default: boolean;
 };
+
+/** A folder in compatibilitytools.d that isn't a build: what it takes, and the games Steam still maps to its name. */
+export type ProtonOther = Pick<InstalledProtonTool, "id" | "size" | "games" | "global_default">;
 
 /** Games an update left on older builds of a build, to move to the newer one now that Steam lists it. */
 export type ProtonMove = { build: string; target: string; sources: string[]; games: ProtonGame[] };
@@ -171,6 +176,9 @@ export type InstalledProton = {
   problem: ProtonProblem | null;
   /** The device's own newest first, then the system's. */
   tools: InstalledProtonTool[];
+  /** The device's own folders in compatibilitytools.d that aren't builds Steam would list (no manifest declaring
+   *  one), listed to remove; sized only when asked, as builds are. */
+  others: ProtonOther[];
   installed_bytes: number | null;
   /** Builds came or went since Steam started: it lists them only after a restart. */
   restart_needed: boolean;

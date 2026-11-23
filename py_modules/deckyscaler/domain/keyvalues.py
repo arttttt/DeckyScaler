@@ -7,8 +7,13 @@ KeyValues = dict[str, "str | KeyValues"]
 _ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"'}
 
 
+BYTE_ORDER_MARK = "\ufeff"
+"""What an editor on Windows may save before a file's text; no part of the text."""
+
+
 def _tokens(text: str):
-    """Quoted or bare strings and braces, skipping whitespace and // comments."""
+    """Quoted or bare strings and braces, skipping a leading byte-order mark, whitespace and // comments."""
+    text = text.removeprefix(BYTE_ORDER_MARK)
     i, n = 0, len(text)
     while i < n:
         c = text[i]

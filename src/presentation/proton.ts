@@ -5,6 +5,7 @@ import type {
   ProtonGame,
   ProtonListing,
   ProtonMove,
+  ProtonOther,
   ProtonProblem,
   ProtonRemoval,
 } from "../api";
@@ -193,37 +194,58 @@ export type ProtonManageState = {
 };
 
 export type ProtonManageView = {
+  /** The dialog's heading: it names the folders that aren't builds while there are any. */
+  title: string;
   rows: ReleaseRowView[];
   usage: string | null;
   message: string | null;
 };
 
-const usedBy = (tool: InstalledProtonTool): string => {
+const usedBy = (tool: ProtonOther): string => {
   const shown = shownGames(tool.games).length;
   const games = shown ? `used by ${count(shown, "game", "games")}` : "no games";
   return tool.global_default ? `${games} · the default for all games` : games;
 };
 
+const sized = (size: number | null): string[] => (size === null ? [] : [byteSize(size)]);
+
+/** Whether a tool's row offers Remove: never for one installed for every user, nor a link to a build kept
+ *  elsewhere. */
+const removable = (tool: InstalledProtonTool): boolean => !tool.system && !tool.linked;
+
+/** A linked build is still a build the user's games run on: its row keeps what it is, its size and its games. */
 const describeTool = (tool: InstalledProtonTool): string => {
   if (tool.system) return "Installed system-wide · can't be removed here";
-  const size = tool.size === null ? [] : [byteSize(tool.size)];
-  return [tool.build_label ?? "Not installed by DeckyScaler", ...size, usedBy(tool)].join(" · ");
+  const linked = tool.linked ? ["linked from another folder, can't be removed here"] : [];
+  return [tool.build_label ?? "Not installed by DeckyScaler", ...linked, ...sized(tool.size), usedBy(tool)].join(" · ");
 };
+
+/** A folder that isn't a build: what it is, what it takes when sized, and the games Steam still maps to it. */
+const describeOther = (other: ProtonOther): string =>
+  ["Not a Proton build: Steam can't use it", ...sized(other.size), usedBy(other)].join(" · ");
 
 export const protonManageView = (state: ProtonManageState): ProtonManageView => {
   const { installed, busy } = state;
-  const tools = installed?.tools ?? [];
   const idle = busy === null;
-  const nothing = installed?.problem ? problemText(installed.problem) : installed && tools.length === 0 ? "No Proton build is installed yet." : null;
+  const row = (id: string, description: string, removable: boolean): ReleaseRowView => ({
+    id,
+    label: id,
+    description: busy === id ? "Removing…" : description,
+    // Removing is all there is to do with a build: the row's button asks right away, no menu of one item.
+    action: removable ? { label: "Remove", enabled: idle } : null,
+  });
+  const others = installed?.others ?? [];
+  const rows = [
+    ...(installed?.tools ?? []).map((tool) => row(tool.id, describeTool(tool), removable(tool))),
+    ...others.map((other) => row(other.id, describeOther(other), true)),
+  ];
+  const nothing = installed?.problem ? problemText(installed.problem) : installed && rows.length === 0 ? "No Proton build is installed yet." : null;
+  // The folders that aren't builds are named wherever they are counted.
+  const what = others.length ? "Installed builds and other folders" : "Installed builds";
   return {
-    rows: tools.map((tool) => ({
-      id: tool.id,
-      label: tool.id,
-      description: busy === tool.id ? "Removing…" : describeTool(tool),
-      // Removing is all there is to do with a build: the row's button asks right away, no menu of one item.
-      action: tool.system ? null : { label: "Remove", enabled: idle },
-    })),
-    usage: installed?.installed_bytes ? `Installed builds take ${byteSize(installed.installed_bytes)}.` : null,
+    title: others.length ? "Installed Proton builds and other folders" : "Installed Proton builds",
+    rows,
+    usage: installed?.installed_bytes ? `${what} take ${byteSize(installed.installed_bytes)}.` : null,
     message: state.message ?? nothing,
   };
 };

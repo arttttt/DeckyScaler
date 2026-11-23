@@ -20,7 +20,7 @@ import {
 } from "./proton";
 
 const GE: InstalledProtonTool = {
-  id: "GE-Proton11-12-x86_64", build: "ge-proton", build_label: "GE-Proton", system: false, size: 1_600_000_000,
+  id: "GE-Proton11-12-x86_64", build: "ge-proton", build_label: "GE-Proton", system: false, linked: false, size: 1_600_000_000,
   games: [
     { appid: "730", name: "Counter-Strike 2", kind: "steam" },
     { appid: "1245620", name: null, kind: "unknown" },
@@ -29,13 +29,13 @@ const GE: InstalledProtonTool = {
   global_default: false,
 };
 const OTHER: InstalledProtonTool = {
-  id: "Proton-EM-10.0-37", build: null, build_label: null, system: false, size: 1_400_000_000, games: [], global_default: false,
+  id: "Proton-EM-10.0-37", build: null, build_label: null, system: false, linked: false, size: 1_400_000_000, games: [], global_default: false,
 };
 const SYSTEM: InstalledProtonTool = {
-  id: "proton-cachyos", build: null, build_label: null, system: true, size: 1_700_000_000, games: [], global_default: true,
+  id: "proton-cachyos", build: null, build_label: null, system: true, linked: false, size: 1_700_000_000, games: [], global_default: true,
 };
 const installed = (overrides: Partial<InstalledProton> = {}): InstalledProton => ({
-  status: "success", problem: null, tools: [GE, OTHER, SYSTEM], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
+  status: "success", problem: null, tools: [GE, OTHER, SYSTEM], others: [], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
   ...overrides,
 });
 
@@ -169,6 +169,42 @@ describe("the manage dialog", () => {
     expect(protonManageView({ installed: installed(), busy: null, message: removeDone(GE.id) }).message).toBe(
       "GE-Proton11-12-x86_64 is removed.",
     );
+  });
+
+  it("lists a folder that isn't a build after the builds, to remove, with its size when asked and its games", () => {
+    const leftover = { id: "GE-Proton9-1", size: 400_000_000, games: [GE.games[0]], global_default: false };
+    const view = protonManageView({ installed: installed({ tools: [GE], others: [leftover] }), busy: null, message: null });
+
+    expect(view.rows[1]).toEqual({
+      id: "GE-Proton9-1", label: "GE-Proton9-1", description: "Not a Proton build: Steam can't use it · 400 MB · used by 1 game",
+      action: { label: "Remove", enabled: true },
+    });
+    const unsized = protonManageView({ installed: installed({ tools: [], others: [{ ...leftover, size: null, games: [] }] }), busy: null, message: null });
+    expect(unsized.rows[0].description).toBe("Not a Proton build: Steam can't use it · no games");
+    expect(unsized.message).toBeNull(); // a folder to remove is something to show
+    expect(protonManageView({ installed: installed({ tools: [], others: [leftover] }), busy: leftover.id, message: null }).rows[0]).toMatchObject({
+      description: "Removing…", action: { enabled: false },
+    });
+  });
+
+  it("names the folders that aren't builds in the heading and the usage, only while there are any", () => {
+    const leftover = { id: "GE-Proton9-1", size: 400_000_000, games: [], global_default: false };
+    const withOther = protonManageView({ installed: installed({ tools: [], others: [leftover], installed_bytes: 400_000_000 }), busy: null, message: null });
+    const buildsOnly = protonManageView({ installed: installed(), busy: null, message: null });
+
+    expect(withOther.title).toBe("Installed Proton builds and other folders");
+    expect(withOther.usage).toBe("Installed builds and other folders take 400 MB.");
+    expect(buildsOnly.title).toBe("Installed Proton builds");
+    expect(buildsOnly.usage).toBe("Installed builds take 3.0 GB.");
+  });
+
+  it("offers no Remove for a build linked in from elsewhere, says why, and still says what it is and who uses it", () => {
+    const linked = { ...GE, linked: true };
+
+    expect(protonManageView({ installed: installed({ tools: [linked] }), busy: null, message: null }).rows[0]).toEqual({
+      id: GE.id, label: GE.id,
+      description: "GE-Proton · linked from another folder, can't be removed here · 1.6 GB · used by 2 games", action: null,
+    });
   });
 
   it("says when nothing is installed or there is no Steam", () => {

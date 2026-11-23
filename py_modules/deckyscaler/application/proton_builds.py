@@ -99,36 +99,44 @@ class ProtonBuilds:
         return offers
 
     def installed(self, with_sizes: bool = False) -> dict:
-        """Every build Steam would find, newest first, with the games whose user chose it, and whether Steam must
-        restart to see the builds as they are now. Sizing walks thousands of files per build: only when asked."""
+        """Every build Steam would find, newest first, with the games whose user chose it; the device's own folders
+        in compatibilitytools.d that aren't builds, to remove; and whether Steam must restart to see the builds as
+        they are now. Sizing walks thousands of files per build: only when asked."""
         clients = steam_library.running_clients()
         active = self._active(clients)
         if active.root is None:
-            return {"status": "success", "problem": active.problem, "tools": [], "installed_bytes": 0, "restart_needed": False,
-                    "moves": []}
+            return {"status": "success", "problem": active.problem, "tools": [], "others": [], "installed_bytes": 0,
+                    "restart_needed": False, "moves": []}
         store = self._store(active.root)
         forced = proton.forced_mappings(active.root)
         name = self._namer(active.root)
         tools = proton_builds.newest_first(store.installed())
+
+        def row_of(tool: proton_builds.Tool) -> dict:
+            """What every row says: its folder, its size when asked, and the games whose user chose it."""
+            appids, global_default = proton_builds.chosen_for(tool, forced)
+            size = store.size(tool) if with_sizes else None
+            return {"id": tool.folder, "size": size, "games": name(appids), "global_default": global_default}
+
         rows = []
         for tool in tools:
-            appids, global_default = proton_builds.chosen_for(tool, forced)
             build = tool.build
             rows.append({
-                "id": tool.folder,
+                **row_of(tool),
                 "build": build.id if build else None,
                 "build_label": build.label if build else None,
                 "system": tool.system,
-                "size": store.size(tool) if with_sizes else None,
-                "games": name(appids),
-                "global_default": global_default,
+                "linked": tool.linked,
             })
-        own = sum(row["size"] for row in rows if not row["system"]) if with_sizes else None
+        others = [row_of(tool) for tool in store.others()]
+        own = (
+            sum(row["size"] for row in rows if not row["system"]) + sum(row["size"] for row in others) if with_sizes else None
+        )
         restart = steam.restart_needed(active.root, clients, store.changed_at())
         # Steam takes a game's move only to a build it lists, which a restart due means it doesn't yet.
         moves = [] if restart else self._offers(tools, forced, name)
-        return {"status": "success", "problem": None, "tools": rows, "installed_bytes": own, "restart_needed": restart,
-                "moves": moves}
+        return {"status": "success", "problem": None, "tools": rows, "others": others, "installed_bytes": own,
+                "restart_needed": restart, "moves": moves}
 
     def _published(self, build_id: str) -> list[proton_builds.Release]:
         return proton_builds.available(build_id, self.list_releases(proton_builds.BUILDS[build_id].repository))
@@ -170,6 +178,11 @@ class ProtonBuilds:
         tools = store.installed()
         if any(tool.known_as(tool_name) for tool in tools):
             return _error(f"{tool_name} is already installed.")
+        if store.taken(tool_name):
+            # The build would land on what holds its name: say so before downloading, and leave clearing it to the user.
+            if any(other.folder == tool_name for other in store.others()):
+                return _error(f"{tool_name} is already in compatibilitytools.d, but it isn't a build. Remove it under Manage installed… first.")
+            return _error(f"Something named {tool_name} is already in compatibilitytools.d, and it isn't a build. Move it out of there first.")
         if store.free_bytes() < proton_builds.space_needed(release.size):
             needed = proton_builds.space_needed(release.size) // 1_000_000
             return _error(f"Not enough free space: installing {tool_name} needs about {needed} MB.")
@@ -245,12 +258,17 @@ class ProtonBuilds:
         return {"status": "success", "games": self._namer(active.root)(appids)}
 
     def _own_tool(self, root: Path, folder: str) -> proton_builds.Tool | str:
-        tool = next((t for t in self._store(root).installed() if t.folder == folder), None)
-        if tool is None:
-            return f"{folder} is not installed."
-        if tool.system:
+        """A tool of the device's own to remove: a build, or a folder there that isn't one (it declares no names, so
+        only a mapping naming its folder can name it); never a tool installed for every user, nor a link to a build
+        kept elsewhere. A system tool of the same name doesn't hide the device's own."""
+        store = self._store(root)
+        tools = store.installed()
+        own = next((t for t in [*tools, *store.others()] if t.folder == folder and not t.system), None)
+        if own is not None:
+            return f"{folder} is a link to a build kept elsewhere; it can't be removed here." if own.linked else own
+        if any(t.folder == folder for t in tools):
             return f"{folder} is installed for every user of this device; it can't be removed here."
-        return tool
+        return f"{folder} is not installed."
 
     def removal(self, folder: str) -> dict:
         """The games whose user chose a build, asked before removing it: removing warns, it doesn't refuse."""

@@ -141,7 +141,7 @@ def test_without_a_steam_to_install_into_nothing_is_written_and_the_frontend_is_
     proton = world.proton()
 
     assert proton.install(pb.GE_PROTON, NEWEST) == {"status": "error", "problem": steam.NO_STEAM}
-    assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "installed_bytes": 0,
+    assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "others": [], "installed_bytes": 0,
                                   "restart_needed": False, "moves": []}
     assert proton.versions(pb.GE_PROTON)["problem"] == steam.NO_STEAM
     assert world.tree() == []
@@ -156,7 +156,7 @@ def test_installed_builds_list_every_tool_with_the_games_whose_user_chose_it(wor
 
     tools = {tool["id"]: tool for tool in listed["tools"]}
     assert tools[NEWEST] | {"size": 0} == {
-        "id": NEWEST, "build": pb.GE_PROTON, "build_label": "GE-Proton", "system": False, "size": 0,
+        "id": NEWEST, "build": pb.GE_PROTON, "build_label": "GE-Proton", "system": False, "linked": False, "size": 0,
         "games": [
             {"appid": "1245620", "name": None, "kind": "unknown"},  # uninstalled since: still the user's choice
             {"appid": SHORTCUT_APPID, "name": "Heroic", "kind": "shortcut"},
@@ -204,6 +204,85 @@ def test_a_system_wide_build_is_never_removed(world, home):
     assert "installed for every user" in proton.removal("proton-cachyos")["message"]
     assert "installed for every user" in proton.remove("proton-cachyos")["message"]
     assert (home.parent / "system-compatibilitytools.d" / "proton-cachyos").is_dir()
+
+
+def test_a_folder_that_isnt_a_build_is_listed_apart_and_removed_like_one(world, steam_library):
+    world.proton().install(pb.GE_PROTON, NEWEST)
+    write(world.tools / "GE-Proton9-1" / "proton", b"#!/bin/sh")  # a broken install: no compatibilitytool.vdf
+    steam_library.set_compat_tools({"730": "GE-Proton9-1"})
+    proton = world.proton()
+
+    listed = proton.installed(with_sizes=True)
+    assert [tool["id"] for tool in listed["tools"]] == [NEWEST]
+    size = listed["others"][0]["size"]
+    assert listed["others"] == [{  # Steam still names it for a game: say so
+        "id": "GE-Proton9-1", "size": size, "games": [{"appid": "730", "name": "Counter-Strike 2", "kind": "steam"}],
+        "global_default": False,
+    }] and size > 0
+    assert listed["installed_bytes"] == listed["tools"][0]["size"] + size
+    assert proton.installed()["others"][0]["size"] is None  # sizing is the manage dialog's
+
+    assert proton.removal("GE-Proton9-1") == {
+        "status": "success", "games": [{"appid": "730", "name": "Counter-Strike 2", "kind": "steam"}], "global_default": False,
+    }
+    assert proton.remove("GE-Proton9-1") == {"status": "success", "message": "GE-Proton9-1 is removed."}
+    assert world.tree() == [".deckyscaler-partial", NEWEST]
+    assert proton.remove("GE-Proton9-1") == {"status": "error", "message": "GE-Proton9-1 is not installed."}
+
+
+def test_a_build_whose_name_a_folder_that_isnt_one_holds_is_refused_before_downloading(world):
+    write(world.tools / NEWEST / "proton", b"#!/bin/sh")  # what a broken install of that very build left
+    download = FakeDownload(world.archive)
+
+    assert world.proton(download).install(pb.GE_PROTON, NEWEST) == {
+        "status": "error",
+        "message": f"{NEWEST} is already in compatibilitytools.d, but it isn't a build. Remove it under Manage installed… first.",
+    }
+    assert download.urls == [] and world.tree() == [NEWEST]
+
+
+@pytest.mark.parametrize("holder", ["link", "dangling link", "file"])
+def test_a_build_whose_name_a_link_or_a_file_holds_is_refused_before_downloading(world, tmp_path, holder):
+    world.tools.mkdir(parents=True, exist_ok=True)
+    if holder == "link":
+        (tmp_path / "elsewhere").mkdir()
+        os.symlink(tmp_path / "elsewhere", world.tools / NEWEST)
+    elif holder == "dangling link":
+        os.symlink(tmp_path / "gone", world.tools / NEWEST)
+    else:
+        write(world.tools / NEWEST, b"")
+    download = FakeDownload(world.archive)
+
+    assert world.proton(download).install(pb.GE_PROTON, NEWEST) == {
+        "status": "error",
+        "message": f"Something named {NEWEST} is already in compatibilitytools.d, and it isn't a build. Move it out of there first.",
+    }
+    assert download.urls == []
+
+
+def test_a_system_build_of_the_same_name_doesnt_hide_the_devices_own_folder(world, home):
+    build_tree(home.parent / "system-compatibilitytools.d", "proton-cachyos")
+    write(world.tools / "proton-cachyos" / "readme.txt", b"")  # the device's own, and no build
+    proton = world.proton()
+
+    assert [other["id"] for other in proton.installed()["others"]] == ["proton-cachyos"]
+    assert proton.remove("proton-cachyos") == {"status": "success", "message": "proton-cachyos is removed."}
+    assert not (world.tools / "proton-cachyos").exists()
+    assert (home.parent / "system-compatibilitytools.d" / "proton-cachyos").is_dir()
+
+
+def test_a_build_linked_in_from_elsewhere_is_listed_as_linked_and_never_removed(world, tmp_path):
+    sdcard = tmp_path / "sdcard"
+    build_tree(sdcard, "GE-Proton9-1")
+    world.tools.mkdir(parents=True, exist_ok=True)
+    os.symlink(sdcard / "GE-Proton9-1", world.tools / "GE-Proton9-1")
+    proton = world.proton()
+
+    assert {tool["id"]: tool["linked"] for tool in proton.installed()["tools"]} == {"GE-Proton9-1": True}
+    refused = "GE-Proton9-1 is a link to a build kept elsewhere; it can't be removed here."
+    assert proton.removal("GE-Proton9-1") == {"status": "error", "message": refused}
+    assert proton.remove("GE-Proton9-1") == {"status": "error", "message": refused}
+    assert (world.tools / "GE-Proton9-1").is_symlink() and (sdcard / "GE-Proton9-1" / "proton").is_file()
 
 
 def test_github_failing_still_lists_what_is_installed(world, github_api):
