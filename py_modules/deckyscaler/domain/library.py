@@ -251,6 +251,12 @@ def choice_json(installed: Installed, size: int) -> dict:
     }
 
 
+def damaged_json(version_id: str, size: int) -> dict:
+    """What is left of a version that isn't whole, as the library lists it to remove: its directory's name, which is
+    the id it had, and its bytes on disk. No game can be patched with it."""
+    return {"id": version_id, "size": size}
+
+
 def newer_in_channel(installed: list[Installed], version_id: str | None) -> str | None:
     """The newest installed version of the same channel built after `version_id`, if any: a game
     patched with `version_id` could be patched again with it."""
@@ -287,10 +293,10 @@ def catalog(installed: list[Installed], published: list[Available], sizes: dict[
     return sorted(rows, key=lambda row: row.date, reverse=True)
 
 
-def removal_refused(version_id: str, installed_ids: set[str], games: list[str]) -> str | None:
-    """Why a version can't be removed, or None. A version stays while games are patched with it: their files
-    are symlinks into it, so removing it would break them."""
-    if version_id not in installed_ids:
+def removal_refused(version_id: str, listed: set[str], games: list[str]) -> str | None:
+    """Why a version, or what is left of a damaged one (`listed` holds both), can't be removed, or None. It stays
+    while games are patched with it: their files are symlinks into it, so removing it would break them."""
+    if version_id not in listed:
         return f"{version_id} is not in the library."
     if games:
         return f"{', '.join(games)} {'is' if len(games) == 1 else 'are'} patched with {version_id}. Unpatch them first."
