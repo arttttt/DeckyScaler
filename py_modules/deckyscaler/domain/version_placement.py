@@ -48,6 +48,13 @@ def linked_files(files: frozenset[str]) -> frozenset[str]:
     return frozenset(path for path in files if path not in (INJECTOR, INI_FILENAME) and is_for_the_game(path))
 
 
+def placed_dirs(files: frozenset[str]) -> tuple[str, ...]:
+    """The directories of a game a version's files are linked into, every one on the way included, deepest first,
+    and the game's own ("") last."""
+    dirs = {str(parent) for path in linked_files(files) for parent in PurePosixPath(path).parents if str(parent) != "."}
+    return (*sorted(dirs, key=lambda path: (-path.count("/"), path)), "")
+
+
 def lost_files(installed: Installed, present: frozenset[str]) -> frozenset[str]:
     """The files a game gets from a version (`is_for_the_game`) that it was unpacked with and are gone from it now
     (`present`): it is incomplete, and downloading it again brings them back. A lost licence or note is no loss to

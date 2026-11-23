@@ -8,6 +8,7 @@ from deckyscaler.domain import library
 from deckyscaler.domain.patch_plan import Copy, Link, Move, PlanError
 from deckyscaler.domain.patch_record import PatchRecord, Placed
 from deckyscaler.domain.version_placement import (
+    placed_dirs,
     Request, is_for_the_game, linked_files, lost_files, placed_every_file, plan_patch,
 )
 
@@ -168,3 +169,17 @@ def test_the_users_libraries_are_copied_in_after_the_version_and_whatever_they_r
     )
 
     assert operations[-2:] == (Move(copy.destination, f"{copy.destination}.b"), copy)
+
+
+def test_the_directories_a_version_is_linked_into_go_deepest_first_and_the_games_own_last():
+    v10 = frozenset({
+        "OptiScaler.dll", "OptiScaler.ini", "OptiScaler/libxess.dll", "OptiScaler/D3D12_OptiScaler/D3D12Core.dll",
+        "OptiScaler/Streamlined_fetcher_windows.bat", "Licenses/LICENSE.txt",
+    })
+    v09 = frozenset({"OptiScaler.dll", "libxess.dll", "D3D12_Optiscaler/D3D12Core.dll"})
+
+    assert placed_dirs(v10) == ("OptiScaler/D3D12_OptiScaler", "OptiScaler", "")
+    assert placed_dirs(v09) == ("D3D12_Optiscaler", "")
+    assert placed_dirs(frozenset({"OptiScaler.dll"})) == ("",)  # nothing it links but what the game's own holds
+    # A directory holding only directories is looked into too: another version may have linked files right in it.
+    assert placed_dirs(frozenset({"OptiScaler/D3D12_OptiScaler/D3D12Core.dll"})) == ("OptiScaler/D3D12_OptiScaler", "OptiScaler", "")

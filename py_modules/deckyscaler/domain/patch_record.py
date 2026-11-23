@@ -85,6 +85,11 @@ def record(
             case Copy(source, destination) | Link(source, destination):
                 sha = None if destination == INI_FILENAME or destination in rewritten else bundle_hashes[source]
                 placed[destination] = Placed(destination, sha)
+    # A backup beside a file the patch places, the file itself gone, was set aside by a patch whose record was lost:
+    # it is the original this patch restores.
+    backups += [
+        Backup(path, f"{path}{BACKUP_SUFFIX}") for path in placed if path not in entries and f"{path}{BACKUP_SUFFIX}" in entries
+    ]
     created = sorted(
         {
             str(parent)
@@ -96,6 +101,18 @@ def record(
     )
     owned = tuple(directory for directory in owned_dirs if directory in created)
     return PatchRecord(tuple(placed.values()), tuple(backups), tuple(created), owned)
+
+
+def left_behind(links: dict[str, str], plugin_home: str) -> tuple[Operation | RemoveDirIfEmpty, ...]:
+    """What a patch whose record is gone left in a game, to clear before patching it again: every link pointing into
+    the plugin's home (`links` maps a link's path to its target), which only a patch of the plugin's makes, a backup's
+    name included; then the directories that held them, deepest first, should nothing else be in them."""
+    ours = sorted(path for path, target in links.items() if PurePosixPath(target).is_relative_to(plugin_home))
+    holding = {str(parent) for path in ours for parent in PurePosixPath(path).parents if str(parent) != "."}
+    return (
+        *(DeleteFile(path) for path in ours),
+        *(RemoveDirIfEmpty(path) for path in sorted(holding, key=lambda path: (-path.count("/"), path))),
+    )
 
 
 def to_json(patch: PatchRecord, complete: bool) -> dict:

@@ -153,6 +153,12 @@ class Patcher:
             if undone["status"] != "success":
                 return undone
         try:
+            # Links a patch left whose record is gone (the marker lost, or damaged) go first: nothing would take them
+            # away, and a link can't be made where one is.
+            here = game_directory.links(directory, version_placement.placed_dirs(version_files))
+            left = patch_record.left_behind(here, str(self.plugin_home.absolute()))
+            if left:
+                game_directory.execute(left, directory, source)
             entries, _ = game_directory.listing(directory)
             driver = version_placement.driver_path(family)
             if os.path.lexists(directory / driver):
