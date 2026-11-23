@@ -240,3 +240,12 @@ def test_a_reset_that_fails_midway_answers_with_the_error(plugin, tmp_path, monk
     monkeypatch.setattr(game_directory, "execute", crash)
 
     assert run(plugin.manual_unpatch_directory(str(game), True)) == {"status": "error", "message": "device went to sleep"}
+
+
+def test_a_reset_tells_the_plugins_options_by_the_proxy_the_originals_marker_names(plugin, steam_library):
+    steam_library.add_game("740", "Asi Tweak Game", {"FRAMEGEN_PATCH": OLD_MARKER, "dxgi.dll": b"old opti"})
+
+    # The user's own tweak, written since: the options the original writes for dxgi.dll are other ones.
+    preview = run(plugin.preview_unpatch_game("740", "SteamDeck=0 %command%"))
+
+    assert preview["status"] == "success" and preview["launch_options"] is None

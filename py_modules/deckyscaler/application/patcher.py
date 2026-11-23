@@ -796,8 +796,11 @@ class Patcher:
         reset = stock_reset.plan(entries, plugin_entries, marked_elsewhere)
         if reset.evidence is None:
             return _error(f"No sign of DeckyScaler in {directory}; nothing to reset."), ()
-        stored = str(files.read_json(marker_path).get("original_launch_options") or "") if marker_path else ""
-        new_options = marker.launch_options_after_unpatch(current_launch_options, stored, None)
+        found = files.read_json(marker_path) if marker_path else {}
+        # The original's marker names its proxy too: ours are told by it, else by any.
+        new_options = marker.launch_options_after_unpatch(
+            current_launch_options, str(found.get("original_launch_options") or ""), found.get("dll_name") or None
+        )
         preview = {
             "status": "success",
             "target_dir": str(directory),
