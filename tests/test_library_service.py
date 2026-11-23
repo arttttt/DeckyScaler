@@ -236,6 +236,21 @@ def test_a_library_directory_without_a_readable_entry_is_not_a_version(world):
     assert rows[0]["id"] == NEWEST and rows[0]["state"] == "available"
 
 
+def test_what_isnt_a_whole_version_is_damaged_and_a_copy_set_aside_is_neither(world):
+    world.library().install(library.NIGHTLY, NEWEST)
+    versions = world.plugin_home / "library" / "versions"
+    write(versions / "stable-0.9.4" / "files" / "OptiScaler.dll", b"leftover")  # an interrupted removal took its entry
+    write(versions / "stable-0.9.5" / "entry.json", b"{not json")
+    shutil.copytree(versions / NEWEST, versions / "nightly-20261020")  # renamed by hand: its entry names another
+    write(versions / f".{NEWEST}.old" / "files" / "OptiScaler.dll", b"set aside")  # a replace's own, settled by clear_partial
+
+    store = world.library().store
+    newest = store.installed()
+    assert [entry.id for entry in newest] == [NEWEST]
+    assert store.damaged() == [("nightly-20261020", newest[0]), ("stable-0.9.4", None), ("stable-0.9.5", None)]
+    assert store.listed() == {NEWEST, "nightly-20261020", "stable-0.9.4", "stable-0.9.5"}
+
+
 def test_github_failing_still_lists_what_is_installed(world, github_api):
     world.library().install(library.NIGHTLY, NEWEST)
     github_api.status, github_api.body = 403, b'{"message": "API rate limit exceeded"}'
