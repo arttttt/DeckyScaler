@@ -47,6 +47,10 @@ def test_bare_tokens_comments_and_a_repeated_key():
     assert tree == {"root": {"install_path": ".", "key": "b"}}
 
 
+def test_a_byte_order_mark_before_the_text_is_no_part_of_it():
+    assert keyvalues.parse('\ufeff"compatibilitytools" { "a" "b" }') == {"compatibilitytools": {"a": "b"}}
+
+
 def test_malformed_input_keeps_what_was_read():
     assert keyvalues.parse('"a" { "b" "c" ') == {"a": {"b": "c"}}
     assert keyvalues.parse("} } \"x\" \"y\"") == {"x": "y"}
