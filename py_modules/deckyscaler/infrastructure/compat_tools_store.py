@@ -37,8 +37,8 @@ def _modified(directory: Path) -> float:
 
 
 def _folders(directory: Path) -> list[Path]:
-    """The folders in a compatibilitytools.d, by name, linked ones too (Steam follows a link, as to a build kept on
-    an SD card); none named with a dot (the plugin's own staging), and none when the directory can't be read."""
+    """The folders in a compatibilitytools.d, by name, linked ones too (a build kept elsewhere, as on an SD card, is
+    linked in: it is listed, never removed); none named with a dot (the plugin's own staging), and none when the directory can't be read."""
     try:
         return sorted(path for path in directory.iterdir() if path.is_dir() and not path.name.startswith("."))
     except OSError:

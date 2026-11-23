@@ -142,7 +142,7 @@ class Tool:
     modified: float = 0.0
     """When its directory last changed: unpacking keeps the archive's times, so about when the build was made."""
     linked: bool = False
-    """A link to a folder kept elsewhere (a build on an SD card): Steam follows it, the plugin never removes it."""
+    """A link to a folder kept elsewhere (a build on an SD card): listed as a tool, never removed by the plugin."""
 
     def known_as(self, name: str) -> bool:
         """Whether Steam knows the tool by `name` (a mapping's or a release's tool name)."""
