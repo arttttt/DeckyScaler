@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import fcntl
 import filecmp
 import hashlib
 import json
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -60,6 +62,17 @@ def replace_json(path: Path, payload: dict) -> None:
     staged = path.with_name(path.name + ".new")
     write_json(staged, payload)
     staged.replace(path)
+
+
+@contextmanager
+def locked(path: Path) -> Iterator[None]:
+    """Hold a file kept beside what it guards, for one read-modify-write at a time between threads and processes (the
+    plugin and the launch wrapper): each holder opens it on its own, and a holder that dies lets it go. A file
+    replaced by a rename can't hold its own lock, the rename leaving the lock on the old file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
 
 
 def read_text(path: Path) -> str:
