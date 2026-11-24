@@ -1,7 +1,9 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { latestStable, pluginBuild, setDeveloperMode } from "../api";
-import type { UpdatesCheck } from "../presentation/updates";
+import { PluginBuild, latestStable, pluginBuild, setDeveloperMode } from "../api";
+import { UpdatesCheck, withDeveloperMode } from "../presentation/updates";
+import { BACKEND_DID_NOT_ANSWER } from "../presentation/words";
 import { safeAsyncOperation } from "../utils";
+import { saveDeveloperMode } from "./developerModeFlow";
 
 // One copy for the Quick Access panel and the plugin's page: the release is checked once when either
 // first opens, and again by the page's button.
@@ -14,16 +16,17 @@ const set = (next: Partial<UpdatesCheck>): void => {
   listeners.forEach((listener) => listener());
 };
 
-const loadBuild = async (): Promise<void> => {
+const loadBuild = async (): Promise<PluginBuild | null> => {
   const build = await safeAsyncOperation(pluginBuild, "usePluginUpdates -> pluginBuild");
   if (build) set({ build });
+  return build ?? null;
 };
 
 const check = async (): Promise<void> => {
   if (state.checking || state.build?.known !== true) return;
   set({ checking: true });
   const latest = await safeAsyncOperation(latestStable, "usePluginUpdates -> latestStable");
-  set({ checking: false, latest: latest ?? { status: "error", message: "The plugin backend did not answer." } });
+  set({ checking: false, latest: latest ?? { status: "error", message: BACKEND_DID_NOT_ANSWER } });
 };
 
 const start = (): void => {
@@ -44,12 +47,12 @@ export const usePluginUpdates = () => {
   return {
     check: current,
     onCheck: () => void check(),
-    /** Saves Developer mode, then reads the build again for what the backend made of it. */
-    onDeveloperMode: async (on: boolean): Promise<string | null> => {
-      const answer = await safeAsyncOperation(() => setDeveloperMode(on), "usePluginUpdates -> setDeveloperMode");
-      await loadBuild();
-      if (!answer) return "The plugin backend did not answer.";
-      return answer.status === "error" ? answer.message : null;
-    },
+    /** Saves Developer mode and keeps what the backend made of it; the failure to show, or null. */
+    onDeveloperMode: (on: boolean): Promise<string | null> =>
+      saveDeveloperMode(on, {
+        save: (value) => safeAsyncOperation(() => setDeveloperMode(value), "usePluginUpdates -> setDeveloperMode"),
+        keep: (developerMode) => set({ build: withDeveloperMode(state.build, developerMode) }),
+        readBuild: loadBuild,
+      }),
   };
 };

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { protonBuildOptions, protonInstall, protonVersions } from "../api";
 import { ProtonDownloadState, installDone, protonDownloadView, protonOutcome } from "../presentation/proton";
+import { BACKEND_DID_NOT_ANSWER } from "../presentation/words";
 import { safeAsyncOperation } from "../utils";
 import { useDownloadEvents } from "./useDownloadEvents";
 
-const NO_ANSWER = { status: "error" as const, message: "The plugin backend did not answer." };
+const NO_ANSWER = { status: "error" as const, message: BACKEND_DID_NOT_ANSWER };
 
 /** State and calls behind the dialog that downloads Proton builds; `onChanged` runs after a build is installed. */
 export const useDownloadBuilds = (onChanged: () => void) => {

@@ -1,10 +1,35 @@
 import type { LatestStable, PluginBuild } from "../api";
 import { DECKY_INSTALLER_UNREACHABLE, InstallState, canStartInstall, installMessage } from "./install";
+import { BACKEND_DID_NOT_ANSWER } from "./words";
 
 /** The running build and the last check for a release, shared by the Quick Access panel and the page. */
 export type UpdatesCheck = { build: PluginBuild | null; checking: boolean; latest: LatestStable | null };
 
-export type UpdatesState = UpdatesCheck & { install: InstallState; deckyInstallerAvailable: boolean };
+/** A Developer mode change the user asked for, until the backend has it. */
+export type DeveloperModeChange = { on: boolean; stage: "confirming" | "saving" };
+
+/** What a tap on the Developer mode toggle starts: turning it on asks first, turning it off saves at once. */
+export const developerModeChange = (on: boolean): DeveloperModeChange => ({ on, stage: on ? "confirming" : "saving" });
+
+/** The change once the user confirmed it: it is saved next. */
+export const confirmedDeveloperModeChange = (change: DeveloperModeChange): DeveloperModeChange => ({ ...change, stage: "saving" });
+
+/** The running build once the backend saved Developer mode: its answer is what the build now has (a development
+ *  build keeps it on), so the build needn't be read again. */
+export const withDeveloperMode = (build: PluginBuild | null, developerMode: boolean): PluginBuild | null =>
+  build?.known === true ? { ...build, developer_mode: developerMode } : build;
+
+/** Said when saving Developer mode got no answer. The build read again tells whether the save happened anyway. */
+export const developerModeNoAnswer = (on: boolean, build: PluginBuild | null): string =>
+  build?.known === true && build.developer_mode === on
+    ? `${BACKEND_DID_NOT_ANSWER} Developer mode is ${on ? "on" : "off"} all the same.`
+    : BACKEND_DID_NOT_ANSWER;
+
+export type UpdatesState = UpdatesCheck & {
+  install: InstallState;
+  deckyInstallerAvailable: boolean;
+  developerModeChange: DeveloperModeChange | null;
+};
 
 export type UpdatesView = {
   running: string;
@@ -14,6 +39,8 @@ export type UpdatesView = {
   releaseLine: string | null;
   install: { visible: boolean; label: string; enabled: boolean };
   developerMode: { visible: boolean; on: boolean; enabled: boolean; description: string };
+  /** Asked before Developer mode turns on; null when nothing is being asked. */
+  confirmation: typeof DEVELOPER_MODE_CONFIRMATION | null;
   message: string | null;
 };
 
@@ -32,7 +59,7 @@ const installLabel = (latest: Extract<LatestStable, { status: "success" }>): str
 /** What the Updates section shows: the running build, the newest release with an update or a switch
  *  to it, and Developer mode. */
 export const updatesView = (state: UpdatesState): UpdatesView => {
-  const { build, checking, latest, install } = state;
+  const { build, checking, latest, install, developerModeChange: change } = state;
   const known = build?.known === true;
   const offer = latest?.status === "success" && latest.offer !== "none" ? latest : null;
   const downloading = install.phase === "downloading";
@@ -48,13 +75,17 @@ export const updatesView = (state: UpdatesState): UpdatesView => {
     },
     developerMode: {
       visible: known,
-      on: build?.known === true && build.developer_mode,
-      enabled: build?.known === true && !build.is_dev_build,
+      // While a change is asked or saved the toggle shows it, and can't be tapped; after a cancel or a failed save it
+      // shows the saved value again. Steam's toggle keeps its own state and follows `checked` only when that changes,
+      // so without this a cancelled turn-on would leave it showing on with Developer mode off.
+      on: change?.on ?? (build?.known === true && build.developer_mode),
+      enabled: build?.known === true && !build.is_dev_build && change === null,
       description:
         build?.known === true && build.is_dev_build
           ? "On in a development build. Switch to a release to turn it off."
           : "Offers development builds: unreviewed, and they may break things.",
     },
+    confirmation: change?.stage === "confirming" ? DEVELOPER_MODE_CONFIRMATION : null,
     message:
       installMessage(install, offer?.release?.title ?? "the release") ??
       (offer && !state.deckyInstallerAvailable ? DECKY_INSTALLER_UNREACHABLE : null),

@@ -364,9 +364,10 @@ export type InstallRequestAnswer =
 
 export const pluginBuild = callable<[], PluginBuild>("plugin_build");
 
-export const setDeveloperMode = callable<[on: boolean], { status: "success"; developer_mode: boolean } | { status: "error"; message: string }>(
-  "set_developer_mode",
-);
+/** What saving Developer mode answers: the mode the build now has (a development build keeps it on). */
+export type DeveloperModeAnswer = { status: "success"; developer_mode: boolean } | { status: "error"; message: string };
+
+export const setDeveloperMode = callable<[on: boolean], DeveloperModeAnswer>("set_developer_mode");
 
 export const latestStable = callable<[], LatestStable>("latest_stable");
 

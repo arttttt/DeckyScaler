@@ -1,4 +1,5 @@
 import type { UnpatchPreview, UnpatchResult } from "../api";
+import { BACKEND_DID_NOT_ANSWER } from "./words";
 
 /**
  * The step Unpatch takes after asking the backend: undo the patch record right away, or, for a
@@ -51,6 +52,6 @@ export const unpatchSubject = (target: { kind: "game"; name: string } | { kind: 
   target.kind === "game" ? target.name : target.path;
 
 export const unpatchOutcome = (result: UnpatchResult | undefined): string => {
-  if (!result) return "The plugin backend did not answer.";
+  if (!result) return BACKEND_DID_NOT_ANSWER;
   return result.message ?? (result.status === "success" ? "Unpatched." : "Unpatch failed.");
 };

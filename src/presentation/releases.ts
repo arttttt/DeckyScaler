@@ -4,6 +4,7 @@
  */
 
 import type { ReleaseReason, ReleaseVersion } from "../api";
+import { BACKEND_DID_NOT_ANSWER } from "./words";
 
 /** Bytes of the release being downloaded received so far, and the total when GitHub said it. */
 export type ReleaseDownload = { received: number; total: number | null };
@@ -85,4 +86,4 @@ export const listingMessage = (
 
 /** A dialog's note once an action ends: the backend's words, or a fallback when it did not answer. */
 export const actionOutcome = (answer: { status: string; message?: string } | null, done: string): string =>
-  answer?.message ?? (answer?.status === "success" ? done : "The plugin backend did not answer.");
+  answer?.message ?? (answer?.status === "success" ? done : BACKEND_DID_NOT_ANSWER);

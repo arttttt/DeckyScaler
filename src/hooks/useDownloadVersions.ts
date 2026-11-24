@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LibraryChannel, libraryInstall, libraryVersions } from "../api";
 import { DownloadState, downloadView } from "../presentation/library";
 import { actionOutcome } from "../presentation/releases";
+import { BACKEND_DID_NOT_ANSWER } from "../presentation/words";
 import { safeAsyncOperation } from "../utils";
 import { useDownloadEvents } from "./useDownloadEvents";
 
@@ -25,7 +26,7 @@ export const useDownloadVersions = (onChanged: () => void) => {
     void safeAsyncOperation(() => libraryVersions(channel), "DownloadVersions -> libraryVersions").then((listing) =>
       setState((s) =>
         s.channel === channel
-          ? { ...s, checking: false, listing: listing ?? { status: "error", message: "The plugin backend did not answer." } }
+          ? { ...s, checking: false, listing: listing ?? { status: "error", message: BACKEND_DID_NOT_ANSWER } }
           : s,
       ),
     );

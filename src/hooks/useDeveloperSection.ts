@@ -2,6 +2,7 @@ import { useState } from "react";
 import { devInstallRequest, DevBuildList, listDevBuilds } from "../api";
 import { canInstallThroughDecky } from "../api/deckyInstaller";
 import { DeveloperSectionView, developerSectionView, selectedBuild } from "../presentation/developerSection";
+import { BACKEND_DID_NOT_ANSWER } from "../presentation/words";
 import { safeAsyncOperation } from "../utils";
 import { useDeckyInstall } from "./useDeckyInstall";
 import { usePluginUpdates } from "./usePluginUpdates";
@@ -26,7 +27,7 @@ export const useDeveloperSection = (): {
     clearError();
     void safeAsyncOperation(listDevBuilds, "DeveloperSection -> listDevBuilds").then((answer) => {
       setChecking(false);
-      setList(answer ?? { status: "error", message: "The plugin backend did not answer." });
+      setList(answer ?? { status: "error", message: BACKEND_DID_NOT_ANSWER });
     });
   };
 
