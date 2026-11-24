@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 
 from . import release_assets
+from . import compat_tools
 from .compat_tools import ForcedMappings
 
 GE_PROTON = "ge-proton"
@@ -143,6 +144,9 @@ class Tool:
     """When its directory last changed: unpacking keeps the archive's times, so about when the build was made."""
     linked: bool = False
     """A link to a folder kept elsewhere (a build on an SD card): listed as a tool, never removed by the plugin."""
+    missing: str | None = None
+    """The file its toolmanifest.vdf has Steam run, when that isn't there (a removal cut short, files deleted by
+    hand): Steam lists the tool, and it can't start a game."""
 
     def known_as(self, name: str) -> bool:
         """Whether Steam knows the tool by `name` (a mapping's or a release's tool name)."""
@@ -175,6 +179,31 @@ def versions(build_id: str, releases: list[Release], tools: list[Tool]) -> list[
         if tool.build == BUILDS[build_id] and not any(tool.known_as(name) for name in listed)
     ]
     return rows
+
+
+@dataclass(frozen=True)
+class Unresolved:
+    """The tools the user chose that aren't on the device: the one for every game, and each other with its games."""
+
+    global_tool: str | None
+    games: tuple[tuple[str, tuple[str, ...]], ...]
+    """Each absent tool's name, with the appids set to it, by name."""
+
+
+def unresolved(forced: ForcedMappings, tools: list[Tool]) -> Unresolved:
+    """The tools the user chose that no installed tool is known as (a build removed elsewhere, a linked one whose
+    card is out), Valve's own aside: Steam keeps those itself."""
+    def absent(name: str) -> bool:
+        return not compat_tools.is_valves(name) and not any(tool.known_as(name) for tool in tools)
+
+    by_tool: dict[str, list[str]] = {}
+    for appid, name in forced.games.items():
+        if absent(name):
+            by_tool.setdefault(name, []).append(appid)
+    return Unresolved(
+        forced.global_tool if forced.global_tool and absent(forced.global_tool) else None,
+        tuple((name, tuple(sorted(appids))) for name, appids in sorted(by_tool.items())),
+    )
 
 
 def chosen_for(tool: Tool, forced: ForcedMappings) -> tuple[list[str], bool]:

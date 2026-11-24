@@ -290,3 +290,38 @@ def test_a_game_recorded_under_the_originals_name_keeps_its_libraries_keys_and_s
 
     wrapper_patch(home, game)  # patched as the wrapper would patch it: started as it is
     assert (game / "FRAMEGEN_PATCH").is_file() and not (game / "DECKYSCALER_PATCH").exists()
+
+
+def test_the_users_own_file_where_a_library_is_copied_is_set_aside_and_back_after_unpatching(plugin, plugin_home, tmp_path):
+    anr(plugin_home)
+    choose(plugin_home, library_choice.GLOBAL, FG, "anr")
+    game = make_game_dir(tmp_path / "games" / "Game", {f"OptiScaler/custom/{ANR}/dlssg/nvngx_dlssg.dll": b"the user's own build"})
+    before = snapshot(game)
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", NIGHTLY))["status"] == "success"
+    folder = game / "OptiScaler" / "custom" / ANR / "dlssg"
+    assert (folder / "nvngx_dlssg.dll").read_bytes() == b"anr dll"
+    assert (folder / "nvngx_dlssg.dll.b").read_bytes() == b"the user's own build"
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert snapshot(game) == before
+
+
+def test_a_folder_behind_a_linked_optiscaler_is_never_the_patchs_to_remove(plugin, plugin_home, home, tmp_path):
+    from deckyscaler.application.patcher import Patcher
+
+    anr(plugin_home)
+    choose(plugin_home, library_choice.GLOBAL, FG, "anr")
+    shared = tmp_path / "shared-optiscaler"  # one OptiScaler/ folder several games link to
+    write(shared / "custom" / ANR / "dlssg" / "my-notes.txt", b"the user's own")
+    write(shared / "amdxcffx64.dll", b"FSR 4's driver, linked by another game's patch")
+    game = make_game_dir(tmp_path / "games" / "Game")
+    (game / "OptiScaler").symlink_to(shared)
+
+    patched = Patcher(home).patch_directory(game, "dxgi.dll", version_id=NIGHTLY, fsr4_driver=tmp_path / "prefix" / "amdxcffx64.dll")
+    assert patched["status"] == "success"
+    assert marker_of(game)["owned_dirs"] == [] and marker_of(game)["created_dirs"] == []
+
+    assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
+    assert (shared / "custom" / ANR / "dlssg" / "my-notes.txt").read_bytes() == b"the user's own"
+    assert (shared / "amdxcffx64.dll").read_bytes() == b"FSR 4's driver, linked by another game's patch"

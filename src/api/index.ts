@@ -167,6 +167,8 @@ export type InstalledProtonTool = {
   system: boolean;
   /** A link to a build kept elsewhere (an SD card): listed as a build, never removed here. */
   linked: boolean;
+  /** The file Steam runs it by, when that isn't there (a removal cut short): it can't start a game. */
+  missing: string | null;
   /** Bytes on disk, when asked for (sizing walks thousands of files). */
   size: number | null;
   games: ProtonGame[];
@@ -192,6 +194,8 @@ export type InstalledProton = {
   /** Builds came or went since Steam started: it lists them only after a restart. */
   restart_needed: boolean;
   moves: ProtonMove[];
+  /** Tools the user chose in Steam that aren't on the device (Valve's own aside): for every game, and per game. */
+  unresolved: { global: string | null; tools: { tool: string; games: ProtonGame[] }[] };
 };
 
 export type ProtonListing =
