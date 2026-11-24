@@ -39,7 +39,7 @@ export function UpdatesSection() {
           />
         </PanelSectionRow>
       )}
-      <Confirmation confirmation={updates.confirmation} onConfirm={updates.onConfirm} onCancel={updates.onCancel} />
+      <Confirmation confirmation={view.confirmation} onConfirm={updates.onConfirm} onCancel={updates.onCancel} />
     </PanelSection>
   );
 }

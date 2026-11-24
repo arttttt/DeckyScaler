@@ -2,7 +2,7 @@ import { useState } from "react";
 import { notify } from "../utils/notify";
 import { stableInstallRequest } from "../api";
 import { canInstallThroughDecky } from "../api/deckyInstaller";
-import { DEVELOPER_MODE_CONFIRMATION, updatesView } from "../presentation/updates";
+import { DeveloperModeChange, confirmedDeveloperModeChange, developerModeChange, updatesView } from "../presentation/updates";
 import { useDeckyInstall } from "./useDeckyInstall";
 import { usePluginUpdates } from "./usePluginUpdates";
 
@@ -11,26 +11,30 @@ import { usePluginUpdates } from "./usePluginUpdates";
 export const useUpdatesSection = () => {
   const { check, onCheck, onDeveloperMode } = usePluginUpdates();
   const { install, start, clearError } = useDeckyInstall();
-  const [asking, setAsking] = useState(false);
+  const [change, setChange] = useState<DeveloperModeChange | null>(null);
 
-  const applyDeveloperMode = async (on: boolean) => {
-    const failure = await onDeveloperMode(on);
+  const save = async (saving: DeveloperModeChange) => {
+    setChange(saving);
+    const failure = await onDeveloperMode(saving.on);
+    setChange(null);
     if (failure) notify(failure);
   };
 
   return {
-    view: updatesView({ ...check, install, deckyInstallerAvailable: canInstallThroughDecky() }),
+    view: updatesView({ ...check, install, deckyInstallerAvailable: canInstallThroughDecky(), developerModeChange: change }),
     onCheck: () => {
       clearError();
       onCheck();
     },
     onInstall: () => start(stableInstallRequest, "Updates -> stableInstallRequest"),
-    onDeveloperMode: (on: boolean) => (on ? setAsking(true) : void applyDeveloperMode(false)),
-    confirmation: asking ? DEVELOPER_MODE_CONFIRMATION : null,
-    onConfirm: () => {
-      setAsking(false);
-      void applyDeveloperMode(true);
+    onDeveloperMode: (on: boolean) => {
+      const next = developerModeChange(on);
+      if (next.stage === "confirming") setChange(next);
+      else void save(next);
     },
-    onCancel: () => setAsking(false),
+    onConfirm: () => {
+      if (change) void save(confirmedDeveloperModeChange(change));
+    },
+    onCancel: () => setChange(null),
   };
 };

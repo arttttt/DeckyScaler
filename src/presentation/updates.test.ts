@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { LatestStable, PluginBuild } from "../api";
 import { NO_INSTALL } from "./install";
-import { UpdatesState, updateAvailableLine, updatesView } from "./updates";
+import {
+  DEVELOPER_MODE_CONFIRMATION,
+  UpdatesState,
+  confirmedDeveloperModeChange,
+  developerModeChange,
+  updateAvailableLine,
+  updatesView,
+} from "./updates";
 
 const release: PluginBuild = {
   known: true,
@@ -23,6 +30,7 @@ const state = (overrides: Partial<UpdatesState> = {}): UpdatesState => ({
   latest: null,
   install: NO_INSTALL,
   deckyInstallerAvailable: true,
+  developerModeChange: null,
   ...overrides,
 });
 
@@ -84,6 +92,31 @@ describe("the Updates section", () => {
       enabled: false,
       description: "On in a development build. Switch to a release to turn it off.",
     });
+  });
+
+  it("asks before Developer mode turns on, turns it off at once, and saves a turn-on once confirmed", () => {
+    expect(developerModeChange(true)).toEqual({ on: true, stage: "confirming" });
+    expect(developerModeChange(false)).toEqual({ on: false, stage: "saving" });
+    expect(confirmedDeveloperModeChange(developerModeChange(true))).toEqual({ on: true, stage: "saving" });
+  });
+
+  it("shows the asked-for Developer mode while it's asked and saved, locked, and the saved one after a cancel", () => {
+    const asking = updatesView(state({ developerModeChange: { on: true, stage: "confirming" } }));
+    expect(asking.developerMode).toMatchObject({ on: true, enabled: false });
+    expect(asking.confirmation).toBe(DEVELOPER_MODE_CONFIRMATION);
+
+    const savingOn = updatesView(state({ developerModeChange: { on: true, stage: "saving" } }));
+    expect(savingOn.developerMode).toMatchObject({ on: true, enabled: false });
+    expect(savingOn.confirmation).toBeNull();
+
+    const turnedOn = { ...release, developer_mode: true };
+    const savingOff = updatesView(state({ build: turnedOn, developerModeChange: { on: false, stage: "saving" } }));
+    expect(savingOff.developerMode).toMatchObject({ on: false, enabled: false });
+
+    const cancelled = updatesView(state());
+    expect(cancelled.developerMode).toMatchObject({ on: false, enabled: true });
+    expect(cancelled.confirmation).toBeNull();
+    expect(updatesView(state({ build: turnedOn })).developerMode).toMatchObject({ on: true, enabled: true });
   });
 });
 
