@@ -1,6 +1,7 @@
 import type { InstalledLibrary, InstalledVersion, PlacedLibrary } from "../api";
 import { ProxyDllView, patchReady } from "./launch";
 import { librariesLine } from "./libraries";
+import { lines } from "./lines";
 import { versionLabel } from "./releases";
 
 /**
@@ -105,16 +106,26 @@ export type Fsr4State = {
   version: string | null;
 };
 
+/** How to tell FSR 4 rendering from FSR 3, on a line of its own: AMD's DLL being there doesn't mean the GPU runs it,
+ *  as the DLL turns down GPUs it doesn't support and FSR 3 renders in its place. The setting and the in-game menu's
+ *  switch turn on the watermark FSR 4 draws, from AMD's DLL and OptiScaler's own FidelityFX SDK alike. FSR 4 reads it
+ *  as the game starts, so the setting shows from the next launch; the in-game switch at once. */
+const withWatermarkHint = (line: string) =>
+  lines([
+    line,
+    "To see FSR 4 render rather than FSR 3: turn on Fsr4EnableWatermark in OptiScaler settings before launching, or Watermark in OptiScaler's in-game menu, and FSR 4 shows its watermark in the game.",
+  ]);
+
 /** What the panel says about FSR 4 for a game: whether its Proton has it (and the game's patch links it), will fetch
- *  it, can't, or isn't on the device. */
+ *  it, can't, or isn't on the device; where OptiScaler can run it, how to see that it does. */
 export const fsr4Line = (fsr4: Fsr4State | null | undefined): string | null => {
   if (!fsr4) return null;
   const proton = fsr4.tool ?? "Steam's default Proton";
   const inPrefix = `FSR 4${fsr4.version ? ` ${fsr4.version}` : ""} is in this game's Proton prefix`;
-  if (fsr4.state === "in-prefix") return `${inPrefix}.`;
+  if (fsr4.state === "in-prefix") return withWatermarkHint(`${inPrefix}.`);
   if (fsr4.state === "not-linked") return `${inPrefix}, but it isn't linked into the game: patch it again from here.`;
   if (fsr4.state === "absent") return `${proton} isn't on this device: pick another Proton in the game's Properties → Compatibility.`;
-  if (fsr4.state === "will-fetch") return `${proton} downloads FSR 4 on the game's first launch after patching.`;
+  if (fsr4.state === "will-fetch") return withWatermarkHint(`${proton} downloads FSR 4 on the game's first launch after patching.`);
   return `${proton} can't provide FSR 4. Choose GE-Proton or Proton-CachyOS for this game.`;
 };
 

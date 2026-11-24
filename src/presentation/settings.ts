@@ -1,4 +1,5 @@
 import type { SettingInfo, SettingsAnswer } from "../api";
+import { lines } from "./lines";
 import { plural } from "./words";
 
 /** The scope of the global settings; any other scope is a game's appid. */
@@ -105,7 +106,7 @@ const row = (scope: string, section: string, setting: SettingInfo): SettingRow =
     section,
     key: setting.key,
     label: setting.key,
-    description: [lockedLine(setting), setting.description, rangeLine(setting), textHint].filter(Boolean).join("\n"),
+    description: lines([lockedLine(setting), setting.description, rangeLine(setting), textHint]),
     control: control(scope, setting),
   };
 };
@@ -166,7 +167,7 @@ export const searchRows = (sections: SettingsSectionView[], query: string): Sett
 /** What a global change says about the games it didn't reach: the running ones, and those on a drive that isn't
  *  mounted. */
 export const skippedMessage = (skipped: string[], away: string[] = []): string | null => {
-  const lines = [
+  const sentences = [
     ...(skipped.length
       ? [`${skipped.join(", ")} ${plural(skipped.length, "is", "are")} running and ${plural(skipped.length, "gets", "get")} the change once closed.`]
       : []),
@@ -174,7 +175,7 @@ export const skippedMessage = (skipped: string[], away: string[] = []): string |
       ? [`${away.join(", ")} ${plural(away.length, "is", "are")} on a drive that isn't mounted and ${plural(away.length, "gets", "get")} the change once it's back and the game has run.`]
       : []),
   ];
-  return lines.length ? lines.join(" ") : null;
+  return sentences.length ? sentences.join(" ") : null;
 };
 
 export const RESET_GAME_LABEL = "Reset to global settings";

@@ -2,6 +2,7 @@ import { ButtonItem, Field, PanelSectionRow } from "@decky/ui";
 import type { GamePatch } from "../hooks/useGamePatch";
 import { toneColor } from "../presentation/patching";
 import { Confirmation } from "./Confirmation";
+import { multiline } from "./MultilineText";
 
 /** A game's patch status, its FSR 4 state, and Patch and Unpatch. The lines are plain text the
  *  gamepad skips: only the buttons take focus. */
@@ -22,7 +23,7 @@ export function GamePatchCard({ patch }: { patch: GamePatch }) {
       )}
       {view.fsr4Line && (
         <PanelSectionRow>
-          <Field label="FSR 4" description={view.fsr4Line} />
+          <Field label="FSR 4" description={multiline(view.fsr4Line)} />
         </PanelSectionRow>
       )}
       {view.librariesLine && (
