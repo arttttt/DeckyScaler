@@ -1,4 +1,5 @@
 import type { AwayGame, InstalledLibrary, PatchedGame, PatchedGames } from "../api";
+import { WRAPPER_ROUTE } from "./patching";
 import { versionLabel } from "./releases";
 
 export type GameRowView = {
@@ -28,6 +29,7 @@ const problem = (game: PatchedGame): string | null => {
   if (game.record === "damaged") return "Its patch record is damaged: patch it again to repair it.";
   if (game.record === "incomplete") return "The patch didn't finish: unpatch it, then patch again.";
   if (!game.dll_present) return `${game.dll_name} is missing: patch it again.`;
+  if (game.changed_files.length) return "Some of its files are gone or changed since the patch: patch it again.";
   if (game.version_incomplete) return "Its OptiScaler version is missing files: download it again from the OptiScaler page.";
   if (game.lacks_version_files) return "Its OptiScaler version has files this patch lacks: patch it again.";
   return null;
@@ -37,6 +39,7 @@ const row = (game: PatchedGame, library: InstalledLibrary | null): GameRowView =
   const patchedOn = game.patched_at ? `, patched ${game.patched_at.slice(0, 10)}` : "";
   const lines = [
     `OptiScaler ${versionName(library, game.version_id)} via ${game.dll_name}${patchedOn}`,
+    ...(game.by_wrapper ? [WRAPPER_ROUTE] : []),
     ...(game.newer_version ? [`${versionName(library, game.newer_version)} is in the library: patch again to update.`] : []),
     ...(game.own_settings ? ["Has settings of its own."] : []),
     ...[problem(game)].filter((line): line is string => line !== null),

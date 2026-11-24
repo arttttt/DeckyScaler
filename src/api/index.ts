@@ -67,14 +67,17 @@ export const patchGame = callable<
     name?: string;
     dll_name?: string;
     target_dir?: string;
-    launch_options?: string;
+    /** What Steam is to set; null to leave them as they are. */
+    launch_options?: string | null;
     original_launch_options?: string;
     optiscaler_version?: string | null;
   }
 >("patch_game");
 
+/** current_launch_options is null when Steam didn't say what they are; launch_options in the answer is what Steam is
+ *  to set, null to leave them. */
 export const unpatchGame = callable<
-  [appid: string, current_launch_options: string, confirmed_reset: boolean],
+  [appid: string, current_launch_options: string | null, confirmed_reset: boolean],
   UnpatchResult
 >("unpatch_game");
 
@@ -164,6 +167,8 @@ export type InstalledProtonTool = {
   system: boolean;
   /** A link to a build kept elsewhere (an SD card): listed as a build, never removed here. */
   linked: boolean;
+  /** The file Steam runs it by, when that isn't there (a removal cut short): it can't start a game. */
+  missing: string | null;
   /** Bytes on disk, when asked for (sizing walks thousands of files). */
   size: number | null;
   games: ProtonGame[];
@@ -189,6 +194,8 @@ export type InstalledProton = {
   /** Builds came or went since Steam started: it lists them only after a restart. */
   restart_needed: boolean;
   moves: ProtonMove[];
+  /** Tools the user chose in Steam that aren't on the device (Valve's own aside): for every game, and per game. */
+  unresolved: { global: string | null; tools: { tool: string; games: ProtonGame[] }[] };
 };
 
 export type ProtonListing =
@@ -411,7 +418,8 @@ export type UnpatchResult =
   | { status: "success"; message?: string; launch_options?: string | null }
   | { status: "error"; message: string };
 
-export const previewUnpatchGame = callable<[appid: string, current_launch_options: string], UnpatchPreview>(
+/** current_launch_options is null when Steam didn't say what they are: then they are left as they are. */
+export const previewUnpatchGame = callable<[appid: string, current_launch_options: string | null], UnpatchPreview>(
   "preview_unpatch_game"
 );
 export const previewUnpatchDirectory = callable<[directory: string], UnpatchPreview>("preview_unpatch_directory");
@@ -490,6 +498,10 @@ export type PatchedGame = {
   patched_at: string | null;
   /** Its marker's record: whole, stopped before the last file, or damaged (patching again repairs it). */
   record: "ok" | "incomplete" | "damaged";
+  /** Patched by the launch wrapper, at a start: it patches the game again at each one. */
+  by_wrapper: boolean;
+  /** Files its patch placed, other than the proxy, that are gone or not as placed: patching again puts them back. */
+  changed_files: string[];
   own_settings: boolean;
 };
 

@@ -15,11 +15,12 @@ import { safeAsyncOperation } from "../utils";
 /** One game the user picked: a Steam game, or a directory patched by path or through the launch wrapper. */
 export type UnpatchTarget = { kind: "game"; appid: string; name: string } | { kind: "directory"; path: string };
 
-const currentLaunchOptions = async (appid: string): Promise<string> => {
+/** What Steam holds for the game; unknown, not empty, when it doesn't answer: the backend then leaves them. */
+const currentLaunchOptions = async (appid: string): Promise<string | null> => {
   try {
     return await getAppLaunchOptions(Number(appid));
   } catch {
-    return "";
+    return null;
   }
 };
 

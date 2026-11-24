@@ -20,7 +20,7 @@ import {
 } from "./proton";
 
 const GE: InstalledProtonTool = {
-  id: "GE-Proton11-12-x86_64", build: "ge-proton", build_label: "GE-Proton", system: false, linked: false, size: 1_600_000_000,
+  id: "GE-Proton11-12-x86_64", build: "ge-proton", build_label: "GE-Proton", system: false, linked: false, missing: null, size: 1_600_000_000,
   games: [
     { appid: "730", name: "Counter-Strike 2", kind: "steam" },
     { appid: "1245620", name: null, kind: "unknown" },
@@ -29,20 +29,21 @@ const GE: InstalledProtonTool = {
   global_default: false,
 };
 const OTHER: InstalledProtonTool = {
-  id: "Proton-EM-10.0-37", build: null, build_label: null, system: false, linked: false, size: 1_400_000_000, games: [], global_default: false,
+  id: "Proton-EM-10.0-37", build: null, build_label: null, system: false, linked: false, missing: null, size: 1_400_000_000, games: [], global_default: false,
 };
 const SYSTEM: InstalledProtonTool = {
-  id: "proton-cachyos", build: null, build_label: null, system: true, linked: false, size: 1_700_000_000, games: [], global_default: true,
+  id: "proton-cachyos", build: null, build_label: null, system: true, linked: false, missing: null, size: 1_700_000_000, games: [], global_default: true,
 };
 const installed = (overrides: Partial<InstalledProton> = {}): InstalledProton => ({
   status: "success", problem: null, tools: [GE, OTHER, SYSTEM], others: [], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
+  unresolved: { global: null, tools: [] },
   ...overrides,
 });
 
 describe("the Proton page", () => {
   it("counts the installed builds, or says there is none, and always says where a game's Proton is chosen", () => {
     expect(protonPageView(installed())).toEqual({
-      summary: "2 builds installed. Newest: GE-Proton11-12-x86_64.", restart: false, moves: [], moveMessage: null,
+      summary: "2 builds installed. Newest: GE-Proton11-12-x86_64.", restart: false, moves: [], moveMessage: null, unresolved: [],
       dialogsEnabled: true, hint: CHOOSING_HINT,
     });
     expect(protonPageView(installed({ tools: [GE] })).summary).toBe("1 build installed. Newest: GE-Proton11-12-x86_64.");
@@ -207,6 +208,22 @@ describe("the manage dialog", () => {
     });
   });
 
+  it("says a build isn't whole, what it misses, and still offers removing it", () => {
+    const cut = { ...GE, missing: "proton" };
+
+    expect(protonManageView({ installed: installed({ tools: [cut] }), busy: null, message: null }).rows[0]).toEqual({
+      id: GE.id, label: GE.id,
+      description: "Not whole: its proton is missing, so games set to it can't start · 1.6 GB · used by 2 games",
+      action: { label: "Remove", enabled: true },
+    });
+    const linked = { ...GE, missing: "proton", linked: true };
+    expect(protonManageView({ installed: installed({ tools: [linked] }), busy: null, message: null }).rows[0]).toEqual({
+      id: GE.id, label: GE.id,
+      description: "Not whole: its proton is missing, so games set to it can't start · linked from another folder: mend it there · 1.6 GB · used by 2 games",
+      action: null,
+    });
+  });
+
   it("says when nothing is installed or there is no Steam", () => {
     expect(protonManageView({ installed: installed({ tools: [], installed_bytes: 0 }), busy: null, message: null })).toMatchObject({
       rows: [], usage: null, message: "No Proton build is installed yet.",
@@ -353,5 +370,27 @@ describe("restarting Steam", () => {
       lines: ["Steam closes and opens again, and then lists its Proton builds as they are now.", "A running game closes with it."],
       okLabel: "Restart",
     });
+  });
+});
+
+
+describe("tools games are set to that aren't on the device", () => {
+  it("are told on the page, the one for every game first, the games by name, and the nameless left out", () => {
+    const view = protonPageView(installed({
+      unresolved: {
+        global: "GE-Proton11-11-x86_64",
+        tools: [
+          { tool: "GE-Proton10-5", games: [{ appid: "620", name: "Portal 2", kind: "steam" }, { appid: "1250", name: "Killing Floor", kind: "steam" }] },
+          { tool: "GE-Proton9-1", games: [{ appid: "999", name: null, kind: "unknown" }] },
+        ],
+      },
+    }));
+
+    expect(view.unresolved).toEqual([
+      "Every game without its own choice is set to GE-Proton11-11-x86_64, which isn't on this device.",
+      "Set to GE-Proton10-5, which isn't on this device: Killing Floor, Portal 2. Pick another one in the game's Properties → Compatibility.",
+    ]);
+    expect(protonPageView(installed()).unresolved).toEqual([]);
+    expect(protonPageView(null).unresolved).toEqual([]);
   });
 });

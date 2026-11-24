@@ -21,8 +21,14 @@ TRACKING_FILE = "upscaler_files"
 _TRACKED_DLL = f"drive_c/windows/system32/{DLL}"
 
 IN_PREFIX = "in-prefix"
+"""In the prefix, where OptiScaler sees it: the game's patch linked it, or a patch from the plugin would."""
+NOT_LINKED = "not-linked"
+"""In the prefix, but the game's patch didn't link it where OptiScaler looks (the launch wrapper's patch doesn't), and
+a patch from the plugin would."""
 WILL_FETCH = "will-fetch"
 UNSUPPORTED = "unsupported"
+ABSENT = "absent"
+"""The game is set to a Proton that isn't on the device."""
 
 
 def is_amd(vendor: str) -> bool:
@@ -48,20 +54,38 @@ def tracked_version(tracking: str) -> str | None:
 
 @dataclass(frozen=True)
 class State:
-    """A game's FSR 4 under Proton: the DLL is in its prefix (with the version when recorded), its
-    Proton will fetch it on launch, or its Proton can't. `tool` is the Proton's name, None for Steam's default."""
+    """A game's FSR 4 under Proton: the DLL is in its prefix where OptiScaler sees it, or would once patched again
+    (with the version when recorded), its Proton will fetch it on launch, its Proton can't, or its Proton isn't on the
+    device. `tool` is the Proton's name, None for Steam's default."""
 
     kind: str
     tool: str | None
     version: str | None = None
 
 
-def state(amd_gpu: bool, tool: str | None, tool_reads_variable: bool, dll_in_prefix: bool, version: str | None) -> State | None:
-    """What to tell the user about FSR 4 for a game; None off AMD, where FSR 4 isn't the question."""
+def state(
+    amd_gpu: bool,
+    tool: str | None,
+    tool_reads_variable: bool,
+    dll_in_prefix: bool,
+    version: str | None,
+    tool_absent: bool = False,
+    linked: bool | None = None,
+) -> State | None:
+    """What to tell the user about FSR 4 for a game; None off AMD, where FSR 4 isn't the question. `tool_absent`: the
+    game is set to a Proton that isn't on the device. `linked`: whether the game's patch linked the DLL where
+    OptiScaler looks, None for a game that isn't patched.
+
+    OptiScaler loads the DLL only from where it looks, never from the prefix, and a patch links it there only when it
+    asks Proton for it (wants_upgrade_variable). So the DLL in the prefix counts only when linked, or when a patch
+    would link it: under a Proton that can't fetch it (an earlier one did, or a copy by hand), it is that Proton's
+    case, whatever the prefix holds."""
     if not amd_gpu:
         return None
-    if dll_in_prefix:
-        return State(IN_PREFIX, tool, version)
+    if tool_absent:
+        return State(ABSENT, tool)
+    if dll_in_prefix and (linked or wants_upgrade_variable(amd_gpu, tool_reads_variable)):
+        return State(NOT_LINKED if linked is False else IN_PREFIX, tool, version)
     if tool_reads_variable:
         return State(WILL_FETCH, tool)
     return State(UNSUPPORTED, tool)

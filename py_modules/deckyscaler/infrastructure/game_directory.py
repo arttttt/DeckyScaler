@@ -45,18 +45,18 @@ def current_state(directory: Path, patch: patch_record.PatchRecord) -> dict[str,
     return state
 
 
-def links(directory: Path, dirs: tuple[str, ...]) -> dict[str, str]:
-    """Every symlink right in each of `dirs` of a game directory ("" for its own), by its path in the game, with where
-    it points. A directory reached through a link is never looked into."""
-    found: dict[str, str] = {}
+def contents(directory: Path, dirs: tuple[str, ...]) -> dict[str, str | None]:
+    """Every entry right in each of `dirs` of a game directory ("" for its own), by its path in the game, with where
+    it points when it is a link (None for a file or a directory). A directory reached through a link is never looked
+    into."""
+    found: dict[str, str | None] = {}
     for name in dirs:
         relative = PurePosixPath(name)
         folder = directory / relative
         if any((directory / step).is_symlink() for step in (relative, *relative.parents) if str(step) != ".") or not folder.is_dir():
             continue
         for entry in os.scandir(folder):
-            if entry.is_symlink():
-                found[str(relative / entry.name)] = os.readlink(entry.path)
+            found[str(relative / entry.name)] = os.readlink(entry.path) if entry.is_symlink() else None
     return found
 
 
@@ -71,6 +71,19 @@ def directories_under(directory: Path, roots: tuple[str, ...]) -> frozenset[str]
         for current, _, _ in os.walk(top):  # a linked directory is listed by its parent, never walked into
             found.add(Path(current).relative_to(directory).as_posix())
     return frozenset(found)
+
+
+def placed_kinds(directory: Path, patch: patch_record.PatchRecord) -> dict[str, str | None]:
+    """What each file a recorded patch placed is now, without reading any: a link by where it points while that is
+    there, patch_record.FILE for a file, None when it is gone or a link leads nowhere."""
+    kinds: dict[str, str | None] = {}
+    for item in patch.placed:
+        full = directory / item.path
+        if full.is_symlink():
+            kinds[item.path] = _link_identity(os.readlink(full)) if full.exists() else None
+        else:
+            kinds[item.path] = patch_record.FILE if full.is_file() else None
+    return kinds
 
 
 def listing(directory: Path) -> tuple[frozenset[str], frozenset[str]]:

@@ -116,7 +116,7 @@ class ProtonBuilds:
         active = self._active(clients)
         if active.root is None:
             return {"status": "success", "problem": active.problem, "tools": [], "others": [], "installed_bytes": 0,
-                    "restart_needed": False, "moves": []}
+                    "restart_needed": False, "moves": [], "unresolved": {"global": None, "tools": []}}
         store = self._store(active.root)
         forced = proton.forced_mappings(active.root)
         name = self._namer(active.root)
@@ -137,8 +137,14 @@ class ProtonBuilds:
                 "build_label": build.label if build else None,
                 "system": tool.system,
                 "linked": tool.linked,
+                "missing": tool.missing,
             })
         others = [row_of(tool) for tool in store.others()]
+        absent = proton_builds.unresolved(forced, tools)
+        unresolved = {
+            "global": absent.global_tool,
+            "tools": [{"tool": tool, "games": name(list(appids))} for tool, appids in absent.games],
+        }
         own = (
             sum(row["size"] for row in rows if not row["system"]) + sum(row["size"] for row in others) if with_sizes else None
         )
@@ -146,7 +152,7 @@ class ProtonBuilds:
         # Steam takes a game's move only to a build it lists, which a restart due means it doesn't yet.
         moves = [] if restart else self._offers(tools, forced, name)
         return {"status": "success", "problem": None, "tools": rows, "others": others, "installed_bytes": own,
-                "restart_needed": restart, "moves": moves}
+                "restart_needed": restart, "moves": moves, "unresolved": unresolved}
 
     def _published(self, build_id: str) -> list[proton_builds.Release]:
         return proton_builds.available(build_id, self.list_releases(proton_builds.BUILDS[build_id].repository))
@@ -186,7 +192,18 @@ class ProtonBuilds:
             return _error(f"{tool_name} can't be downloaded now. Check again.")
         store = self._store(active.root)
         tools = store.installed()
-        if any(tool.known_as(tool_name) for tool in tools):
+        known = next((tool for tool in tools if tool.known_as(tool_name)), None)
+        if known is not None and known.missing:
+            if known.linked:
+                return _error(
+                    f"{tool_name} is a link to a build kept elsewhere, and that build isn't whole (its {known.missing} is "
+                    "missing): mend it where it is kept, or take the link out of compatibilitytools.d."
+                )
+            return _error(
+                f"{tool_name} is there but not whole (its {known.missing} is missing): remove it under Manage installed…, "
+                "then download it again."
+            )
+        if known is not None:
             return _error(f"{tool_name} is already installed.")
         if store.taken(tool_name):
             # The build would land on what holds its name: say so before downloading, and leave clearing it to the user.

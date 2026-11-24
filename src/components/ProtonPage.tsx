@@ -49,6 +49,11 @@ export function ProtonPage() {
       <PanelSectionRow>
         <Field description={view.summary} />
       </PanelSectionRow>
+      {view.unresolved.map((line) => (
+        <PanelSectionRow key={line}>
+          <Field description={line} />
+        </PanelSectionRow>
+      ))}
       <PanelSectionRow>
         <ButtonItem
           layout="below"
