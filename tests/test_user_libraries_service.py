@@ -273,3 +273,28 @@ def test_a_patched_game_says_when_its_choice_needs_patching_again(plugin, home, 
     assert run(plugin.user_library_game_choice("1234"))["pending"] is True
     run(plugin.patch_game("1234", "dxgi.dll", "", NIGHTLY))
     assert run(plugin.user_library_game_choice("1234"))["pending"] is False
+
+
+def test_a_second_library_is_turned_away_while_one_is_added_or_downloaded(home, tmp_path):
+    busy = owner(home)
+    picked = tmp_path / "picked.dll"
+    picked.write_bytes(b"MZ")
+    message = "Another library is still being added or downloaded: try again once it's done."
+    with busy.store.assembling():
+        assert owner(home).add(str(picked)) == {"status": "error", "message": message}
+        assert owner(home).install(ul.ANR, "anr-v-b19") == {"status": "error", "message": message}
+    assert owner(home).install(ul.ANR, "anr-v-b19")["status"] == "success"
+
+
+def test_choices_made_at_once_all_land(home, plugin_home):
+    import threading
+
+    chooser = owner(home)
+    owner(home).install(ul.ANR, "anr-v-b19")
+    threads = [threading.Thread(target=lambda appid=appid: chooser.choose(appid, FG, "none")) for appid in map(str, range(600, 640))]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(chooser.choices.read().games) == sorted(map(str, range(600, 640)))

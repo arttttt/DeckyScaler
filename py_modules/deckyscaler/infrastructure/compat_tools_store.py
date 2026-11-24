@@ -11,6 +11,7 @@ from pathlib import Path
 
 from deckyscaler.domain import compat_tools, keyvalues
 from deckyscaler.domain.proton_builds import Tool
+from deckyscaler.infrastructure.staging import Staging
 
 MANIFEST = "compatibilitytool.vdf"
 TOOL_MANIFEST = "toolmanifest.vdf"
@@ -57,12 +58,14 @@ def _scan(directory: Path, system: bool) -> list[Tool]:
     return [tool for folder in _folders(directory) if (tool := _tool(folder, system)) is not None]
 
 
-class CompatToolsStore:
+class CompatToolsStore(Staging):
     def __init__(self, tools_dir: Path, system_dir: Path | None = None):
         self.tools_dir = tools_dir
         self.system_dir = system_dir
         """Tools installed for every user: listed, never changed."""
         self.partial_dir = tools_dir / PARTIAL_DIRNAME
+        self.lock_dir = self.partial_dir
+        """The staging directory stays once made: compatibilitytools.d doesn't change for an install's lock."""
 
     def installed(self) -> list[Tool]:
         """Every tool Steam would find, whoever put it there: this install's own, then the system's."""
@@ -120,6 +123,11 @@ class CompatToolsStore:
                 shutil.rmtree(leftover, ignore_errors=True)
             else:
                 leftover.unlink(missing_ok=True)
+
+    def clear_when_idle(self) -> None:
+        """As every store does, but never making the staging directory to lock it: compatibilitytools.d would change."""
+        if self.partial_dir.is_dir():
+            super().clear_when_idle()
 
     def staging(self, name: str) -> Path:
         """An empty directory on compatibilitytools.d's filesystem to download and unpack a build in."""

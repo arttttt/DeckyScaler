@@ -8,13 +8,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from deckyscaler.domain import library, version_placement
-from deckyscaler.infrastructure import archive
+from deckyscaler.infrastructure import archive, processes
 from deckyscaler.infrastructure.files import files_under, sha256
 from deckyscaler.infrastructure.github_releases import Download, ListReleases, ReleasesUnavailable, Report
 from deckyscaler.infrastructure.library_store import LibraryStore
 
 log = logging.getLogger(__name__)
 
+
+
+BUSY = "Another download into the OptiScaler library is still running: try again once it's done."
+UNPACKER_GRACE = 30.0
+"""How long the library waits, as the plugin loads, for an unpacker its last stop left running to end."""
 
 
 def _error(message: str) -> dict:
@@ -47,8 +52,10 @@ class Library:
 
     def clear_interrupted(self) -> None:
         """Remove what an install the plugin's stop cut short left in the library, and settle a replace it cut
-        short: the old copy comes back when no new one took its place."""
-        self.store.clear_partial()
+        short: the old copy comes back when no new one took its place. An unpacker that outlived the plugin's stop
+        is given a while to end first, or it would write on after the clear; an install going on is left alone."""
+        processes.wait_while_running(str(self.store.partial_dir), UNPACKER_GRACE)
+        self.store.clear_when_idle()
 
     def keep_file_lists(self) -> None:
         """Give each version installed before the library kept file lists the list of what it holds now."""
@@ -124,27 +131,27 @@ class Library:
             needed = library.space_needed(version.size) // 1_000_000
             return _error(f"Not enough free space: installing {version_id} needs about {needed} MB.")
 
-        self.store.clear_partial()
-        try:
-            stage = self.store.staging(version_id)
-            archive_path = stage.parent / f"{version_id}.7z"
-            self.download(version.url, archive_path, lambda got, total: self.report(version_id, got, total))
-            if sha256(archive_path) != version.sha256:
-                return _error(f"The {version_id} download did not match its checksum. Try again.")
-            files = stage / library.FILES_DIRNAME
-            archive.extract_7z(self.seven_zip, archive_path, files)
-            family = library.family_of(version.version)
-            unpacked = files_under(files)
-            missing = library.missing_files(family, unpacked) if family else {"a known layout"}
-            if missing:
-                return _error(f"The {version_id} archive lacks {', '.join(sorted(missing))}; not added.")
-            installed = library.entry(version, datetime.now(timezone.utc).isoformat(), unpacked)
-            (self.store.replace if replacing else self.store.commit)(stage, installed)
-        except (ReleasesUnavailable, RuntimeError, OSError) as exc:
-            log.error(f"Installing {version_id} failed: {exc}")
-            return _error(f"Installing {version_id} failed: {exc}")
-        finally:
-            self.store.clear_partial()
+        with self.store.assembling() as free:
+            if not free:
+                return _error(BUSY)
+            try:
+                stage = self.store.staging(version_id)
+                archive_path = stage.parent / f"{version_id}.7z"
+                self.download(version.url, archive_path, lambda got, total: self.report(version_id, got, total))
+                if sha256(archive_path) != version.sha256:
+                    return _error(f"The {version_id} download did not match its checksum. Try again.")
+                files = stage / library.FILES_DIRNAME
+                archive.extract_7z(self.seven_zip, archive_path, files)
+                family = library.family_of(version.version)
+                unpacked = files_under(files)
+                missing = library.missing_files(family, unpacked) if family else {"a known layout"}
+                if missing:
+                    return _error(f"The {version_id} archive lacks {', '.join(sorted(missing))}; not added.")
+                installed = library.entry(version, datetime.now(timezone.utc).isoformat(), unpacked)
+                (self.store.replace if replacing else self.store.commit)(stage, installed)
+            except (ReleasesUnavailable, RuntimeError, OSError) as exc:
+                log.error(f"Installing {version_id} failed: {exc}")
+                return _error(f"Installing {version_id} failed: {exc}")
         log.info(f"{'Reinstalled' if replacing else 'Installed'} OptiScaler {version_id}")
         message = f"OptiScaler {version.version} is {'downloaded again' if replacing else 'installed'}."
         try:

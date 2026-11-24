@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from datetime import datetime
 
 log = logging.getLogger(__name__)
@@ -19,6 +20,17 @@ def command_lines() -> list[str]:
         log.error(f"[DeckyScaler] running exe scan failed: {exc}")
         return []
     return result.stdout.splitlines()
+
+
+def wait_while_running(fragment: str, timeout: float, poll: float = 0.5) -> bool:
+    """Wait, at most `timeout` seconds, while a running process's command line holds `fragment`: whether none does
+    by then."""
+    deadline = time.monotonic() + timeout
+    while any(fragment in line for line in command_lines()):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(poll)
+    return True
 
 
 _STARTED = re.compile(r"^\s*(\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.*)$")

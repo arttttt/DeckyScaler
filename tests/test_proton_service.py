@@ -458,3 +458,12 @@ def test_moves_changed_at_once_keep_both_changes(world, monkeypatch):
     assert json.loads(world.moves_file.read_text()) == {
         pb.GE_PROTON: {"target": NEWEST, "sources": ["ge-proton11-11-x86_64"], "appids": ["440"]},
     }
+
+
+def test_a_second_build_is_turned_away_while_one_downloads(world):
+    from deckyscaler.infrastructure.compat_tools_store import CompatToolsStore
+
+    with CompatToolsStore(world.tools).assembling():
+        refused = world.proton(FakeDownload(world.archive)).install(pb.GE_PROTON, NEWEST)
+    assert refused == {"status": "error", "message": "Another Proton build is still being downloaded: try again once it's done."}
+    assert world.proton(FakeDownload(world.archive)).install(pb.GE_PROTON, NEWEST)["status"] == "success"

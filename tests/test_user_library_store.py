@@ -181,5 +181,5 @@ def test_the_choices_are_kept_in_one_file(tmp_path):
     store = LibraryChoicesStore(tmp_path / "settings" / "libraries.json")
 
     assert store.read() == Choices({}, {})
-    store.write(Choices({UP: "xess"}, {"620": {FG: "none"}}))
+    assert store.change(lambda _: Choices({UP: "xess"}, {"620": {FG: "none"}})) == Choices({UP: "xess"}, {"620": {FG: "none"}})
     assert store.read() == Choices({UP: "xess"}, {"620": {FG: "none"}})

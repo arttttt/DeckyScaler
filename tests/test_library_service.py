@@ -512,3 +512,61 @@ def test_an_old_copy_left_after_the_new_one_landed_is_cleared_by_the_next_instal
 
     assert not (versions / f".{NEWEST}.old").exists()
     assert (versions / NEWEST / "files" / "OptiScaler.dll").read_bytes() == b"opti"
+
+
+def test_a_second_download_into_the_library_is_turned_away_while_the_first_goes_on(world):
+    busy = world.library()
+    with busy.store.assembling():
+        refused = world.library().install(library.NIGHTLY, NEWEST)
+        world.library().clear_interrupted()  # the load's clear leaves an install going on alone
+
+    assert refused == {"status": "error", "message": "Another download into the OptiScaler library is still running: try again once it's done."}
+    assert world.library().install(library.NIGHTLY, NEWEST)["status"] == "success"
+
+
+def test_loading_waits_for_an_unpacker_a_stop_left_running_before_clearing(world, monkeypatch):
+    from deckyscaler.application import library as library_module
+
+    staging = world.plugin_home / "library" / ".partial"
+    write(staging / NEWEST / "files" / "OptiScaler.dll", b"half")
+    running = [f"7zzs x -o{staging}/{NEWEST}/files {staging}/{NEWEST}.7z"] * 2
+    seen: list[bool] = []
+
+    def command_lines() -> list[str]:
+        seen.append(staging.exists())
+        return [running.pop()] if running else []
+
+    monkeypatch.setattr(library_module.processes, "command_lines", command_lines)
+    monkeypatch.setattr(library_module.processes.time, "sleep", lambda _: None)
+
+    world.library().clear_interrupted()
+
+    assert seen == [True, True, True] and not staging.exists()  # cleared only once it had ended
+
+
+def test_an_unpacker_that_never_ends_is_waited_for_a_while_only(world, monkeypatch):
+    from deckyscaler.application import library as library_module
+
+    staging = world.plugin_home / "library" / ".partial"
+    write(staging / NEWEST / "half", b"")
+    monkeypatch.setattr(library_module.processes, "command_lines", lambda: [f"7zzs x {staging}/{NEWEST}.7z"])
+    monkeypatch.setattr(library_module, "UNPACKER_GRACE", 0.05)
+    monkeypatch.setattr(library_module.processes.time, "sleep", lambda _: None)
+
+    world.library().clear_interrupted()
+
+    assert not staging.exists()
+
+
+def test_what_a_cut_short_install_left_is_cleared_before_the_next_downloads(world):
+    leftover = world.plugin_home / "library" / ".partial" / "nightly-20260101" / "files" / "OptiScaler.dll"
+    write(leftover, b"half")
+    fake = FakeDownload(world.archive)
+    seen: list[bool] = []
+
+    def download(url, destination, on_progress):
+        seen.append(leftover.exists())
+        fake(url, destination, on_progress)
+
+    assert world.library(download).install(library.NIGHTLY, NEWEST)["status"] == "success"
+    assert seen == [False]  # the room it took is free before the download starts
