@@ -75,3 +75,19 @@ def test_names_keep_the_case_steam_wrote_them_in_and_junk_is_no_choice():
     assert chosen.games == {"730": "GE-Proton11-12-x86_64"}
     assert chosen.global_tool is None
     assert compat_tools.forced_mappings({}) == compat_tools.ForcedMappings({}, None)
+
+
+@pytest.mark.parametrize(
+    ("toolmanifest", "target"),
+    [
+        ('"manifest" { "version" "2" "commandline" "/proton %verb%" }', "proton"),  # every Proton
+        ('"manifest" { "commandline" "/luxtorpeda.sh %verb%" }', "luxtorpeda.sh"),
+        ('"manifest" { "commandline" "/run-dosbox" }', "run-dosbox"),  # Boxtron: no %verb%
+        ('"manifest" { "commandline_waitforexitandrun" "/steamtinkerlaunch %verb%" }', "steamtinkerlaunch"),
+        ('"manifest" { "version" "2" }', None),  # names none: nothing proves the tool broken
+        ('"manifest" { "commandline" "" }', None),
+        ("", None),
+    ],
+)
+def test_a_tools_launch_file_is_the_first_word_of_its_command_line(toolmanifest, target):
+    assert compat_tools.launch_target(keyvalues.parse(toolmanifest)) == target

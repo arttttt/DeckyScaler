@@ -164,6 +164,8 @@ export type InstalledProtonTool = {
   system: boolean;
   /** A link to a build kept elsewhere (an SD card): listed as a build, never removed here. */
   linked: boolean;
+  /** The file Steam runs it by, when that isn't there (a removal cut short): it can't start a game. */
+  missing: string | null;
   /** Bytes on disk, when asked for (sizing walks thousands of files). */
   size: number | null;
   games: ProtonGame[];

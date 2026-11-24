@@ -21,12 +21,27 @@ stays once made: Steam needs a restart when compatibilitytools.d itself changes,
 directory would change it."""
 
 
-def _declared(manifest: Path) -> frozenset[str]:
+def _read(manifest: Path) -> keyvalues.KeyValues | None:
     try:
-        text = manifest.read_text(encoding="utf-8", errors="replace")
+        return keyvalues.parse(manifest.read_text(encoding="utf-8", errors="replace"))
     except OSError:
-        return frozenset()
-    return frozenset(compat_tools.custom_tools(keyvalues.parse(text)))
+        return None
+
+
+def _declared(manifest: Path) -> frozenset[str]:
+    parsed = _read(manifest)
+    return frozenset(compat_tools.custom_tools(parsed)) if parsed is not None else frozenset()
+
+
+def _missing(folder: Path) -> str | None:
+    """The file a tool's toolmanifest.vdf has Steam run, under its install path, when it isn't there; None when it is,
+    or the tool names none (nothing proves it broken)."""
+    tool_manifest, manifest = _read(folder / TOOL_MANIFEST), _read(folder / MANIFEST)
+    target = compat_tools.launch_target(tool_manifest) if tool_manifest is not None else None
+    if target is None:
+        return None
+    install_path = next(iter(compat_tools.custom_tools(manifest).values()), ".") if manifest is not None else "."
+    return None if (folder / install_path / target).exists() else target
 
 
 def _modified(directory: Path) -> float:
@@ -46,11 +61,23 @@ def _folders(directory: Path) -> list[Path]:
         return []
 
 
+def _plain_files(directory: Path) -> list[Path]:
+    """The plain files in a compatibilitytools.d (an archive, a note), none a link or named with a dot; a .vdf
+    there may register a tool kept elsewhere, so it is never one."""
+    try:
+        return sorted(
+            path for path in directory.iterdir()
+            if path.is_file() and not path.is_symlink() and not path.name.startswith(".") and path.suffix.lower() != ".vdf"
+        )
+    except OSError:
+        return []
+
+
 def _tool(folder: Path, system: bool) -> Tool | None:
     """The tool a folder is, as Steam finds one: a compatibilitytool.vdf that declares a tool. Anything else, a
     missing, unreadable or empty manifest included, is no tool Steam would list."""
     names = _declared(folder / MANIFEST)
-    return Tool(folder.name, names, system, _modified(folder), folder.is_symlink()) if names else None
+    return Tool(folder.name, names, system, _modified(folder), folder.is_symlink(), _missing(folder)) if names else None
 
 
 def _scan(directory: Path, system: bool) -> list[Tool]:
@@ -69,14 +96,15 @@ class CompatToolsStore:
         return _scan(self.tools_dir, system=False) + (_scan(self.system_dir, system=True) if self.system_dir else [])
 
     def others(self) -> list[Tool]:
-        """The device's own folders in compatibilitytools.d that aren't tools Steam would find (`_tool`): what a
-        broken install or a folder copied by hand leaves. They are listed so that they can be removed, as tools that
-        declare no names. A link never counts: it isn't removed here."""
-        return [
+        """The device's own folders in compatibilitytools.d that aren't tools Steam would find (`_tool`), and its plain
+        files: what a broken install, a folder copied by hand or a downloaded archive leaves. They are listed so that
+        they can be removed, as tools that declare no names. A link never counts: it isn't removed here."""
+        folders = [
             Tool(folder.name, frozenset(), modified=_modified(folder))
             for folder in _folders(self.tools_dir)
             if not folder.is_symlink() and _tool(folder, system=False) is None
         ]
+        return folders + [Tool(path.name, frozenset(), modified=_modified(path)) for path in _plain_files(self.tools_dir)]
 
     def _own(self, folder: str) -> Path:
         """A tool's directory in compatibilitytools.d; anything that would point elsewhere is refused."""
@@ -87,6 +115,8 @@ class CompatToolsStore:
     def size(self, tool: Tool) -> int:
         """What a tool takes on disk; its symlinks count as themselves."""
         root = (self.system_dir if tool.system and self.system_dir else self.tools_dir) / tool.folder
+        if root.is_file() and not root.is_symlink():
+            return root.stat().st_size
         total = 0
         for directory, _dirs, names in os.walk(root):
             for name in names:
@@ -151,8 +181,11 @@ class CompatToolsStore:
         unpacked.rename(self._own(folder))
 
     def remove(self, folder: str) -> None:
-        """Delete a tool from compatibilitytools.d; a link, or anything outside it, is refused."""
+        """Delete a tool, or a plain file, from compatibilitytools.d; a link, or anything outside it, is refused."""
         path = self._own(folder)
-        if path.is_symlink() or not path.is_dir():
+        if path.is_symlink() or not (path.is_dir() or path.is_file()):
             raise ValueError(f"{folder} is not a tool directory in {self.tools_dir}")
-        shutil.rmtree(path)
+        if path.is_file():
+            path.unlink()
+        else:
+            shutil.rmtree(path)

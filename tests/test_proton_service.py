@@ -156,7 +156,7 @@ def test_installed_builds_list_every_tool_with_the_games_whose_user_chose_it(wor
 
     tools = {tool["id"]: tool for tool in listed["tools"]}
     assert tools[NEWEST] | {"size": 0} == {
-        "id": NEWEST, "build": pb.GE_PROTON, "build_label": "GE-Proton", "system": False, "linked": False, "size": 0,
+        "id": NEWEST, "build": pb.GE_PROTON, "build_label": "GE-Proton", "system": False, "linked": False, "missing": None, "size": 0,
         "games": [
             {"appid": "1245620", "name": None, "kind": "unknown"},  # uninstalled since: still the user's choice
             {"appid": SHORTCUT_APPID, "name": "Heroic", "kind": "shortcut"},
@@ -253,9 +253,13 @@ def test_a_build_whose_name_a_link_or_a_file_holds_is_refused_before_downloading
         write(world.tools / NEWEST, b"")
     download = FakeDownload(world.archive)
 
+    # A plain file is listed among the others, to remove; a link is never the plugin's to remove.
+    removable = holder == "file"
     assert world.proton(download).install(pb.GE_PROTON, NEWEST) == {
         "status": "error",
-        "message": f"Something named {NEWEST} is already in compatibilitytools.d, and it isn't a build. Move it out of there first.",
+        "message": f"{NEWEST} is already in compatibilitytools.d, but it isn't a build. Remove it under Manage installed… first."
+        if removable
+        else f"Something named {NEWEST} is already in compatibilitytools.d, and it isn't a build. Move it out of there first.",
     }
     assert download.urls == []
 
@@ -458,3 +462,15 @@ def test_moves_changed_at_once_keep_both_changes(world, monkeypatch):
     assert json.loads(world.moves_file.read_text()) == {
         pb.GE_PROTON: {"target": NEWEST, "sources": ["ge-proton11-11-x86_64"], "appids": ["440"]},
     }
+
+
+def test_a_build_there_but_not_whole_is_listed_so_and_refused_until_removed(world):
+    (build_tree(world.tools, NEWEST) / "proton").unlink()  # a removal cut short: the manifests outlived the files
+    download = FakeDownload(world.archive)
+
+    assert {tool["id"]: tool["missing"] for tool in world.proton().installed()["tools"]}[NEWEST] == "proton"
+    assert world.proton(download).install(pb.GE_PROTON, NEWEST) == {
+        "status": "error",
+        "message": f"{NEWEST} is there but not whole (its proton is missing): remove it under Manage installed…, then download it again.",
+    }
+    assert download.urls == []

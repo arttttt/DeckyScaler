@@ -80,3 +80,17 @@ def custom_tools(manifest: keyvalues.KeyValues) -> dict[str, str]:
         for name, entry in tools.items()
         if isinstance(entry, dict)
     }
+
+
+def launch_target(toolmanifest: keyvalues.KeyValues) -> str | None:
+    """The file a tool's toolmanifest.vdf has Steam run, relative to the tool's install path: the first word of its
+    commandline (else of commandline_waitforexitandrun), without the leading "/". Every Proton names `proton`; other
+    tools their own script. None when it names none."""
+    manifest = keyvalues.find(toolmanifest, "manifest")
+    if not isinstance(manifest, dict):
+        return None
+    for key in ("commandline", "commandline_waitforexitandrun"):
+        line = manifest.get(key)
+        if isinstance(line, str) and line.split():
+            return line.split()[0].lstrip("/") or None
+    return None

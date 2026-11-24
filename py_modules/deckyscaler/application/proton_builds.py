@@ -134,6 +134,7 @@ class ProtonBuilds:
                 "build_label": build.label if build else None,
                 "system": tool.system,
                 "linked": tool.linked,
+                "missing": tool.missing,
             })
         others = [row_of(tool) for tool in store.others()]
         own = (
@@ -183,7 +184,13 @@ class ProtonBuilds:
             return _error(f"{tool_name} can't be downloaded now. Check again.")
         store = self._store(active.root)
         tools = store.installed()
-        if any(tool.known_as(tool_name) for tool in tools):
+        known = next((tool for tool in tools if tool.known_as(tool_name)), None)
+        if known is not None and known.missing:
+            return _error(
+                f"{tool_name} is there but not whole (its {known.missing} is missing): remove it under Manage installed…, "
+                "then download it again."
+            )
+        if known is not None:
             return _error(f"{tool_name} is already installed.")
         if store.taken(tool_name):
             # The build would land on what holds its name: say so before downloading, and leave clearing it to the user.

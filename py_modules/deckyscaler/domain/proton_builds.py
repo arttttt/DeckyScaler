@@ -143,6 +143,9 @@ class Tool:
     """When its directory last changed: unpacking keeps the archive's times, so about when the build was made."""
     linked: bool = False
     """A link to a folder kept elsewhere (a build on an SD card): listed as a tool, never removed by the plugin."""
+    missing: str | None = None
+    """The file its toolmanifest.vdf has Steam run, when that isn't there (a removal cut short, files deleted by
+    hand): Steam lists the tool, and it can't start a game."""
 
     def known_as(self, name: str) -> bool:
         """Whether Steam knows the tool by `name` (a mapping's or a release's tool name)."""
