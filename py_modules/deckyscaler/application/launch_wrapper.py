@@ -58,7 +58,6 @@ class LaunchWrapper:
             reset_ini=reset_ini,
             unless_current=True,
             # Steam names the game it starts: its page then shows it, and its own settings go in on top of the global ones.
-            steam_game=self.patcher.wrapper_game(directory, appid),
             through=marker.WRAPPER,
             settings_appid=appid,
             keep_libraries=True,

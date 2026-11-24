@@ -171,9 +171,16 @@ class Patcher:
         version_files = files.files_under(source)
         if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name, placed, version_files):
             log.info(f"{directory} is already patched with OptiScaler {entry.id}, {dll_name}")
-            if patch_record.placed_by(patch_record.parse(files.read_json(marker_path)), plan.INI_FILENAME):
+            current = files.read_json(recorded_in)
+            if through and current.get("through") != through:
+                # A patch the wrapper now starts (made from the panel, or before routes were kept) is the wrapper's.
+                files.replace_json(recorded_in, {**current, "through": through})
+            if patch_record.placed_by(patch_record.parse(current), plan.INI_FILENAME):
                 self.apply_settings(directory, source, settings_appid)
             return {"status": "success", "message": f"OptiScaler {entry.version} is in {directory}.", "optiscaler_version": entry.id}
+        if through == marker.WRAPPER and steam_game is None:
+            # Looked up only when the marker is written: a start that changes nothing scans no Steam library.
+            steam_game = self.wrapper_game(directory, settings_appid)
 
         carried_over: frozenset[str] = frozenset()
         previous = patch_record.parse(previous_details)

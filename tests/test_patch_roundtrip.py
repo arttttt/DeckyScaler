@@ -149,7 +149,8 @@ def test_a_steam_game_the_wrapper_patched_is_known_by_its_page_and_stays_the_wra
     reinstalled = asyncio.run(plugin.patch_game("1234", "dxgi.dll", wrapped, STABLE))
     assert reinstalled["launch_options"] is None  # the wrapper stays: nothing to set
     assert reinstalled["message"].endswith("The launch wrapper stays in its launch options.")
-    assert json.loads((root / "DECKYSCALER_PATCH").read_text())["through"] == "wrapper"
+    reinstalled_marker = json.loads((root / "DECKYSCALER_PATCH").read_text())
+    assert (reinstalled_marker["through"], reinstalled_marker["launch_options"]) == ("wrapper", "")  # it set none
 
     unpatched = asyncio.run(plugin.unpatch_game("1234", wrapped))
     assert unpatched["launch_options"] == "gamemoderun %command%"
@@ -195,3 +196,18 @@ def test_unpatching_a_directory_the_wrapper_patched_says_it_comes_back(plugin, h
 
 def run_status(plugin) -> dict:
     return asyncio.run(plugin.get_game_status("1234"))
+
+
+def test_a_start_that_changes_nothing_looks_up_no_game_and_marks_a_panel_patch_the_wrappers(plugin, home, plugin_home, steam_library, monkeypatch):
+    from deckyscaler.application import patcher as patcher_module
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    root = steam_library.add_game("1234", "Test Game")
+    asyncio.run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))  # from the panel, then the user adds the wrapper
+    assert "through" not in json.loads((root / "DECKYSCALER_PATCH").read_text())
+    monkeypatch.setattr(patcher_module.steam_library, "find_game", lambda *_: (_ for _ in ()).throw(AssertionError("scanned")))
+
+    LaunchWrapper(home, {"SteamAppId": "1234"}).patch([str(root / "Game.exe")], "dxgi.dll", STABLE)
+
+    marker = json.loads((root / "DECKYSCALER_PATCH").read_text())
+    assert (marker["through"], marker["appid"]) == ("wrapper", "1234")  # the panel's record kept, its route made true
