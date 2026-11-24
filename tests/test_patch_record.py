@@ -556,6 +556,26 @@ def test_a_game_whose_backup_is_gone_says_so_before_and_after_unpatching(plugin,
     )
 
 
+def test_after_a_verify_the_games_own_proxy_is_told_and_the_patch_set_aside_as_its_backup_is_matched(plugin, plugin_home, tmp_path):
+    shipped = game_file("dxgi.dll")
+    game = make_game_dir(tmp_path / "games" / "Game", {"dxgi.dll": shipped})
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    (game / "DECKYSCALER_PATCH").unlink()  # the record lost, and Steam's Verify put the game's own back:
+    (game / "dxgi.dll").unlink()
+    write(game / "dxgi.dll", shipped)  # dxgi.dll and the same dxgi.dll.b side by side
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+    assert (game / "dxgi.dll.b").read_bytes() == shipped and (game / "dxgi.dll").is_symlink()
+
+    (game / "dxgi.dll").unlink()
+    write(game / "dxgi.dll", shipped)  # verified again, now with the record there
+    assert run(plugin.patched_games())["games"][0]["proxy_taken_back"] is True
+    (game / "DECKYSCALER_PATCH").unlink()
+    write(game / "dxgi.dll.b", b"another build")  # and a backup that isn't the same
+    refused = run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    assert refused["status"] == "error" and "so is a different dxgi.dll.b" in refused["message"]
+
+
 def test_links_are_looked_for_only_where_a_version_links_and_never_through_a_link(tmp_path):
     game = tmp_path / "Game"
     write(game / "OptiScaler" / "keep.txt", b"game")

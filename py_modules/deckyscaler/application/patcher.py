@@ -197,7 +197,8 @@ class Patcher:
                 entries |= {driver}
             placement = self.placement(to_place, family)
             request = version_placement.Request(
-                dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies
+                dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies,
+                game_directory.same_as_backup(directory, entries),
             )
             operations = version_placement.plan_patch(entries, version_files, family, request)
             log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(placed)}")
@@ -398,17 +399,21 @@ class Patcher:
 
     def _against_its_files(self, directory: Path, details: dict) -> dict:
         """What a game's files say of its patch, without reading any: the files it placed that aren't as it placed them
-        (patch_record.changed), but its proxy and FSR 4's driver, told on their own (the proxy by its name, the driver
-        by the game's Proton); and the game's own files Unpatch can't put back, their backup gone."""
+        (patch_record.changed), but its proxy and FSR 4's driver, told on their own (the proxy by its name, and whether
+        the game's own took its place back; the driver by the game's Proton); and the game's own files Unpatch can't
+        put back, their backup gone."""
         recorded = patch_record.parse(details)
         if recorded is None:
-            return {"changed_files": [], "lost_backups": []}
+            return {"changed_files": [], "lost_backups": [], "proxy_taken_back": False}
         family = library.FAMILIES.get(str(details.get("family")))
-        aside = {details.get("dll_name") or bundle.DEFAULT_PROXY_DLL, *([version_placement.driver_path(family)] if family else [])}
+        proxy = details.get("dll_name") or bundle.DEFAULT_PROXY_DLL
+        aside = {proxy, *([version_placement.driver_path(family)] if family else [])}
         now = game_directory.placed_kinds(directory, recorded)
         return {
             "changed_files": [path for path in patch_record.changed(recorded, now) if path not in aside],
             "lost_backups": list(patch_record.unrestorable(recorded, now)),
+            # The game's own proxy back in its place (Steam's Verify): OptiScaler doesn't load, though a file is there.
+            "proxy_taken_back": proxy in patch_record.taken_back(recorded, now),
         }
 
     def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:

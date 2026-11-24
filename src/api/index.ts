@@ -494,6 +494,8 @@ export type PatchedGame = {
   changed_files: string[];
   /** The game's own files its patch set aside whose backup is gone: Unpatch can't put them back. */
   lost_backups: string[];
+  /** The game's own file is back where the patch linked its proxy (Steam's Verify, an update): OptiScaler doesn't load. */
+  proxy_taken_back: boolean;
   own_settings: boolean;
 };
 

@@ -31,6 +31,8 @@ class Request:
     OptiScaler loads that DLL only from its own directory, never by name, so a patch links it there."""
     libraries: tuple[Copy, ...] = ()
     """The copies of the user's libraries picked for the game (domain/library_placement)."""
+    same_as_backup: frozenset[str] = frozenset()
+    """Files in the directory with a backup beside it of the same content (patch_plan.preserving_existing)."""
 
 
 def is_for_the_game(path: str) -> bool:
@@ -106,7 +108,7 @@ def plan_patch(entries: frozenset[str], files: frozenset[str], family: Family, r
     if request.fsr4_driver and driver not in entries:
         operations.append(Link(request.fsr4_driver, driver))
     operations += request.libraries
-    return preserving_existing(tuple(operations), entries)
+    return preserving_existing(tuple(operations), entries, request.same_as_backup)
 
 
 def driver_path(family: Family) -> str:

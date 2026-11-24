@@ -1,10 +1,26 @@
 """The rules every plan shares, the unpatch of Decky Framegen's patches, and the launch options to restore."""
 
+import pytest
+
 from deckyscaler.domain import marker
 from deckyscaler.domain import patch_plan as plan
 from deckyscaler.domain.patch_plan import Copy, DeleteFile, Move, RemoveFileOrTree, RemoveTree, preserving_existing
 
 # ── keeping what was in the directory ────────────────────────────────────────
+
+
+def test_a_file_with_a_backup_beside_it_is_set_aside_when_the_same_and_refused_when_not():
+    from deckyscaler.domain.patch_plan import Link, PlanError
+
+    link = (Link("OptiScaler.dll", "dxgi.dll"),)
+    entries = frozenset({"dxgi.dll", "dxgi.dll.b"})
+
+    # The same as its backup: that is the backup already, set aside over it.
+    assert preserving_existing(link, entries, frozenset({"dxgi.dll"})) == (Move("dxgi.dll", "dxgi.dll.b"), *link)
+    with pytest.raises(PlanError, match="dxgi.dll is there, and so is a different dxgi.dll.b"):
+        preserving_existing(link, entries)
+    # A removal keeps the old behaviour: the backup is the original.
+    assert preserving_existing((DeleteFile("dxgi.dll"),), entries) == (DeleteFile("dxgi.dll"),)
 
 
 def test_a_file_a_copy_would_overwrite_is_backed_up_first():

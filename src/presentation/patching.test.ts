@@ -158,6 +158,12 @@ describe("steam game view", () => {
     );
   });
 
+  it("tells the game's own proxy is back, after a verify", () => {
+    expect(steamGameView({ ...base, status: { ...patched, proxy_taken_back: true } }).versionLine).toBe(
+      "stable-0.9.4. The game's own dxgi.dll is back, after a verify or an update: patch it again.",
+    );
+  });
+
   it("tells files of the patch gone or changed since", () => {
     expect(steamGameView({ ...base, status: { ...patched, changed_files: ["OptiScaler/libxess.dll"] } }).versionLine).toBe(
       "stable-0.9.4. Some of its files are gone or changed since the patch; patch again to put them back.",

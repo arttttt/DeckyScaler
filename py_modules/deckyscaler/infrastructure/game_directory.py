@@ -86,6 +86,18 @@ def placed_kinds(directory: Path, patch: patch_record.PatchRecord) -> dict[str, 
     return kinds
 
 
+def same_as_backup(directory: Path, entries: frozenset[str]) -> frozenset[str]:
+    """The files among `entries` with a backup beside them (X.b) of the same content; a link is never one."""
+    return frozenset(
+        name
+        for name in entries
+        if f"{name}{plan.BACKUP_SUFFIX}" in entries
+        and not (directory / name).is_symlink()
+        and not (directory / f"{name}{plan.BACKUP_SUFFIX}").is_symlink()
+        and files.files_match(directory / name, directory / f"{name}{plan.BACKUP_SUFFIX}")
+    )
+
+
 def listing(directory: Path) -> tuple[frozenset[str], frozenset[str]]:
     """The names in a game directory and in its plugins/ subdirectory (empty when there is none)."""
     entries = frozenset(entry.name for entry in directory.iterdir())

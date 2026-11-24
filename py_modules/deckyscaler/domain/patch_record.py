@@ -202,6 +202,16 @@ def changed(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
     )
 
 
+def taken_back(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
+    """The links a patch placed whose place a file took since (`now` as for `changed`): a game update, or Steam's
+    Verify putting the game's own back."""
+    return tuple(
+        item.path
+        for item in patch.placed
+        if item.sha256 is not None and item.sha256.startswith(LINK_PREFIX) and now.get(item.path) == FILE
+    )
+
+
 def unrestorable(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
     """The files of the game's own a patch set aside that Unpatch can't put back: their backup is gone, and what is in
     their place is still the patch's (or nothing of it was placed there), so the game's own is lost until Steam

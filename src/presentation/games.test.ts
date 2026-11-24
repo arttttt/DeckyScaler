@@ -25,6 +25,7 @@ const game = (overrides: Partial<PatchedGame>): PatchedGame => ({
   record: "ok",
   changed_files: [],
   lost_backups: [],
+  proxy_taken_back: false,
   own_settings: false,
   ...overrides,
 });
@@ -101,6 +102,7 @@ describe("the Games page", () => {
     expect(rowOf(game({ lost_backups: ["libxess.dll"], dll_present: false })).lines[1]).toBe(
       "The backup of libxess.dll is gone: Unpatch can't put the game's own back. Verify the game's files in Steam first.",
     );
+    expect(rowOf(game({ proxy_taken_back: true })).lines[1]).toBe("The game's own dxgi.dll is back, after a verify or an update: patch it again.");
     expect(rowOf(game({ lacks_version_files: true })).lines[1]).toBe("Its OptiScaler version has files this patch lacks: patch it again.");
     expect(rowOf(game({ lacks_version_files: true, dll_present: false })).lines[1]).toBe("dxgi.dll is missing: patch it again.");
     expect(rowOf(game({ version_incomplete: true, lacks_version_files: true })).lines[1]).toBe(
