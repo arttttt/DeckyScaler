@@ -124,11 +124,6 @@ class CompatToolsStore(Staging):
             else:
                 leftover.unlink(missing_ok=True)
 
-    def clear_when_idle(self) -> None:
-        """As every store does, but never making the staging directory to lock it: compatibilitytools.d would change."""
-        if self.partial_dir.is_dir():
-            super().clear_when_idle()
-
     def staging(self, name: str) -> Path:
         """An empty directory on compatibilitytools.d's filesystem to download and unpack a build in."""
         stage = self.partial_dir / name

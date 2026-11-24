@@ -51,7 +51,10 @@ class Staging:
                     self.clear_partial()
 
     def clear_when_idle(self) -> None:
-        """Clear what an install the plugin's stop cut short left, unless an install is assembling one now."""
+        """Clear what an install the plugin's stop cut short left, unless an install is assembling one now. A store
+        whose directory isn't there has nothing to clear, and isn't made for it."""
+        if not self.lock_dir.is_dir():
+            return
         with _held(self.lock_dir) as free:
             if free:
                 self.clear_partial()

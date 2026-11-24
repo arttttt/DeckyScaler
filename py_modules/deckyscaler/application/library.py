@@ -148,6 +148,8 @@ class Library:
                 if missing:
                     return _error(f"The {version_id} archive lacks {', '.join(sorted(missing))}; not added.")
                 installed = library.entry(version, datetime.now(timezone.utc).isoformat(), unpacked)
+                if replacing and version_id not in self.store.listed():
+                    return _error(f"{version_id} was removed while it downloaded again: download it to add it back.")
                 (self.store.replace if replacing else self.store.commit)(stage, installed)
             except (ReleasesUnavailable, RuntimeError, OSError) as exc:
                 log.error(f"Installing {version_id} failed: {exc}")
