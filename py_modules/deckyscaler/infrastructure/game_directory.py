@@ -22,7 +22,7 @@ def bundle_hashes(source: Path, operations: tuple[plan.Operation, ...]) -> dict[
             case plan.Copy(origin, _):
                 hashes[origin] = files.sha256(source / origin)
             case plan.Link(origin, _):
-                # An absolute origin (the FSR 4 driver DLL in the game's prefix) wins the join: it is its own target.
+                # An absolute origin wins the join: it is its own target.
                 hashes[origin] = _link_identity(str((source / origin).absolute()))
     return hashes
 

@@ -137,31 +137,6 @@ def test_everything_but_the_ini_is_a_symlink_into_the_library():
     assert not any(isinstance(op, Copy) and op.destination != "OptiScaler.ini" for op in operations)
 
 
-DRIVER = "/home/deck/.local/share/Steam/steamapps/compatdata/730/pfx/drive_c/windows/system32/amdxcffx64.dll"
-
-
-@pytest.mark.parametrize(("files", "family", "where"), [(V10, "10", "OptiScaler/amdxcffx64.dll"), (V094, "0.9", "amdxcffx64.dll")])
-def test_the_fsr4_driver_is_linked_where_optiscaler_looks_for_it(files, family, where):
-    operations = plan_patch(frozenset({"Game.exe"}), files, library.FAMILIES[family], Request("dxgi.dll", fsr4_driver=DRIVER))
-
-    assert Link(DRIVER, where) in operations
-
-
-def test_a_driver_dll_already_there_is_the_users_and_stays():
-    entries = frozenset({"Game.exe", "OptiScaler/amdxcffx64.dll"})
-
-    operations = plan_patch(entries, V10, library.FAMILIES["10"], Request("dxgi.dll", fsr4_driver=DRIVER))
-
-    assert not any(getattr(op, "destination", None) == "OptiScaler/amdxcffx64.dll" for op in operations)
-    assert not any(isinstance(op, Move) and op.source == "OptiScaler/amdxcffx64.dll" for op in operations)
-
-
-def test_without_a_driver_to_fetch_nothing_is_linked_for_it():
-    operations = plan_patch(frozenset(), V10, library.FAMILIES["10"], Request("dxgi.dll"))
-
-    assert not any(str(getattr(op, "destination", "")).endswith("amdxcffx64.dll") for op in operations)
-
-
 def test_the_users_libraries_are_copied_in_after_the_version_and_whatever_they_replace_is_backed_up():
     copy = Copy("/libraries/anr/files/ANR/dlssg/a.dll", "OptiScaler/custom/ANR/dlssg/a.dll")
 

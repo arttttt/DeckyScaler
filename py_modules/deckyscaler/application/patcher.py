@@ -13,7 +13,6 @@ from pathlib import Path
 
 from deckyscaler.domain import (
     bundle,
-    compat_tools,
     exe_target,
     fsr4,
     ini,
@@ -31,7 +30,7 @@ from deckyscaler.domain import (
     version_placement,
 )
 from deckyscaler.domain import patch_plan as plan
-from deckyscaler.infrastructure import drives, files, game_directory, processes, proton
+from deckyscaler.infrastructure import dll_version, drives, files, game_directory, gpu, pe_file, processes
 from deckyscaler.infrastructure.library_store import LibraryStore
 from deckyscaler.infrastructure.patch_index import PatchIndex
 from deckyscaler.infrastructure.settings_store import SettingsStore
@@ -106,8 +105,13 @@ def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
 
-def _fsr4_json(state: fsr4.State | None) -> dict | None:
-    return None if state is None else {"state": state.kind, "tool": state.tool, "version": state.version}
+def _carried_fsr4(upscaler: Path) -> dict | None:
+    """The FSR 4 a game's OptiScaler carries, read from its upscaler DLL without running it: the DLL's version, which is
+    FSR 4's, and its models (fsr4.models); None when there is no DLL to read."""
+    rtti = pe_file.sections(upscaler, frozenset({fsr4.RTTI_SECTION})).get(fsr4.RTTI_SECTION)
+    if rtti is None:
+        return None
+    return {"version": dll_version.file_version(upscaler), "models": list(fsr4.models(rtti))}
 
 
 class Patcher:
@@ -142,7 +146,6 @@ class Patcher:
         reset_ini: bool = False,
         steam_game: marker.SteamGame | None = None,
         through: str | None = None,
-        fsr4_driver: Path | None = None,
         unless_current: bool = False,
         settings_appid: str | None = None,
         keep_libraries: bool = False,
@@ -222,12 +225,9 @@ class Patcher:
             # unpacked by hand, the user's own provider files) is set aside as a backup, never linked or copied over.
             there = game_directory.contents(directory, looked_into)
             entries = game_directory.listing(directory)[0] | frozenset(there)
-            driver = version_placement.driver_path(family)
-            if os.path.lexists(directory / driver):
-                entries |= {driver}  # behind a linked folder too, where nothing is listed
             placement = self.placement(to_place, family)
             request = version_placement.Request(
-                dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies,
+                dll_name, reset_ini or repairing, placement.copies,
                 game_directory.same_as_backup(directory, entries),
             )
             operations = version_placement.plan_patch(entries, version_files, family, request)
@@ -441,18 +441,15 @@ class Patcher:
 
     def _against_its_files(self, directory: Path, details: dict) -> dict:
         """What a game's files say of its patch, without reading any: the files it placed that aren't as it placed them
-        (patch_record.changed), but its proxy and FSR 4's driver, told on their own (the proxy by its name, and whether
-        the game's own took its place back; the driver by the game's Proton); and the game's own files Unpatch can't
-        put back, their backup gone."""
+        (patch_record.changed), but its proxy, told on its own (by its name, and whether the game's own took its place
+        back); and the game's own files Unpatch can't put back, their backup gone."""
         recorded = patch_record.parse(details)
         if recorded is None:
             return {"changed_files": [], "lost_backups": [], "proxy_taken_back": False}
-        family = library.FAMILIES.get(str(details.get("family")))
         proxy = details.get("dll_name") or bundle.DEFAULT_PROXY_DLL
-        aside = {proxy, *([version_placement.driver_path(family)] if family else [])}
         now = game_directory.placed_kinds(directory, recorded)
         return {
-            "changed_files": [path for path in patch_record.changed(recorded, now) if path not in aside],
+            "changed_files": [path for path in patch_record.changed(recorded, now) if path != proxy],
             "lost_backups": list(patch_record.unrestorable(recorded, now)),
             # The game's own proxy back in its place (Steam's Verify): OptiScaler doesn't load, though a file is there.
             "proxy_taken_back": proxy in patch_record.taken_back(recorded, now),
@@ -622,19 +619,6 @@ class Patcher:
     def _is_running(self, game: steam_library.InstalledGame) -> bool:
         return self._running_executable(steam_library.executables(game.install_path)) is not None
 
-    def _fsr4(self, game: steam_library.InstalledGame, linked: bool | None = None) -> tuple[fsr4.State | None, Path | None]:
-        """The game's FSR 4 under Proton, and — when a patch should ask Proton to fetch it — where in the
-        game's prefix the DLL lands. `linked`: whether the game's patch has the DLL linked where OptiScaler looks
-        (None for a game that isn't patched)."""
-        amd = proton.amd_gpu()
-        tool = proton.compat_tool(self.home, game.appid)
-        tool_dir = proton.tool_directory(self.home, tool) if tool else None
-        reads_variable = tool_dir is not None and proton.reads_upgrade_variable(tool_dir)
-        absent = tool is not None and tool_dir is None and not compat_tools.is_valves(tool)
-        prefix = proton.compatdata(game.library_path, game.appid)
-        state = fsr4.state(amd, tool, reads_variable, proton.dll_in_prefix(prefix), proton.tracked_version(prefix), absent, linked)
-        return state, proton.prefix_dll(prefix) if fsr4.wants_upgrade_variable(amd, reads_variable) else None
-
     def _patch_target(self, game: steam_library.InstalledGame) -> tuple[Path, Path | None]:
         candidates = steam_library.executables(game.install_path)
         running = self._running_executable(candidates)
@@ -691,8 +675,6 @@ class Patcher:
             return {**unpatched, "install_found": False, "message": "Game not found in Steam library."}
         if not game.install_path.exists():
             return {**unpatched, "name": game.name, "install_found": False, "message": "Game install directory not found."}
-        # FSR 4 is the Proton's business, so it is told whether the game is patched or not.
-        unpatched["fsr4"] = _fsr4_json(self._fsr4(game)[0])
         marker_path = self.find_marker(game.install_path)
         if marker_path is None:
             return {**unpatched, "name": game.name, "install_found": True, "message": "Not patched."}
@@ -710,9 +692,6 @@ class Patcher:
         target_dir = marker_path.parent
         dll_present = (target_dir / dll_name).exists()
         family = library.FAMILIES.get(str(metadata.get("family")))
-        if family is not None:
-            # A patch the launch wrapper made doesn't link FSR 4's driver: OptiScaler can't see it though it's there.
-            unpatched["fsr4"] = _fsr4_json(self._fsr4(game, os.path.lexists(target_dir / version_placement.driver_path(family)))[0])
         version = metadata.get("optiscaler_version")
         installed = self.library.installed()
         if dll_present:
@@ -732,7 +711,8 @@ class Patcher:
             "newer_version": library.newer_in_channel(installed, version),
             **self._against_version(metadata, installed, {}),
             **self._against_its_files(target_dir, metadata),
-            "fsr4": unpatched["fsr4"],
+            # FSR 4 comes with the game's OptiScaler; off AMD it isn't the question.
+            "fsr4": _carried_fsr4(target_dir / family.upscaler) if family is not None and gpu.amd_gpu() else None,
             "libraries": metadata.get("libraries") or [],
             "by_wrapper": marker.through_wrapper(metadata),
             "record": record,
@@ -776,18 +756,16 @@ class Patcher:
             if moved["status"] != "success":
                 return moved
         log.info(f"[DeckyScaler] patch_game: appid={appid} dll={dll_name} target={target_dir} exe={target_exe}")
-        fsr4_driver = self._fsr4(game)[1]
         # A game the launch wrapper starts stays its: patched from here too, its launch options aren't the plugin's to
         # set, or the wrapper would be dropped from them without a word.
         by_wrapper = marker.started_by_wrapper(current_launch_options, existing)
-        managed_options = "" if by_wrapper else launch_options.managed(dll_name, fsr4_driver is not None)
+        managed_options = "" if by_wrapper else launch_options.managed(dll_name)
         result = self.patch_directory(
             target_dir,
             dll_name,
             version_id=version_id,
             steam_game=marker.SteamGame(str(appid), game.name, original_options, managed_options),
             through=marker.WRAPPER if by_wrapper else None,
-            fsr4_driver=fsr4_driver,
         )
         if result["status"] != "success":
             return result

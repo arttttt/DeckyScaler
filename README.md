@@ -8,7 +8,7 @@ DeckyScaler is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loade
 
 OptiScaler takes the upscaling a game already has (DLSS, FSR 2 and newer, or XeSS) and runs the one you pick in its place: FSR 3.1 or FSR 4, XeSS, or DLSS on NVIDIA. It can add frame generation too.
 
-DeckyScaler downloads OptiScaler from its own releases, stable or nightly, and each game runs the version you pick for it. The settings come from that version's `OptiScaler.ini`, so a new OptiScaler brings its new settings without waiting for a plugin update. With OptiScaler 10 a game can also get upscaling and frame generation libraries OptiScaler doesn't ship, downloaded from the plugin or brought by you. Proton builds install from the plugin as well, and the ones it offers fetch the driver file FSR 4 needs on Linux.
+DeckyScaler downloads OptiScaler from its own releases, stable or nightly, and each game runs the version you pick for it. The settings come from that version's `OptiScaler.ini`, so a new OptiScaler brings its new settings without waiting for a plugin update. With OptiScaler 10 a game can also get upscaling and frame generation libraries OptiScaler doesn't ship, downloaded from the plugin or brought by you. Proton builds install from the plugin as well.
 
 Every patch is recorded, so Unpatch undoes exactly what it did, launch options included. A game the original Decky Framegen patched can be reset to its own files.
 
@@ -42,7 +42,6 @@ The wrapper patches a game each time it starts instead of once from the plugin. 
 
 - It works as Steam launch options, for Lutris games (it finds the game's directory from Lutris), and as a wrapper in launchers that run one before the game, such as Heroic.
 - Variables set before it: `DECKYSCALER_VERSION=<version>` (for example `nightly-20261116`; unset keeps the version the game is patched with, else the newest), `DLL=<proxy DLL>` (default `dxgi.dll`), `PRESERVE_INI=false` (starts the game's `OptiScaler.ini` over), and OptiScaler settings (see [below](#optiscaler-settings-as-environment-variables)).
-- The wrapper doesn't know the game's Proton prefix, so it can't link FSR 4's driver DLL (see [FSR 4](#fsr-4)): a game keeps the link a patch from the plugin made, but if the wrapper has to patch it again, the link is gone until the next patch from the plugin.
 - To take it out, put the command **Copy Unpatch Command** copies (`~/deckyscaler/unpatch %command%`) there instead and start the game once; then the launch option can go.
 
 ### Games patched by Decky Framegen
@@ -97,9 +96,11 @@ Dx12Upscaler=ffx ~/deckyscaler/patch %command%
 
 ### FSR 4
 
-The plugin does not pick an FSR 4 model: OptiScaler does. OptiScaler 10 uses the best model the GPU supports (`Fsr4Model` on auto); `FSR_Fsr4GpuSupport` overrides the support it detects (INT8 Lite is the smaller model meant for APUs). OptiScaler 0.9.x supports RDNA4 and RDNA3 desktop GPUs officially; `FSR_Fsr4ForceEnableInt8=true` forces INT8 elsewhere, but does not make older non-INT8 hardware compatible. `FSR_Fsr4EnableWatermark=true` shows which FSR runs.
+FSR 4 comes with OptiScaler itself: its archive holds AMD's FidelityFX upscaler, and nothing else is needed under Proton. OptiScaler 10's nightlies since 2026-10-28 carry FSR 4.1.2 with all four models: FP8 (RDNA 4), INT8 (RDNA 3), INT8 RDNA2 (RDNA 2 cards) and INT8 Lite (the Steam Deck and Ryzen APUs such as the Z1 Extreme). Older versions carry FSR 4.1.1 or 4.1.0, with fewer models. On an AMD GPU a patched game's status says which FSR 4 its OptiScaler carries, with which models.
 
-On Linux FSR 4 also needs AMD's driver DLL (`amdxcffx64.dll`), which neither OptiScaler nor Valve's Proton ship. GE-Proton and Proton-CachyOS (both installable from [**DeckyScaler → Proton**](#proton-builds)) download it into the game's prefix when the game is launched with `PROTON_FSR4_UPGRADE=1`. On an AMD GPU the plugin adds that variable to the launch options it writes when the game's Proton reads it, and links the DLL next to OptiScaler, the only place OptiScaler loads it from. The game's status says whether FSR 4 is already in the prefix, will be downloaded on the next launch, or needs another Proton. Without the DLL, OptiScaler's upscaler list ends at FSR 3.1.5.
+The plugin does not pick an FSR 4 model: OptiScaler does, by the GPU (`Fsr4Model` on auto); `FSR_Fsr4GpuSupport` overrides the support it detects. A GPU FSR 4 has no model for renders FSR 3 instead, so `FSR_Fsr4EnableWatermark=true` (or **Watermark** in OptiScaler's in-game menu) is how to see FSR 4 render: its watermark shows in the game. The INT8 models run on any current Proton; the FP8 model needs a Proton from 10.0-3 on and Mesa 25.2 or newer.
+
+Earlier versions of the plugin had Proton fetch AMD's FSR 4 driver DLL (`amdxcffx64.dll`) with `PROTON_FSR4_UPGRADE=1` in the launch options, and linked it next to OptiScaler. OptiScaler's own FSR 4 is newer and has the models that DLL lacks, so the plugin does neither any more; patching a game again takes both out.
 
 ### Proton builds
 **DeckyScaler → Proton** installs custom Proton builds into Steam. *Download builds…* lists the ten newest releases of GE-Proton, Proton-CachyOS and Proton-CachyOS's x86_64_v3 variant (built for newer CPUs; for experimenting), checks each download against the checksum GitHub publishes, and unpacks it into the `compatibilitytools.d` of the Steam install that is running (or the only one that has run). *Manage installed…* lists every build Steam would find, including ones other tools installed, with the games set to use it, and removes one after a warning naming those games; builds installed for every user of the device are only listed.

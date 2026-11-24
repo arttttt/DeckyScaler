@@ -3,6 +3,7 @@ import { ProxyDllView, patchReady } from "./launch";
 import { librariesLine } from "./libraries";
 import { lines } from "./lines";
 import { versionLabel } from "./releases";
+import { listed, plural } from "./words";
 
 /**
  * Patching needs an installed OptiScaler; looking at games, unpatching them and resetting
@@ -99,34 +100,42 @@ export const quickPatchWith = (status: GameStatus | null, launch: ProxyDllView, 
   ready: patchReady(versionReady, launch),
 });
 
-/** A game's FSR 4 under Proton, as the backend reads it; null off AMD. */
-export type Fsr4State = {
-  state: "in-prefix" | "not-linked" | "will-fetch" | "unsupported" | "absent";
-  tool: string | null;
+/** The FSR 4 a patched game's OptiScaler carries, as the backend reads it from its upscaler DLL; null off AMD. */
+export type Fsr4 = {
+  /** The upscaler DLL's version, which is FSR 4's: 4.1.2.4555. */
   version: string | null;
+  models: Fsr4Model[];
 };
 
-/** How to tell FSR 4 rendering from FSR 3, on a line of its own: AMD's DLL being there doesn't mean the GPU runs it,
- *  as the DLL turns down GPUs it doesn't support and FSR 3 renders in its place. The setting and the in-game menu's
- *  switch turn on the watermark FSR 4 draws, from AMD's DLL and OptiScaler's own FidelityFX SDK alike. FSR 4 reads it
- *  as the game starts, so the setting shows from the next launch; the in-game switch at once. */
+export type Fsr4Model = "fp8" | "int8" | "int8-rdna2" | "int8-lite";
+
+const FSR4_MODEL_NAMES: Record<Fsr4Model, string> = {
+  fp8: "FP8",
+  int8: "INT8",
+  "int8-rdna2": "INT8 RDNA2",
+  "int8-lite": "INT8 Lite",
+};
+
+/** How to tell FSR 4 rendering from FSR 3, on a line of its own: a GPU FSR 4 has no model for renders FSR 3 in its
+ *  place. The setting and the in-game menu's switch turn on the watermark FSR 4 draws. FSR 4 reads it as the game
+ *  starts, so the setting shows from the next launch; the in-game switch at once. */
 const withWatermarkHint = (line: string) =>
   lines([
     line,
     "To see FSR 4 render rather than FSR 3: turn on Fsr4EnableWatermark in OptiScaler settings before launching, or Watermark in OptiScaler's in-game menu, and FSR 4 shows its watermark in the game.",
   ]);
 
-/** What the panel says about FSR 4 for a game: whether its Proton has it (and the game's patch links it), will fetch
- *  it, can't, or isn't on the device; where OptiScaler can run it, how to see that it does. */
-export const fsr4Line = (fsr4: Fsr4State | null | undefined): string | null => {
+/** What the panel says about FSR 4 for a patched game: the FSR 4 its OptiScaler carries, with which models (OptiScaler
+ *  picks the GPU's), and how to see it render; or that it carries none. */
+export const fsr4Line = (fsr4: Fsr4 | null | undefined): string | null => {
   if (!fsr4) return null;
-  const proton = fsr4.tool ?? "Steam's default Proton";
-  const inPrefix = `FSR 4${fsr4.version ? ` ${fsr4.version}` : ""} is in this game's Proton prefix`;
-  if (fsr4.state === "in-prefix") return withWatermarkHint(`${inPrefix}.`);
-  if (fsr4.state === "not-linked") return `${inPrefix}, but it isn't linked into the game: patch it again from here.`;
-  if (fsr4.state === "absent") return `${proton} isn't on this device: pick another Proton in the game's Properties → Compatibility.`;
-  if (fsr4.state === "will-fetch") return withWatermarkHint(`${proton} downloads FSR 4 on the game's first launch after patching.`);
-  return `${proton} can't provide FSR 4. Choose GE-Proton or Proton-CachyOS for this game.`;
+  if (fsr4.models.length === 0) return "This game's OptiScaler has no FSR 4.";
+  // The version is FSR 4's own (4.1.2.4555, shown as FSR 4.1.2): the build number tells the user nothing.
+  const name = fsr4.version ? `FSR ${fsr4.version.split(".").slice(0, 3).join(".")}` : "FSR 4";
+  const models = listed(fsr4.models.map((model) => FSR4_MODEL_NAMES[model]));
+  return withWatermarkHint(
+    `${name} comes with this game's OptiScaler, with the ${models} ${plural(fsr4.models.length, "model", "models")}: OptiScaler picks the one for this GPU.`,
+  );
 };
 
 /** A Steam game's status as get_game_status reports it. */
@@ -153,7 +162,7 @@ export type GameStatus = {
   proxy_taken_back?: boolean;
   /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
   version_incomplete?: boolean;
-  fsr4?: Fsr4State | null;
+  fsr4?: Fsr4 | null;
   /** The user's libraries its patch placed. */
   libraries?: PlacedLibrary[];
 };

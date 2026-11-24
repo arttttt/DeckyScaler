@@ -1,5 +1,5 @@
-"""Steam's compatibility tools as its files describe them: which tool runs a game, which ones the user chose,
-and what a tool's manifest declares.
+"""Steam's compatibility tools as its files describe them: which ones the user chose, and what a tool's manifest
+declares.
 
 Steam compares tool names case-insensitively; the names here keep the case Steam wrote them in.
 """
@@ -27,17 +27,6 @@ def _mapping(config: keyvalues.KeyValues) -> dict:
 def _name(entry: object) -> str | None:
     name = entry.get("name") if isinstance(entry, dict) else None
     return name if isinstance(name, str) and name else None
-
-
-def compat_tool(config: keyvalues.KeyValues, appid: str) -> str | None:
-    """The compatibility tool Steam runs a game with, by internal name (GE-Proton11-11, proton_experimental):
-    the game's own choice, else the one chosen for every game. None means Steam's default, which no file names."""
-    mapping = _mapping(config)
-    for key in (str(appid), GLOBAL_MAPPING):
-        name = _name(mapping.get(key))
-        if name:
-            return name
-    return None
 
 
 @dataclass(frozen=True)

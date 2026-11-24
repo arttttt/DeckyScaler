@@ -43,7 +43,7 @@ sys.path[:0] = [str(REPO_ROOT / "py_modules"), str(REPO_ROOT)]
 
 import main  # noqa: E402
 from deckyscaler.domain import bundle  # noqa: E402
-from deckyscaler.infrastructure import drives, proton  # noqa: E402
+from deckyscaler.infrastructure import drives, gpu, proton  # noqa: E402
 
 
 # sha256 → label of every placeholder handed out, so snapshots can name content.
@@ -134,7 +134,7 @@ def home(tmp_path, monkeypatch) -> Path:
     monkeypatch.setattr(_decky, "DECKY_PLUGIN_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setattr(_decky, "DECKY_PLUGIN_SETTINGS_DIR", str(tmp_path / "settings"))
     # The machine running the tests has its own GPU and Proton tools; the fake world has none unless a test adds them.
-    monkeypatch.setattr(proton, "SYSFS", tmp_path / "sys")
+    monkeypatch.setattr(gpu, "SYSFS", tmp_path / "sys")
     monkeypatch.setattr(proton, "SYSTEM_TOOLS", tmp_path / "system-compatibilitytools.d")
     return home_dir
 
@@ -348,28 +348,6 @@ class SteamLibrary:
             "\t\t\t}\n\t\t}\n\t}\n}\n"
         )
         write(self.root / "config" / "config.vdf", config.encode())
-
-    def add_tool(self, name: str, reads_fsr4_variable: bool, tools_dir: Path | None = None) -> Path:
-        """A custom Proton in compatibilitytools.d whose proton script reads (or not) the FSR 4 variable."""
-        directory = (tools_dir or self.root / "compatibilitytools.d") / name
-        manifest = (
-            '"compatibilitytools"\n{\n  "compat_tools"\n  {\n'
-            f'    "{name}" // Internal name of this tool\n    {{\n'
-            f'      "install_path" "."\n      "display_name" "{name}"\n'
-            '      "from_oslist"  "windows"\n      "to_oslist"    "linux"\n    }\n  }\n}\n'
-        )
-        write(directory / "compatibilitytool.vdf", manifest.encode())
-        script = 'if os.environ.get("PROTON_FSR4_UPGRADE"):\n    pass\n' if reads_fsr4_variable else "print('proton')\n"
-        write(directory / "proton", script.encode())
-        return directory
-
-    def add_fsr4_to_prefix(self, appid: str, version: str | None) -> None:
-        """What protonfixes leaves after fetching FSR 4: the DLL in the prefix, and its version when tracked."""
-        compatdata = self.steamapps / "compatdata" / appid
-        write(compatdata / "pfx" / "drive_c" / "windows" / "system32" / "amdxcffx64.dll", b"amd fsr4 driver")
-        if version is not None:
-            tracking = {"fsr4_files": {"drive_c/windows/system32/amdxcffx64.dll": {"version": version, "md5_hash": "x"}}}
-            write(compatdata / "upscaler_files", json.dumps(tracking).encode())
 
 
 @pytest.fixture

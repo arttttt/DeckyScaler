@@ -177,15 +177,6 @@ describe("steam game view", () => {
     );
   });
 
-  it("tells FSR 4 the game's patch didn't link, and a Proton that isn't on the device", () => {
-    expect(fsr4Line({ state: "not-linked", tool: "GE-Proton10-25", version: "4.1.1" })).toBe(
-      "FSR 4 4.1.1 is in this game's Proton prefix, but it isn't linked into the game: patch it again from here.",
-    );
-    expect(fsr4Line({ state: "absent", tool: "GE-Proton10-5", version: null })).toBe(
-      "GE-Proton10-5 isn't on this device: pick another Proton in the game's Properties → Compatibility.",
-    );
-  });
-
   it("names the user's libraries a patched game has", () => {
     const withLibraries: GameStatus = { ...patched, libraries: [{ slot: "frame-generation", id: "anr", label: "ANR V.B19" }] };
 
@@ -222,31 +213,34 @@ describe("steam game view", () => {
 });
 
 describe("FSR 4 line", () => {
-  it("says whether the game's Proton has FSR 4, will download it, or can't, and how to see FSR 4 render", () => {
-    const watermark =
-      "To see FSR 4 render rather than FSR 3: turn on Fsr4EnableWatermark in OptiScaler settings before launching, or Watermark in OptiScaler's in-game menu, and FSR 4 shows its watermark in the game.";
-    expect(fsr4Line({ state: "in-prefix", tool: "GE-Proton11-11", version: "4.1.1" })).toBe(
-      `FSR 4 4.1.1 is in this game's Proton prefix.\n${watermark}`,
+  const watermark =
+    "To see FSR 4 render rather than FSR 3: turn on Fsr4EnableWatermark in OptiScaler settings before launching, or Watermark in OptiScaler's in-game menu, and FSR 4 shows its watermark in the game.";
+
+  it("says which FSR 4 the game's OptiScaler carries, with which models, and how to see it render", () => {
+    expect(fsr4Line({ version: "4.1.2.4555", models: ["fp8", "int8", "int8-rdna2", "int8-lite"] })).toBe(
+      "FSR 4.1.2 comes with this game's OptiScaler, with the FP8, INT8, INT8 RDNA2 and INT8 Lite models: " +
+        `OptiScaler picks the one for this GPU.\n${watermark}`,
     );
-    expect(fsr4Line({ state: "in-prefix", tool: null, version: null })).toBe(`FSR 4 is in this game's Proton prefix.\n${watermark}`);
-    expect(fsr4Line({ state: "will-fetch", tool: "GE-Proton11-11", version: null })).toBe(
-      `GE-Proton11-11 downloads FSR 4 on the game's first launch after patching.\n${watermark}`,
+    expect(fsr4Line({ version: "4.1.1.2740", models: ["fp8", "int8"] })).toBe(
+      `FSR 4.1.1 comes with this game's OptiScaler, with the FP8 and INT8 models: OptiScaler picks the one for this GPU.\n${watermark}`,
     );
-    expect(fsr4Line({ state: "unsupported", tool: "proton_experimental", version: null })).toBe(
-      "proton_experimental can't provide FSR 4. Choose GE-Proton or Proton-CachyOS for this game.",
-    );
-    expect(fsr4Line({ state: "unsupported", tool: null, version: null })).toBe(
-      "Steam's default Proton can't provide FSR 4. Choose GE-Proton or Proton-CachyOS for this game.",
+    expect(fsr4Line({ version: null, models: ["fp8"] })).toBe(
+      `FSR 4 comes with this game's OptiScaler, with the FP8 model: OptiScaler picks the one for this GPU.\n${watermark}`,
     );
   });
 
-  it("says nothing off AMD, and nothing while the status loads", () => {
+  it("says when the game's OptiScaler carries no FSR 4, with nothing to look for", () => {
+    expect(fsr4Line({ version: "3.1.5.0", models: [] })).toBe("This game's OptiScaler has no FSR 4.");
+  });
+
+  it("says nothing off AMD or for a game not patched, and nothing while the status loads", () => {
     expect(fsr4Line(null)).toBeNull();
-    const fsr4 = { state: "unsupported" as const, tool: null, version: null };
+    expect(fsr4Line(undefined)).toBeNull();
+    const fsr4 = { version: "4.1.2.4555", models: ["int8-lite" as const] };
     const base = { gameSelected: true, busy: null, dllName: "dxgi.dll", ready: true };
-    const status = { status: "success" as const, install_found: true, patched: false, fsr4 };
+    const status = { status: "success" as const, install_found: true, patched: true, fsr4 };
     expect(steamGameView({ ...base, statusLoading: true, status }).fsr4Line).toBeNull();
-    expect(steamGameView({ ...base, statusLoading: false, status }).fsr4Line).toMatch(/can't provide FSR 4/);
+    expect(steamGameView({ ...base, statusLoading: false, status }).fsr4Line).toMatch(/^FSR 4\.1\.2 comes with .* the INT8 Lite model:/);
   });
 });
 

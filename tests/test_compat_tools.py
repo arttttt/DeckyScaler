@@ -1,4 +1,4 @@
-"""Steam's compatibility-tool data: which tool runs a game, which ones the user chose, what a manifest declares (unit)."""
+"""Steam's compatibility-tool data: which ones the user chose, what a manifest declares (unit)."""
 
 from __future__ import annotations
 
@@ -12,23 +12,6 @@ def mapping(entries: dict[str, str], priority: str | None = "250") -> keyvalues.
     return {"installconfigstore": {"software": {"valve": {"steam": {"compattoolmapping": {
         appid: entry(name) for appid, name in entries.items()
     }}}}}}
-
-
-@pytest.mark.parametrize(
-    ("entries", "tool"),
-    [
-        ({"730": "GE-Proton11-11", "0": "proton_experimental"}, "GE-Proton11-11"),  # the game's own choice wins
-        ({"0": "proton-cachyos"}, "proton-cachyos"),  # else the one for every game
-        ({"730": "", "0": "GE-Proton11-1"}, "GE-Proton11-1"),  # an empty name is no choice
-        ({}, None),  # Steam's default, which no file names
-    ],
-)
-def test_the_games_tool_is_its_own_choice_else_the_global_one(entries, tool):
-    assert compat_tools.compat_tool(mapping(entries), "730") == tool
-
-
-def test_no_mapping_section_means_steams_default():
-    assert compat_tools.compat_tool({}, "730") is None
 
 
 def test_a_tool_manifest_names_its_tools_and_where_they_are():
