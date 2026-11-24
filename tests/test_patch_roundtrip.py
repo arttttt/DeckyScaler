@@ -211,3 +211,16 @@ def test_a_start_that_changes_nothing_looks_up_no_game_and_marks_a_panel_patch_t
 
     marker = json.loads((root / "DECKYSCALER_PATCH").read_text())
     assert (marker["through"], marker["appid"]) == ("wrapper", "1234")  # the panel's record kept, its route made true
+
+
+def test_the_route_a_start_marks_goes_into_the_file_that_holds_the_record(plugin, home, plugin_home, steam_library):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    root = steam_library.add_game("1234", "Test Game")
+    asyncio.run(plugin.patch_game("1234", "dxgi.dll", "", STABLE))
+    (root / "DECKYSCALER_PATCH").rename(root / "FRAMEGEN_PATCH")  # where an early build wrote its record
+
+    LaunchWrapper(home, {"SteamAppId": "1234"}).patch([str(root / "Game.exe")], "dxgi.dll", STABLE)
+
+    assert json.loads((root / "FRAMEGEN_PATCH").read_text())["through"] == "wrapper"
+    assert not (root / "DECKYSCALER_PATCH").exists()  # no second marker beside it
