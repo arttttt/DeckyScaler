@@ -442,10 +442,12 @@ class Patcher:
     def _against_its_files(self, directory: Path, details: dict) -> dict:
         """What a game's files say of its patch, without reading any: the files it placed that aren't as it placed them
         (patch_record.changed), but its proxy, told on its own (by its name, and whether the game's own took its place
-        back); and the game's own files Unpatch can't put back, their backup gone."""
+        back); the game's own files Unpatch can't put back, their backup gone; and whether an earlier version of the
+        plugin set the game up for AMD's FSR 4 driver DLL, which patching again takes out (marker.earlier_fsr4)."""
         recorded = patch_record.parse(details)
+        earlier_fsr4 = marker.earlier_fsr4(details)
         if recorded is None:
-            return {"changed_files": [], "lost_backups": [], "proxy_taken_back": False}
+            return {"changed_files": [], "lost_backups": [], "proxy_taken_back": False, "earlier_fsr4": earlier_fsr4}
         proxy = details.get("dll_name") or bundle.DEFAULT_PROXY_DLL
         now = game_directory.placed_kinds(directory, recorded)
         return {
@@ -453,6 +455,7 @@ class Patcher:
             "lost_backups": list(patch_record.unrestorable(recorded, now)),
             # The game's own proxy back in its place (Steam's Verify): OptiScaler doesn't load, though a file is there.
             "proxy_taken_back": proxy in patch_record.taken_back(recorded, now),
+            "earlier_fsr4": earlier_fsr4,
         }
 
     def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:

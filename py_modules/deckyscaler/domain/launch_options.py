@@ -12,8 +12,8 @@ WRAPPER_UNPATCH = "~/deckyscaler/unpatch %command%"
 """Launch options that unpatch the game through the wrapper on its next start."""
 
 EARLIER_FSR4_VARIABLE = "PROTON_FSR4_UPGRADE=1"
-"""What earlier versions of the plugin added to a game's launch options for Proton to fetch AMD's FSR 4 driver DLL, which
-OptiScaler's own FSR 4 has made unneeded: options with it are still the plugin's, for a patch to replace."""
+"""What earlier versions of the plugin added to a game's launch options for Proton to fetch AMD's FSR 4 driver DLL,
+which OptiScaler's own FSR 4 has made unneeded: options with it are still the plugin's, for a patch to replace."""
 
 _ASI_PROXY = "OptiScaler.asi"
 _OUR_WRAPPERS = ("/deckyscaler/patch", "/deckyscaler/unpatch")
@@ -78,6 +78,11 @@ def is_managed(options: str, patched_with: str | None = None) -> bool:
     proxies = [patched_with] if patched_with else sorted(VALID_DLL_NAMES)
     ours = {_normalized(_options(dll, *earlier)) for dll in proxies for earlier in ((), (EARLIER_FSR4_VARIABLE,))}
     return _normalized(options) in ours
+
+
+def carries_earlier_fsr4(options: str | None) -> bool:
+    """Whether launch options hold EARLIER_FSR4_VARIABLE, as earlier versions of the plugin wrote it."""
+    return options is not None and EARLIER_FSR4_VARIABLE in _normalized(options).split(" ")
 
 
 def without_wrapper(options: str | None) -> str | None:

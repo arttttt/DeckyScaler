@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from . import library_choice, settings_layers
-from .launch_options import is_managed, without_wrapper
+from . import library_choice, patch_record, settings_layers
+from .bundle import FSR4_DRIVER_OVERRIDE_FILENAME
+from .launch_options import carries_earlier_fsr4, is_managed, without_wrapper
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,19 @@ WRAPPER = "wrapper"
 def through_wrapper(details: dict) -> bool:
     """Whether a marker's patch was made by the launch wrapper (a marker from before routes were kept says nothing)."""
     return details.get("through") == WRAPPER
+
+
+def earlier_fsr4(details: dict) -> bool:
+    """Whether a marker's patch is an earlier version's that linked AMD's FSR 4 driver DLL from the game's Proton prefix
+    next to OptiScaler, or had Proton fetch it through the launch options it wrote. OptiScaler brings FSR 4 itself
+    (domain/fsr4), and patching again takes both out."""
+    recorded = patch_record.parse(details)
+    linked = recorded is not None and any(
+        PurePosixPath(item.path).name == FSR4_DRIVER_OVERRIDE_FILENAME
+        and (item.sha256 or "").startswith(patch_record.LINK_PREFIX)
+        for item in recorded.placed
+    )
+    return linked or carries_earlier_fsr4(details.get("launch_options"))
 
 
 def started_by_wrapper(current: str | None, details: dict) -> bool:

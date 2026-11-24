@@ -134,6 +134,21 @@ describe("steam game view", () => {
     });
   });
 
+  it("asks to patch again a game an earlier DeckyScaler set up for AMD's FSR 4 driver DLL, and says why", () => {
+    const earlier: GameStatus = { ...patched, earlier_fsr4: true };
+
+    expect(steamGameView({ ...base, status: earlier })).toMatchObject({
+      status: { text: "Patched (dxgi.dll) — patch it again", tone: "warning" },
+      versionLine:
+        "stable-0.9.4. Patched by an earlier DeckyScaler, which linked AMD's FSR 4 driver DLL from Proton: patch it again " +
+        "to take that out. OptiScaler brings FSR 4 itself.",
+      patch: { label: "Reinstall (dxgi.dll)", enabled: true },
+    });
+    expect(steamGameView({ ...base, dllName: "winmm.dll", status: earlier }).status.text).toBe(
+      "Patched (dxgi.dll) — patch it again",
+    );
+  });
+
   it("offers repairing a damaged record, and no unpatch until then", () => {
     const damaged: GameStatus = { status: "success", install_found: true, patched: true, dll_name: null, record: "damaged" };
     expect(steamGameView({ ...base, status: damaged })).toMatchObject({

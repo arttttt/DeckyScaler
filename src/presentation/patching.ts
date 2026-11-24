@@ -54,6 +54,11 @@ export const patchChoice = (
 /** How a game the launch wrapper patched is told apart: Unpatch alone doesn't keep it unpatched. */
 export const WRAPPER_ROUTE = "Patched at each launch by the launch wrapper.";
 
+/** Why to patch a game again that an earlier DeckyScaler set up for AMD's FSR 4 driver DLL through Proton: OptiScaler
+ *  brings FSR 4 itself, and patching again takes the DLL's link and the launch option out. */
+export const EARLIER_FSR4 =
+  "Patched by an earlier DeckyScaler, which linked AMD's FSR 4 driver DLL from Proton: patch it again to take that out. OptiScaler brings FSR 4 itself.";
+
 /** Why to verify a game in Steam before unpatching it: the game's own files its patch set aside lost their backup. */
 export const lostBackups = (lost: string[]): string =>
   `The backup of ${lost.join(", ")} is gone: Unpatch can't put the game's own back. Verify the game's files in Steam first.`;
@@ -73,6 +78,7 @@ export const gameVersionLine = (status: {
   changed_files?: string[];
   lost_backups?: string[];
   proxy_taken_back?: boolean;
+  earlier_fsr4?: boolean;
   dll_name?: string | null;
 } | null): string | null => {
   if (!status?.patched) return null;
@@ -80,6 +86,7 @@ export const gameVersionLine = (status: {
     ...(status.by_wrapper ? [WRAPPER_ROUTE] : []),
     ...(status.lost_backups?.length ? [lostBackups(status.lost_backups)] : []),
     ...(status.proxy_taken_back ? [proxyTakenBack(status.dll_name ?? "Its proxy")] : []),
+    ...(status.earlier_fsr4 ? [EARLIER_FSR4] : []),
     ...(status.changed_files?.length ? ["Some of its files are gone or changed since the patch; patch again to put them back."] : []),
     ...(status.newer_version ? [`${status.newer_version} is in the library; choose it and patch again to update.`] : []),
     ...(status.version_incomplete ? ["This version is missing files; download it again from the OptiScaler page."] : []),
@@ -160,6 +167,8 @@ export type GameStatus = {
   lost_backups?: string[];
   /** The game's own file is back where the patch linked its proxy. */
   proxy_taken_back?: boolean;
+  /** An earlier DeckyScaler set it up for AMD's FSR 4 driver DLL: patching again takes that out. */
+  earlier_fsr4?: boolean;
   /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
   version_incomplete?: boolean;
   fsr4?: Fsr4 | null;
@@ -205,6 +214,7 @@ export const steamGameView = (s: {
     if (!status.patched) return { text: "Not patched", tone: "neutral" };
     if (status.record === "damaged") return { text: "Patched, but its record is damaged: repair it", tone: "warning" };
     if (status.record === "upstream") return { text: "Patched by Decky Framegen", tone: "warning" };
+    if (status.earlier_fsr4) return { text: `Patched (${dllLabel}) — patch it again`, tone: "warning" };
     if (otherDll) return { text: `Patched (${dllLabel}) — switch available`, tone: "warning" };
     return { text: `Patched (${dllLabel})`, tone: "good" };
   })();

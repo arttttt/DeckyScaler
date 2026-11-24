@@ -506,6 +506,8 @@ export type PatchedGame = {
   lost_backups: string[];
   /** The game's own file is back where the patch linked its proxy (Steam's Verify, an update): OptiScaler doesn't load. */
   proxy_taken_back: boolean;
+  /** An earlier DeckyScaler set it up for AMD's FSR 4 driver DLL through Proton: patching again takes that out. */
+  earlier_fsr4: boolean;
   own_settings: boolean;
 };
 
