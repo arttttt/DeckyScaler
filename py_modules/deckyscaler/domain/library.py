@@ -47,8 +47,9 @@ CHANNELS = {
         NIGHTLY,
         "optiscaler/OptiScaler-nightly",
         prerelease=True,
-        # OptiScaler_v10.0.0-pre1_20261023.7z
-        archive=re.compile(r"^OptiScaler_v(\d+\.\d+\.\d+(?:-pre\d+)?)_(\d{8})\.7z$"),
+        # OptiScaler_v10.0.0-pre1_20261023.7z; since 2026-11-17 the build's commit follows the date:
+        # OptiScaler_v10.0.0-pre1_20261123_b7b07d2d.7z. One build a day, so the date still names it.
+        archive=re.compile(r"^OptiScaler_v(\d+\.\d+\.\d+(?:-pre\d+)?)_(\d{8})(?:_[0-9a-f]{7,40})?\.7z$"),
         shown=NIGHTLY_SHOWN,
     ),
 }

@@ -90,6 +90,17 @@ def test_nightly_offers_the_ten_newest_builds_named_by_date():
     )
 
 
+def test_a_nightly_named_with_its_commit_is_offered_under_its_date():
+    name = "OptiScaler_v10.0.0-pre1_20261023_b7b07d2d.7z"
+    url = f"https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20261023/{name}"
+
+    newest = newest_nightly(lambda r: r["assets"][0].update(name=name, browser_download_url=url))
+
+    assert (newest.id, newest.version, newest.date, newest.url, newest.unsupported) == (
+        "nightly-20261023", "10.0.0-pre1", "20261023", url, None,
+    )
+
+
 # ── what can't be read with certainty ────────────────────────────────────────
 
 
@@ -119,6 +130,13 @@ def newest_nightly(change) -> library.Available:
 )
 def test_a_version_that_cant_be_read_with_certainty_is_unsupported(change, reason):
     assert newest_nightly(change).unsupported == reason
+
+
+@pytest.mark.parametrize("suffix", ["_beta", "_b7b07d"], ids=["word", "short-hash"])
+def test_a_nightly_whose_name_carries_anything_but_a_commit_after_the_date_is_not_offered(suffix):
+    name = f"OptiScaler_v10.0.0-pre1_20261023{suffix}.7z"
+
+    assert newest_nightly(lambda r: r["assets"][0].update(name=name)).unsupported == library.NO_ARCHIVE
 
 
 def test_drafts_and_releases_of_the_other_kind_are_not_listed():
