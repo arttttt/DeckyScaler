@@ -98,8 +98,10 @@ def preserving_existing(
             case Copy(_, destination) | Link(_, destination) if destination in present:
                 if f"{destination}{BACKUP_SUFFIX}" in present and destination not in same_as_backup:
                     raise PlanError(
-                        f"{destination} is there, and so is a different {destination}{BACKUP_SUFFIX}. DeckyScaler can't "
-                        "tell which is the game's own: delete the one to do without, then patch again."
+                        f"{destination} is there, and so is a different {destination}{BACKUP_SUFFIX}, and DeckyScaler "
+                        f"can't tell which is the game's own: keep that one as {destination}, delete the other, then "
+                        "patch again. Can't tell either? Delete both, and Steam's Verify integrity of game files puts "
+                        "the game's own back."
                     )
                 kept.append(Move(destination, f"{destination}{BACKUP_SUFFIX}"))
                 present.add(f"{destination}{BACKUP_SUFFIX}")

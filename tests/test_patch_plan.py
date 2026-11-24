@@ -17,8 +17,13 @@ def test_a_file_with_a_backup_beside_it_is_set_aside_when_the_same_and_refused_w
 
     # The same as its backup: that is the backup already, set aside over it.
     assert preserving_existing(link, entries, frozenset({"dxgi.dll"})) == (Move("dxgi.dll", "dxgi.dll.b"), *link)
-    with pytest.raises(PlanError, match="dxgi.dll is there, and so is a different dxgi.dll.b"):
+    with pytest.raises(PlanError) as refused:
         preserving_existing(link, entries)
+    assert str(refused.value) == (  # which to keep and which to delete, and a way out when neither can be told
+        "dxgi.dll is there, and so is a different dxgi.dll.b, and DeckyScaler can't tell which is the game's own: keep "
+        "that one as dxgi.dll, delete the other, then patch again. Can't tell either? Delete both, and Steam's Verify "
+        "integrity of game files puts the game's own back."
+    )
     # A removal keeps the old behaviour: the backup is the original.
     assert preserving_existing((DeleteFile("dxgi.dll"),), entries) == (DeleteFile("dxgi.dll"),)
 
