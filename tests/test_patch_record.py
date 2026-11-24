@@ -564,6 +564,20 @@ def test_a_game_whose_backup_is_gone_says_so_before_and_after_unpatching(plugin,
     )
 
 
+def test_a_folder_unpatched_without_a_backup_says_the_games_own_couldnt_be_put_back(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    (game / "libxess.dll.b").unlink()
+
+    unpatched = run(plugin.manual_unpatch_directory(str(game)))
+
+    assert unpatched["lost_backups"] == ["libxess.dll"]
+    assert unpatched["message"] == (
+        f"OptiScaler files removed from {game}. No backup of libxess.dll was left, so the game's own couldn't be put "
+        "back: restore it with Steam's Verify integrity of game files."
+    )
+
+
 def test_a_proxy_leading_nowhere_without_its_backup_is_told_before_unpatching_as_unpatching_tells_it(plugin, plugin_home, steam_library):
     root = steam_library.add_game("961", "Dangling Game", {"dxgi.dll": game_file("dxgi.dll")})
     patched = run(plugin.patch_game("961", "dxgi.dll", "", STABLE))
