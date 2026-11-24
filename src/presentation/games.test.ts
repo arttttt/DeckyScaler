@@ -130,7 +130,7 @@ describe("the Games page", () => {
   it("asks to patch again a game an earlier DeckyScaler set up for AMD's FSR 4 driver DLL", () => {
     expect(rowOf(game({ earlier_fsr4: true })).lines).toEqual([
       "OptiScaler 10.0.0-pre1 · 2026-10-23 via dxgi.dll, patched 2026-10-23",
-      "Patched by an earlier DeckyScaler, which linked AMD's FSR 4 driver DLL from Proton: patch it again to take that out. " +
+      "Patched by an earlier DeckyScaler, set up for AMD's FSR 4 driver DLL through Proton: patch it again to take that out. " +
         "OptiScaler brings FSR 4 itself.",
     ]);
     expect(rowOf(game({})).lines).toHaveLength(1);

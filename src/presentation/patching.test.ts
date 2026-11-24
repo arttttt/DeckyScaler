@@ -140,7 +140,7 @@ describe("steam game view", () => {
     expect(steamGameView({ ...base, status: earlier })).toMatchObject({
       status: { text: "Patched (dxgi.dll) — patch it again", tone: "warning" },
       versionLine:
-        "stable-0.9.4. Patched by an earlier DeckyScaler, which linked AMD's FSR 4 driver DLL from Proton: patch it again " +
+        "stable-0.9.4. Patched by an earlier DeckyScaler, set up for AMD's FSR 4 driver DLL through Proton: patch it again " +
         "to take that out. OptiScaler brings FSR 4 itself.",
       patch: { label: "Reinstall (dxgi.dll)", enabled: true },
     });

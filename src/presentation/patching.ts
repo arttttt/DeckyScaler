@@ -54,10 +54,11 @@ export const patchChoice = (
 /** How a game the launch wrapper patched is told apart: Unpatch alone doesn't keep it unpatched. */
 export const WRAPPER_ROUTE = "Patched at each launch by the launch wrapper.";
 
-/** Why to patch a game again that an earlier DeckyScaler set up for AMD's FSR 4 driver DLL through Proton: OptiScaler
- *  brings FSR 4 itself, and patching again takes the DLL's link and the launch option out. */
+/** Why to patch a game again that an earlier DeckyScaler set up for AMD's FSR 4 driver DLL through Proton (the DLL linked
+ *  from the prefix, the launch option that has Proton fetch it, or both): OptiScaler brings FSR 4 itself, and patching
+ *  again takes them out. */
 export const EARLIER_FSR4 =
-  "Patched by an earlier DeckyScaler, which linked AMD's FSR 4 driver DLL from Proton: patch it again to take that out. OptiScaler brings FSR 4 itself.";
+  "Patched by an earlier DeckyScaler, set up for AMD's FSR 4 driver DLL through Proton: patch it again to take that out. OptiScaler brings FSR 4 itself.";
 
 /** Why to verify a game in Steam before unpatching it: the game's own files its patch set aside lost their backup. */
 export const lostBackups = (lost: string[]): string =>
