@@ -58,3 +58,13 @@ def test_a_kept_json_file_is_replaced_whole_and_its_directory_made(tmp_path):
 
     assert json.loads(path.read_text()) == {"b": 2}
     assert sorted(p.name for p in path.parent.iterdir()) == ["proton.json"]  # nothing staged is left
+
+
+def test_read_text_or_empty_reads_a_file_and_gives_nothing_for_one_that_cant_be_read(tmp_path):
+    (tmp_path / "vendor").write_text("0x1002\n")
+    (tmp_path / "a-directory").mkdir()
+
+    assert files.read_text_or_empty(tmp_path / "vendor") == "0x1002\n"
+    assert files.read_text_or_empty(tmp_path / "gone") == ""
+    assert files.read_text_or_empty(tmp_path / "a-directory") == ""
+

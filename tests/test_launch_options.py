@@ -82,6 +82,22 @@ def test_every_shape_the_plugin_writes_is_recognised_as_managed(dll_name):
     assert launch_options.is_managed(launch_options.managed(dll_name))
 
 
+@pytest.mark.parametrize(
+    ("options", "carries"),
+    [
+        ("WINEDLLOVERRIDES=dxgi=n,b PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%", True),
+        ('WINEDLLOVERRIDES="dxgi=n,b"   PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%', True),
+        ("PROTON_FSR4_UPGRADE=1 %command%", True),
+        ("PROTON_FSR4_UPGRADE=10 %command%", False),  # another word that starts the same
+        ("WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", False),
+        ("", False),
+        (None, False),  # Steam didn't say, or a marker from before they were kept
+    ],
+)
+def test_the_earlier_fsr4_variable_is_told_as_a_word_of_the_options(options, carries):
+    assert launch_options.carries_earlier_fsr4(options) is carries
+
+
 def test_the_plugin_no_longer_asks_proton_for_fsr4s_driver():
     assert launch_options.managed("dxgi.dll") == "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
     assert launch_options.managed("OptiScaler.asi") == "SteamDeck=0 %command%"
