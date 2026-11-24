@@ -285,3 +285,28 @@ def test_applying_to_a_steam_game_leaves_launch_options_its_last_patch_set(plugi
 
     # Steam's aren't read: they are the plugin's, or the user's edit since; neither is the plugin's to set again.
     assert applied == [{"name": "Portal 2", "appid": "620", "launch_options": None}]
+
+
+def test_a_second_library_is_turned_away_while_one_is_added_or_downloaded(home, tmp_path):
+    busy = owner(home)
+    picked = tmp_path / "picked.dll"
+    picked.write_bytes(b"MZ")
+    message = "Another library is still being added or downloaded: try again once it's done."
+    with busy.store.assembling():
+        assert owner(home).add(str(picked)) == {"status": "error", "message": message}
+        assert owner(home).install(ul.ANR, "anr-v-b19") == {"status": "error", "message": message}
+    assert owner(home).install(ul.ANR, "anr-v-b19")["status"] == "success"
+
+
+def test_choices_made_at_once_all_land(home, plugin_home):
+    import threading
+
+    chooser = owner(home)
+    owner(home).install(ul.ANR, "anr-v-b19")
+    threads = [threading.Thread(target=lambda appid=appid: chooser.choose(appid, FG, "none")) for appid in map(str, range(600, 640))]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(chooser.choices.read().games) == sorted(map(str, range(600, 640)))

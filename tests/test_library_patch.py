@@ -31,7 +31,7 @@ def add_library(plugin_home, library_id: str, files: dict[str, bytes], settings=
 
 def choose(plugin_home, scope: str, slot: str, value: str | None) -> None:
     store = LibraryChoicesStore(plugin_home / "settings" / "libraries.json")
-    store.write(library_choice.with_choice(store.read(), scope, slot, value))
+    store.change(lambda choices: library_choice.with_choice(choices, scope, slot, value))
 
 
 def anr(plugin_home) -> ul.Library:

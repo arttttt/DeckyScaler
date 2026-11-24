@@ -28,6 +28,9 @@ _PENDING = threading.Lock()
 """Each call builds its own owner, and an install's end can meet a move's: the pending moves change one at a time."""
 
 
+BUSY = "Another Proton build is still being downloaded: try again once it's done."
+
+
 def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
@@ -103,7 +106,7 @@ class ProtonBuilds:
         staging directory itself stays, so Steam needs no restart for it."""
         active = self._active()
         if active.root is not None:
-            self._store(active.root).clear_partial()
+            self._store(active.root).clear_when_idle()
 
     def installed(self, with_sizes: bool = False) -> dict:
         """Every build Steam would find, newest first, with the games whose user chose it; the device's own folders
@@ -211,25 +214,25 @@ class ProtonBuilds:
             needed = proton_builds.space_needed(release.size) // 1_000_000
             return _error(f"Not enough free space: installing {tool_name} needs about {needed} MB.")
 
-        store.clear_partial()
-        try:
-            stage = store.staging(tool_name)
-            archive_path = stage / f"{tool_name}{proton_builds.BUILDS[build_id].extension}"
-            self.download(release.url, archive_path, lambda got, total: self.report(tool_name, got, total))
-            if sha256(archive_path) != release.sha256:
-                return _error(f"The {tool_name} download did not match its checksum. Try again.")
-            unpacked = stage / UNPACKED_DIRNAME
-            archive.extract_tar(archive_path, unpacked)
-            archive_path.unlink()
-            missing = proton_builds.check_extracted(store.top_entries(unpacked), tool_name, *store.manifests(unpacked / tool_name))
-            if missing:
-                return _error(f"The {tool_name} archive {missing}; not installed.")
-            store.commit(unpacked / tool_name, tool_name)
-        except (ReleasesUnavailable, RuntimeError, OSError) as exc:
-            log.error(f"Installing {tool_name} failed: {exc}")
-            return _error(f"Installing {tool_name} failed: {exc}")
-        finally:
-            store.clear_partial()
+        with store.assembling() as free:
+            if not free:
+                return _error(BUSY)
+            try:
+                stage = store.staging(tool_name)
+                archive_path = stage / f"{tool_name}{proton_builds.BUILDS[build_id].extension}"
+                self.download(release.url, archive_path, lambda got, total: self.report(tool_name, got, total))
+                if sha256(archive_path) != release.sha256:
+                    return _error(f"The {tool_name} download did not match its checksum. Try again.")
+                unpacked = stage / UNPACKED_DIRNAME
+                archive.extract_tar(archive_path, unpacked)
+                archive_path.unlink()
+                missing = proton_builds.check_extracted(store.top_entries(unpacked), tool_name, *store.manifests(unpacked / tool_name))
+                if missing:
+                    return _error(f"The {tool_name} archive {missing}; not installed.")
+                store.commit(unpacked / tool_name, tool_name)
+            except (ReleasesUnavailable, RuntimeError, OSError) as exc:
+                log.error(f"Installing {tool_name} failed: {exc}")
+                return _error(f"Installing {tool_name} failed: {exc}")
         log.info(f"Installed {tool_name} into {store.tools_dir}")
         self._remember_move(build_id, proton_builds.pending_move(release, releases, tools, proton.forced_mappings(active.root)))
         return {"status": "success", "id": tool_name, "message": f"{tool_name} is installed. Restart Steam to use it."}

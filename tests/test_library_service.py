@@ -512,3 +512,86 @@ def test_an_old_copy_left_after_the_new_one_landed_is_cleared_by_the_next_instal
 
     assert not (versions / f".{NEWEST}.old").exists()
     assert (versions / NEWEST / "files" / "OptiScaler.dll").read_bytes() == b"opti"
+
+
+def test_a_second_download_into_the_library_is_turned_away_while_the_first_goes_on(world):
+    busy = world.library()
+    with busy.store.assembling():
+        write(busy.store.partial_dir / NEWEST / "files" / "OptiScaler.dll", b"half")  # the first one's
+        refused = world.library().install(library.NIGHTLY, NEWEST)
+        world.library().clear_interrupted()  # the load's clear leaves an install going on alone
+        assert (busy.store.partial_dir / NEWEST / "files" / "OptiScaler.dll").exists()
+
+    assert refused == {"status": "error", "message": "Another download into the OptiScaler library is still running: try again once it's done."}
+    assert world.library().install(library.NIGHTLY, NEWEST)["status"] == "success"
+
+
+def test_loading_waits_for_an_unpacker_a_stop_left_running_before_clearing(world, monkeypatch):
+    from deckyscaler.application import library as library_module
+
+    staging = world.plugin_home / "library" / ".partial"
+    write(staging / NEWEST / "files" / "OptiScaler.dll", b"half")
+    running = [f"7zzs x -o{staging}/{NEWEST}/files {staging}/{NEWEST}.7z"] * 2
+    seen: list[bool] = []
+
+    def command_lines() -> list[str]:
+        seen.append(staging.exists())
+        return [running.pop()] if running else []
+
+    monkeypatch.setattr(library_module.processes, "command_lines", command_lines)
+    monkeypatch.setattr(library_module.processes.time, "sleep", lambda _: None)
+
+    world.library().clear_interrupted()
+
+    assert seen == [True, True, True] and not staging.exists()  # cleared only once it had ended
+
+
+def test_an_unpacker_that_never_ends_is_waited_for_a_while_only(world, monkeypatch):
+    from deckyscaler.application import library as library_module
+
+    staging = world.plugin_home / "library" / ".partial"
+    write(staging / NEWEST / "half", b"")
+    monkeypatch.setattr(library_module.processes, "command_lines", lambda: [f"7zzs x {staging}/{NEWEST}.7z"])
+    monkeypatch.setattr(library_module, "UNPACKER_GRACE", 0.05)
+    monkeypatch.setattr(library_module.processes.time, "sleep", lambda _: None)
+
+    world.library().clear_interrupted()
+
+    assert not staging.exists()
+
+
+def test_what_a_cut_short_install_left_is_cleared_before_the_next_downloads(world):
+    leftover = world.plugin_home / "library" / ".partial" / "nightly-20260101" / "files" / "OptiScaler.dll"
+    write(leftover, b"half")
+    fake = FakeDownload(world.archive)
+    seen: list[bool] = []
+
+    def download(url, destination, on_progress):
+        seen.append(leftover.exists())
+        fake(url, destination, on_progress)
+
+    assert world.library(download).install(library.NIGHTLY, NEWEST)["status"] == "success"
+    assert seen == [False]  # the room it took is free before the download starts
+
+
+def test_a_version_removed_while_it_downloads_again_stays_removed_and_is_told(world):
+    world.library().install(library.NIGHTLY, NEWEST)
+    fake = FakeDownload(world.archive)
+
+    def download(url, destination, on_progress):
+        fake(url, destination, on_progress)
+        assert world.library().remove(NEWEST)["status"] == "success"  # Remove, while the download runs
+
+    again = world.library(download).reinstall(NEWEST)
+
+    assert again == {"status": "error", "message": f"{NEWEST} was removed while it downloaded again: download it to add it back."}
+    assert world.library().installed()["versions"] == []
+
+
+def test_loading_makes_no_store_on_a_device_that_never_downloaded(plugin, home):
+    from deckyscaler.domain import bundle
+
+    run(plugin._main())
+
+    assert not (home / bundle.HOME_DIRNAME / "library").exists()
+    assert not (home / bundle.HOME_DIRNAME / "libraries").exists()

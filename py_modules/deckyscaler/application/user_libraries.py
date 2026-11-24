@@ -15,6 +15,9 @@ from deckyscaler.infrastructure.github_releases import Download, ListReleases, R
 log = logging.getLogger(__name__)
 
 
+BUSY = "Another library is still being added or downloaded: try again once it's done."
+
+
 def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
@@ -37,7 +40,7 @@ class UserLibraries:
 
     def clear_interrupted(self) -> None:
         """Remove what a download or an add the plugin's stop cut short left."""
-        self.store.clear_partial()
+        self.store.clear_when_idle()
 
     def installed(self) -> dict:
         """The libraries, by name, with what they serve and take and the games that have them; what is left of the
@@ -128,30 +131,34 @@ class UserLibraries:
             return _error(f"{release.version} can't be downloaded now. Check again.")
         if self.store.free_bytes() < user_libraries.space_needed(release.size):
             return _error(f"Not enough free space: {release.version} needs about {user_libraries.space_needed(release.size) // 1_000_000 + 1} MB.")
-        self.store.clear_partial()
-        try:
-            stage = self.store.staging(release.id)
-            zip_path = stage.parent / f"{release.id}.zip"
-            self.download(release.url, zip_path, lambda got, total: self.report(release.id, got, total))
-            if files.sha256(zip_path) != release.sha256:
-                return _error(f"The {release.version} download did not match its checksum. Try again.")
-            contents = user_libraries.recognize(archive.zip_members(zip_path))
-            if isinstance(contents, str):
-                return _refused(contents)
-            archive.extract_zip(zip_path, contents.files, stage / user_libraries.FILES_DIRNAME, user_libraries.MAX_BYTES)
-            added = user_libraries.downloaded(release, contents, datetime.now(timezone.utc).isoformat())
-            self.store.commit(stage, added)
-        except (ReleasesUnavailable, RuntimeError, OSError) as exc:
-            log.error(f"Installing {release.id} failed: {exc}")
-            return _error(f"Installing {release.version} failed: {exc}")
-        finally:
-            self.store.clear_partial()
+        with self.store.assembling() as free:
+            if not free:
+                return _error(BUSY)
+            try:
+                stage = self.store.staging(release.id)
+                zip_path = stage.parent / f"{release.id}.zip"
+                self.download(release.url, zip_path, lambda got, total: self.report(release.id, got, total))
+                if files.sha256(zip_path) != release.sha256:
+                    return _error(f"The {release.version} download did not match its checksum. Try again.")
+                contents = user_libraries.recognize(archive.zip_members(zip_path))
+                if isinstance(contents, str):
+                    return _refused(contents)
+                archive.extract_zip(zip_path, contents.files, stage / user_libraries.FILES_DIRNAME, user_libraries.MAX_BYTES)
+                added = user_libraries.downloaded(release, contents, datetime.now(timezone.utc).isoformat())
+                self.store.commit(stage, added)
+            except (ReleasesUnavailable, RuntimeError, OSError) as exc:
+                log.error(f"Installing {release.id} failed: {exc}")
+                return _error(f"Installing {release.version} failed: {exc}")
         return {"status": "success", "id": added.id, "in_menu": added.in_menu, "message": f"{added.label} is downloaded."}
 
     # ── adding the user's own ────────────────────────────────────────────────
 
     def add(self, picked: str) -> dict:
         """Add what the user picked: a library's zip, its folder, or a DLL."""
+        with self.store.assembling() as free:
+            return self._add(picked) if free else _error(BUSY)
+
+    def _add(self, picked: str) -> dict:
         path = Path(picked)
         try:
             if path.is_dir():
@@ -167,7 +174,6 @@ class UserLibraries:
                 return _refused(contents)
             if source is not None and sum((source / p).stat().st_size for p in contents.files) > user_libraries.MAX_BYTES:
                 return _error(f"{path.name} takes more than {user_libraries.MAX_BYTES // 1_000_000} MB.")
-            self.store.clear_partial()
             stage = self.store.staging("added")
             kept = stage / user_libraries.FILES_DIRNAME
             if source is None:
@@ -184,8 +190,6 @@ class UserLibraries:
         except (RuntimeError, OSError) as exc:
             log.error(f"Adding {picked} failed: {exc}")
             return _error(f"Adding {path.name} failed: {exc}")
-        finally:
-            self.store.clear_partial()
         return {"status": "success", "id": added.id, "in_menu": added.in_menu, "message": f"{added.label} is added."}
 
     # ── removing ─────────────────────────────────────────────────────────────
@@ -207,7 +211,7 @@ class UserLibraries:
             return _error(f"{library_id} is not on the device.")
         try:
             self.store.remove(library_id)
-            self.choices.write(library_choice.without(self.choices.read(), library_id))
+            self.choices.change(lambda choices: library_choice.without(choices, library_id))
         except OSError as exc:
             return _error(f"Removing {library_id} failed: {exc}")
         return {"status": "success"}
@@ -225,8 +229,7 @@ class UserLibraries:
         installed = self.store.installed()
         if not library_choice.can_choose(slot, value, installed):
             return _error(f"{value} isn't a library for that.")
-        choices = library_choice.with_choice(self.choices.read(), scope, slot, value)
-        self.choices.write(choices)
+        choices = self.choices.change(lambda current: library_choice.with_choice(current, scope, slot, value))
         # The patched games the change reaches that don't have their libraries yet: every game for a global change.
         patched = [
             entry for entry in self.patcher.patched_markers()

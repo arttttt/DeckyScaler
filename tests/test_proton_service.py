@@ -501,3 +501,12 @@ def test_a_linked_build_that_isnt_whole_is_to_be_mended_where_it_is_kept(world, 
         "message": f"{NEWEST} is a link to a build kept elsewhere, and that build isn't whole (its proton is missing): "
         "mend it where it is kept, or take the link out of compatibilitytools.d.",
     }
+
+
+def test_a_second_build_is_turned_away_while_one_downloads(world):
+    from deckyscaler.infrastructure.compat_tools_store import CompatToolsStore
+
+    with CompatToolsStore(world.tools).assembling():
+        refused = world.proton(FakeDownload(world.archive)).install(pb.GE_PROTON, NEWEST)
+    assert refused == {"status": "error", "message": "Another Proton build is still being downloaded: try again once it's done."}
+    assert world.proton(FakeDownload(world.archive)).install(pb.GE_PROTON, NEWEST)["status"] == "success"
