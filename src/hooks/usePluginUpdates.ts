@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { latestStable, pluginBuild, setDeveloperMode } from "../api";
-import type { UpdatesCheck } from "../presentation/updates";
+import { UpdatesCheck, withDeveloperMode } from "../presentation/updates";
 import { safeAsyncOperation } from "../utils";
 
 // One copy for the Quick Access panel and the plugin's page: the release is checked once when either
@@ -44,12 +44,17 @@ export const usePluginUpdates = () => {
   return {
     check: current,
     onCheck: () => void check(),
-    /** Saves Developer mode, then reads the build again for what the backend made of it. */
+    /** Saves Developer mode and keeps what the backend made of it. Without an answer it reads the build again, to
+     *  learn whether the save happened. */
     onDeveloperMode: async (on: boolean): Promise<string | null> => {
       const answer = await safeAsyncOperation(() => setDeveloperMode(on), "usePluginUpdates -> setDeveloperMode");
-      await loadBuild();
-      if (!answer) return "The plugin backend did not answer.";
-      return answer.status === "error" ? answer.message : null;
+      if (!answer) {
+        await loadBuild();
+        return "The plugin backend did not answer.";
+      }
+      if (answer.status === "error") return answer.message;
+      set({ build: withDeveloperMode(state.build, answer.developer_mode) });
+      return null;
     },
   };
 };

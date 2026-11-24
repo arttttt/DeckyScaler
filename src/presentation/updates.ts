@@ -13,6 +13,11 @@ export const developerModeChange = (on: boolean): DeveloperModeChange => ({ on, 
 /** The change once the user confirmed it: it is saved next. */
 export const confirmedDeveloperModeChange = (change: DeveloperModeChange): DeveloperModeChange => ({ ...change, stage: "saving" });
 
+/** The running build once the backend saved Developer mode: its answer is what the build now has (a development
+ *  build keeps it on), so the build needn't be read again. */
+export const withDeveloperMode = (build: PluginBuild | null, developerMode: boolean): PluginBuild | null =>
+  build?.known === true ? { ...build, developer_mode: developerMode } : build;
+
 export type UpdatesState = UpdatesCheck & {
   install: InstallState;
   deckyInstallerAvailable: boolean;

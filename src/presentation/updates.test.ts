@@ -8,6 +8,7 @@ import {
   developerModeChange,
   updateAvailableLine,
   updatesView,
+  withDeveloperMode,
 } from "./updates";
 
 const release: PluginBuild = {
@@ -117,6 +118,16 @@ describe("the Updates section", () => {
     expect(cancelled.developerMode).toMatchObject({ on: false, enabled: true });
     expect(cancelled.confirmation).toBeNull();
     expect(updatesView(state({ build: turnedOn })).developerMode).toMatchObject({ on: true, enabled: true });
+  });
+});
+
+describe("the build after a Developer mode save", () => {
+  it("takes the backend's answer, and leaves a build it doesn't know as it is", () => {
+    expect(withDeveloperMode(release, true)).toEqual({ ...release, developer_mode: true });
+    expect(withDeveloperMode({ ...release, developer_mode: true }, false)).toEqual(release);
+    const unknown: PluginBuild = { known: false, version: "", message: "Built by hand." };
+    expect(withDeveloperMode(unknown, true)).toBe(unknown);
+    expect(withDeveloperMode(null, true)).toBeNull();
   });
 });
 
