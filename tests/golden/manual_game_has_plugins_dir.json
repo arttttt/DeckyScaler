@@ -94,6 +94,7 @@
   },
   {
     "result": {
+      "lost_backups": [],
       "message": "OptiScaler files removed from <root>/games/Game",
       "status": "success"
     },

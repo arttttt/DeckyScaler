@@ -202,6 +202,25 @@ def changed(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
     )
 
 
+def unrestorable(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
+    """The files of the game's own a patch set aside that Unpatch can't put back: their backup is gone, and what is in
+    their place is still the patch's (or nothing of it was placed there), so the game's own is lost until Steam
+    verifies it. `now` is what each placed path and backup is (a link's identity, a file's, or FILE; None or absent
+    when gone). A file the game put in a link's place since is the game's: nothing of it is lost."""
+    placed = {item.path: item for item in patch.placed}
+    lost = []
+    for backup in patch.backups:
+        if now.get(backup.backup) is not None:
+            continue
+        item = placed.get(backup.original)
+        if item is not None:
+            there = now.get(item.path)
+            if there is None or (item.sha256 is not None and item.sha256.startswith(LINK_PREFIX) and there != item.sha256):
+                continue
+        lost.append(backup.original)
+    return tuple(lost)
+
+
 def covers(patch: PatchRecord, paths: frozenset[str]) -> bool:
     """Whether the patch placed every one of `paths`: a version's files that came back after it was patched while
     some were gone (`version_placement.linked_files`) are not in the game until it is patched again."""

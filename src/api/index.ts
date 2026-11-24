@@ -492,6 +492,8 @@ export type PatchedGame = {
   record: "ok" | "incomplete" | "damaged";
   /** Files its patch placed, other than the proxy, that are gone or not as placed: patching again puts them back. */
   changed_files: string[];
+  /** The game's own files its patch set aside whose backup is gone: Unpatch can't put them back. */
+  lost_backups: string[];
   own_settings: boolean;
 };
 
