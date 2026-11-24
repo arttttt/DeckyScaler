@@ -1,5 +1,6 @@
 import type { LatestStable, PluginBuild } from "../api";
 import { DECKY_INSTALLER_UNREACHABLE, InstallState, canStartInstall, installMessage } from "./install";
+import { BACKEND_DID_NOT_ANSWER } from "./words";
 
 /** The running build and the last check for a release, shared by the Quick Access panel and the page. */
 export type UpdatesCheck = { build: PluginBuild | null; checking: boolean; latest: LatestStable | null };
@@ -17,6 +18,12 @@ export const confirmedDeveloperModeChange = (change: DeveloperModeChange): Devel
  *  build keeps it on), so the build needn't be read again. */
 export const withDeveloperMode = (build: PluginBuild | null, developerMode: boolean): PluginBuild | null =>
   build?.known === true ? { ...build, developer_mode: developerMode } : build;
+
+/** Said when saving Developer mode got no answer. The build read again tells whether the save happened anyway. */
+export const developerModeNoAnswer = (on: boolean, build: PluginBuild | null): string =>
+  build?.known === true && build.developer_mode === on
+    ? `${BACKEND_DID_NOT_ANSWER} Developer mode is ${on ? "on" : "off"} all the same.`
+    : BACKEND_DID_NOT_ANSWER;
 
 export type UpdatesState = UpdatesCheck & {
   install: InstallState;

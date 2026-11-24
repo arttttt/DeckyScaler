@@ -6,6 +6,7 @@ import {
   UpdatesState,
   confirmedDeveloperModeChange,
   developerModeChange,
+  developerModeNoAnswer,
   updateAvailableLine,
   updatesView,
   withDeveloperMode,
@@ -128,6 +129,20 @@ describe("the build after a Developer mode save", () => {
     const unknown: PluginBuild = { known: false, version: "", message: "Built by hand." };
     expect(withDeveloperMode(unknown, true)).toBe(unknown);
     expect(withDeveloperMode(null, true)).toBeNull();
+  });
+});
+
+describe("a Developer mode save without an answer", () => {
+  it("says the mode is what was asked only when the build read again shows it", () => {
+    expect(developerModeNoAnswer(true, { ...release, developer_mode: true })).toBe(
+      "The plugin backend did not answer. Developer mode is on all the same.",
+    );
+    expect(developerModeNoAnswer(false, release)).toBe("The plugin backend did not answer. Developer mode is off all the same.");
+    expect(developerModeNoAnswer(true, release)).toBe("The plugin backend did not answer.");
+    expect(developerModeNoAnswer(true, null)).toBe("The plugin backend did not answer.");
+    expect(developerModeNoAnswer(true, { known: false, version: "", message: "Built by hand." })).toBe(
+      "The plugin backend did not answer.",
+    );
   });
 });
 

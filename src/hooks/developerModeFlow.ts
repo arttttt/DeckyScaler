@@ -1,4 +1,32 @@
-import { DeveloperModeChange, confirmedDeveloperModeChange, developerModeChange } from "../presentation/updates";
+import type { DeveloperModeAnswer, PluginBuild } from "../api";
+import {
+  DeveloperModeChange,
+  confirmedDeveloperModeChange,
+  developerModeChange,
+  developerModeNoAnswer,
+} from "../presentation/updates";
+
+export type DeveloperModeSaveEffects = {
+  /** Asks the backend to save Developer mode; undefined when it didn't answer. */
+  save: (on: boolean) => Promise<DeveloperModeAnswer | undefined>;
+  /** Keeps the mode the backend answered with as the running build's. */
+  keep: (developerMode: boolean) => void;
+  /** Reads the running build again; null when that got no answer either. */
+  readBuild: () => Promise<PluginBuild | null>;
+};
+
+/** Saving Developer mode: the failure to show, or null once the backend has it. An answer is kept as it is, with no
+ *  second read; only a save without an answer reads the build again, to learn whether it happened. */
+export const saveDeveloperMode = async (
+  on: boolean,
+  { save, keep, readBuild }: DeveloperModeSaveEffects,
+): Promise<string | null> => {
+  const answer = await save(on);
+  if (!answer) return developerModeNoAnswer(on, await readBuild());
+  if (answer.status === "error") return answer.message;
+  keep(answer.developer_mode);
+  return null;
+};
 
 export type DeveloperModeEffects = {
   /** Holds the change being asked for or saved; null when there is none. */
