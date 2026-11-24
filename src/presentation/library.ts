@@ -16,7 +16,7 @@ import {
   listingMessage,
   versionLabel,
 } from "./releases";
-import { count } from "./words";
+import { BACKEND_DID_NOT_ANSWER, count } from "./words";
 
 // ── The panel ────────────────────────────────────────────────────────────────
 
@@ -156,7 +156,7 @@ const cantRemove = (label: string, reason: string): RemoveConfirmation => ({
 
 /** Removing a version (by its row's label) asks first, or says why it can't: games are patched with it. */
 export const removeConfirmation = (label: string, removal: LibraryRemoval | null): RemoveConfirmation => {
-  if (removal === null) return cantRemove(label, "The plugin backend did not answer.");
+  if (removal === null) return cantRemove(label, BACKEND_DID_NOT_ANSWER);
   if (removal.refused !== null) return cantRemove(label, removal.refused);
   return {
     title: `Remove OptiScaler ${label}?`,

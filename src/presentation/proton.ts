@@ -10,7 +10,7 @@ import type {
   ProtonRemoval,
 } from "../api";
 import { ReleaseDownload, ReleaseRowView, actionOutcome, byteSize, downloadRows, listingMessage } from "./releases";
-import { count, plural } from "./words";
+import { BACKEND_DID_NOT_ANSWER, count, plural } from "./words";
 
 /**
  * The Proton page and its two dialogs, shaped like the OptiScaler versions block: a summary, a dialog to
@@ -281,7 +281,7 @@ const cantRemove = (tool: string, reason: string): ProtonRemoveConfirmation => (
 });
 
 export const protonRemoveConfirmation = (tool: string, removal: ProtonRemoval | null): ProtonRemoveConfirmation => {
-  if (removal === null) return cantRemove(tool, "The plugin backend did not answer.");
+  if (removal === null) return cantRemove(tool, BACKEND_DID_NOT_ANSWER);
   if (removal.status === "error") return cantRemove(tool, protonOutcome(removal, ""));
   const shown = shownGames(removal.games);
   if (shown.length === 0 && !removal.global_default) {

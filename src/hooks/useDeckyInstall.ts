@@ -3,6 +3,7 @@ import { addEventListener, removeEventListener } from "@decky/api";
 import { InstallRequestAnswer, PLUGIN_DOWNLOAD_EVENT } from "../api";
 import { installThroughDecky } from "../api/deckyInstaller";
 import { INSTALL_SETTLE_MS, InstallState, NO_INSTALL } from "../presentation/install";
+import { BACKEND_DID_NOT_ANSWER } from "../presentation/words";
 import { safeAsyncOperation } from "../utils";
 
 /** Installing a build over the plugin: the backend downloads it (its progress comes as events), then
@@ -24,7 +25,7 @@ export const useDeckyInstall = () => {
     window.clearTimeout(settleTimer.current);
     void safeAsyncOperation(request, context).then((answer) => {
       if (answer?.status !== "success") {
-        setInstall({ ...NO_INSTALL, error: answer?.message ?? "The plugin backend did not answer." });
+        setInstall({ ...NO_INSTALL, error: answer?.message ?? BACKEND_DID_NOT_ANSWER });
         return;
       }
       setInstall({ phase: "started", download: null, error: null });

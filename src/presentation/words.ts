@@ -1,4 +1,7 @@
-/** English words that follow a number. */
+/** English words the views share. */
+
+/** Said when a call to the plugin's backend got no answer. */
+export const BACKEND_DID_NOT_ANSWER = "The plugin backend did not answer.";
 
 /** The word for one, or for any other number. */
 export const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);

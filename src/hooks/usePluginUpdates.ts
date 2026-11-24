@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { latestStable, pluginBuild, setDeveloperMode } from "../api";
 import { UpdatesCheck, withDeveloperMode } from "../presentation/updates";
+import { BACKEND_DID_NOT_ANSWER } from "../presentation/words";
 import { safeAsyncOperation } from "../utils";
 
 // One copy for the Quick Access panel and the plugin's page: the release is checked once when either
@@ -23,7 +24,7 @@ const check = async (): Promise<void> => {
   if (state.checking || state.build?.known !== true) return;
   set({ checking: true });
   const latest = await safeAsyncOperation(latestStable, "usePluginUpdates -> latestStable");
-  set({ checking: false, latest: latest ?? { status: "error", message: "The plugin backend did not answer." } });
+  set({ checking: false, latest: latest ?? { status: "error", message: BACKEND_DID_NOT_ANSWER } });
 };
 
 const start = (): void => {
@@ -50,7 +51,7 @@ export const usePluginUpdates = () => {
       const answer = await safeAsyncOperation(() => setDeveloperMode(on), "usePluginUpdates -> setDeveloperMode");
       if (!answer) {
         await loadBuild();
-        return "The plugin backend did not answer.";
+        return BACKEND_DID_NOT_ANSWER;
       }
       if (answer.status === "error") return answer.message;
       set({ build: withDeveloperMode(state.build, answer.developer_mode) });

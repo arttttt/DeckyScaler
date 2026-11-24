@@ -14,7 +14,7 @@ import type {
   UserLibraryResult,
 } from "../api";
 import { ReleaseDownload, ReleaseRowView, actionOutcome, byteSize, downloadRows, listingMessage } from "./releases";
-import { count, listed, plural } from "./words";
+import { BACKEND_DID_NOT_ANSWER, count, listed, plural } from "./words";
 
 /**
  * The user's libraries, shaped like the OptiScaler versions block: a summary, a choice per slot for every game,
@@ -183,7 +183,7 @@ export const gameApplyConfirmation = (game: string, games: string[] | undefined)
 
 /** What saving a choice came to: nothing to say once saved, else why it wasn't. */
 export const chooseOutcome = (answer: { status: string; message?: string } | null): string | null =>
-  answer?.status === "success" ? null : answer?.message ?? "The plugin backend did not answer.";
+  answer?.status === "success" ? null : answer?.message ?? BACKEND_DID_NOT_ANSWER;
 
 /** The Steam games applying patched again, with the launch options Steam is to set for them. */
 export const launchOptionsToSet = (answer: LibrariesApplied | null): { appid: number; options: string }[] =>
@@ -194,7 +194,7 @@ export const launchOptionsToSet = (answer: LibrariesApplied | null): { appid: nu
 /** What applying the choice came to: the games patched again, those left alone while running, those that failed,
  *  and those on a drive that isn't mounted. */
 export const applyOutcome = (answer: LibrariesApplied | null): string => {
-  if (answer === null) return "The plugin backend did not answer.";
+  if (answer === null) return BACKEND_DID_NOT_ANSWER;
   const lines = [
     ...(answer.applied.length ? [`Applied to ${answer.applied.map((game) => game.name).join(", ")}.`] : []),
     ...(answer.skipped.length
@@ -284,7 +284,7 @@ export const refusalText = (reason: LibraryRefusal): string => REFUSALS[reason] 
 /** What adding came to: the backend's words and where the library goes, why it isn't a library, or that the
  *  backend didn't answer. */
 export const addOutcome = (answer: UserLibraryResult | null): string => {
-  if (answer === null) return "The plugin backend did not answer.";
+  if (answer === null) return BACKEND_DID_NOT_ANSWER;
   if (answer.status === "error") return answer.reason ? refusalText(answer.reason) : answer.message ?? "Adding it failed.";
   return `${answer.message ?? "The library is added."} ${addedNote(answer.in_menu)}`;
 };
@@ -342,7 +342,7 @@ export const libraryRemoveConfirmation = (label: string, removal: UserLibraryRem
   if (removal === null || removal.status === "error") {
     return {
       title: `Can't remove ${label}`,
-      lines: [removal?.message ?? "The plugin backend did not answer."],
+      lines: [removal?.message ?? BACKEND_DID_NOT_ANSWER],
       okLabel: "OK",
       removes: false,
       alert: true,
