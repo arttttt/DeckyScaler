@@ -4,6 +4,7 @@ import { useForgetPatched } from "../hooks/useForgetPatched";
 import { usePatchedGames } from "../hooks/usePatchedGames";
 import { useUnpatch } from "../hooks/useUnpatch";
 import type { GameRowView } from "../presentation/games";
+import { lines } from "../presentation/lines";
 import { Confirmation } from "./Confirmation";
 import { multiline } from "./MultilineText";
 
@@ -11,7 +12,7 @@ import { multiline } from "./MultilineText";
 function SteamGameRow({ row, appid }: { row: GameRowView; appid: string }) {
   return (
     <PanelSectionRow>
-      <ButtonItem label={row.title} description={multiline(row.lines)} onClick={() => openGamePage(appid)}>
+      <ButtonItem label={row.title} description={multiline(lines(row.lines))} onClick={() => openGamePage(appid)}>
         {row.action.label}
       </ButtonItem>
     </PanelSectionRow>
@@ -23,7 +24,7 @@ function DirectoryRow({ row, directory, onChanged }: { row: GameRowView; directo
   const unpatch = useUnpatch({ kind: "directory", path: directory }, onChanged);
   return (
     <PanelSectionRow>
-      <ButtonItem label={row.title} description={multiline(row.lines)} disabled={unpatch.busy} onClick={unpatch.onUnpatch}>
+      <ButtonItem label={row.title} description={multiline(lines(row.lines))} disabled={unpatch.busy} onClick={unpatch.onUnpatch}>
         {row.action.label}
       </ButtonItem>
       <Confirmation confirmation={unpatch.confirmation} onConfirm={unpatch.onConfirm} onCancel={unpatch.onCancel} />
@@ -36,7 +37,7 @@ function AwayRow({ row, directory, onChanged }: { row: GameRowView; directory: s
   const forget = useForgetPatched(directory, onChanged);
   return (
     <PanelSectionRow>
-      <ButtonItem label={row.title} description={multiline(row.lines)} disabled={forget.busy} onClick={forget.onForget}>
+      <ButtonItem label={row.title} description={multiline(lines(row.lines))} disabled={forget.busy} onClick={forget.onForget}>
         {row.action.label}
       </ButtonItem>
     </PanelSectionRow>

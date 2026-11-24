@@ -1,6 +1,7 @@
 import type { InstalledLibrary, InstalledVersion, PlacedLibrary } from "../api";
 import { ProxyDllView, patchReady } from "./launch";
 import { librariesLine } from "./libraries";
+import { lines } from "./lines";
 import { versionLabel } from "./releases";
 
 /**
@@ -110,7 +111,10 @@ export type Fsr4State = {
  *  switch turn on the watermark FSR 4 draws, from AMD's DLL and OptiScaler's own FidelityFX SDK alike. FSR 4 reads it
  *  as the game starts, so the setting shows from the next launch; the in-game switch at once. */
 const withWatermarkHint = (line: string) =>
-  `${line}\nTo see FSR 4 render rather than FSR 3: turn on Fsr4EnableWatermark in OptiScaler settings before launching, or Watermark in OptiScaler's in-game menu, and FSR 4 shows its watermark in the game.`;
+  lines([
+    line,
+    "To see FSR 4 render rather than FSR 3: turn on Fsr4EnableWatermark in OptiScaler settings before launching, or Watermark in OptiScaler's in-game menu, and FSR 4 shows its watermark in the game.",
+  ]);
 
 /** What the panel says about FSR 4 for a game: whether its Proton has it (and the game's patch links it), will fetch
  *  it, can't, or isn't on the device; where OptiScaler can run it, how to see that it does. */
