@@ -578,12 +578,11 @@ def test_a_patched_game_says_which_of_its_files_are_gone_or_changed_and_patching
     assert run(plugin.get_game_status("950"))["changed_files"] == []
 
 
-def test_a_placed_link_leading_nowhere_is_changed_but_fsr4s_driver_is_told_on_its_own(plugin, plugin_home, home, tmp_path):
+def test_a_placed_link_leading_nowhere_is_changed(plugin, plugin_home, home, tmp_path):
     from deckyscaler.application.patcher import Patcher
 
     game = make_game_dir(tmp_path / "games" / "Game")
-    driver = tmp_path / "prefix" / "amdxcffx64.dll"  # not fetched by Proton yet: the link leads nowhere
-    assert Patcher(home).patch_directory(game, "dxgi.dll", version_id=NIGHTLY, fsr4_driver=driver)["status"] == "success"
+    assert Patcher(home).patch_directory(game, "dxgi.dll", version_id=NIGHTLY)["status"] == "success"
     (plugin_home / "library" / "versions" / NIGHTLY / "files" / "OptiScaler" / "libxess.dll").unlink()
 
     assert run(plugin.patched_games())["games"][0]["changed_files"] == ["OptiScaler/libxess.dll"]

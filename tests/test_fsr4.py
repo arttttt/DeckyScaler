@@ -1,4 +1,5 @@
-"""FSR 4 under Proton: the rules (unit) and a game's state and launch options through the plugin (integration)."""
+"""FSR 4 as OptiScaler brings it: the rules (unit), and what a patched game's status says of it and what a patch no
+longer asks of Proton (integration)."""
 
 from __future__ import annotations
 
@@ -8,227 +9,186 @@ from pathlib import Path
 
 import pytest
 
-from conftest import STABLE, add_gpu, run
-from deckyscaler.domain import fsr4, launch_options
+from conftest import NIGHTLY, STABLE, add_gpu, fixed_file_info, pe_dll, run, write
+from deckyscaler.domain import fsr4, launch_options, marker, patch_record
+
+# The class names of the four providers as AMD's upscaler DLL names them (FidelityFX SDK 2.4.0, FSR 4.1.2).
+FP8_CLASS, INT8_CLASS = b".?AVffxProvider_FSR4@@", b".?AVffxProvider_FSR4_Int8@@"
+RDNA2_CLASS, LITE_CLASS = b".?AVffxProvider_FSR4_Int8_Navi2@@", b".?AVffxProvider_FSR4Lite_Int8@@"
+SDK_2_4 = pe_dll({".text": b"code", ".data": b"\0".join([FP8_CLASS, INT8_CLASS, RDNA2_CLASS, LITE_CLASS]),
+                  ".rsrc": fixed_file_info(4, 1, 2, 4555)})
+SDK_2_3 = pe_dll({".data": b"\0".join([FP8_CLASS, INT8_CLASS]), ".rsrc": fixed_file_info(4, 1, 1, 2740)})
 
 # ── unit: rules ──────────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
-    ("tracking", "version"),
+    ("rtti", "models"),
     [
-        (json.dumps({"fsr4_files": {"drive_c/windows/system32/amdxcffx64.dll": {"version": "4.1.1", "md5_hash": "x"}}}), "4.1.1"),
-        (json.dumps({"dlss_files": {}}), None),
-        ("not json", None),
-        ("[]", None),
-        ("", None),
+        (b"\0".join([b"x", LITE_CLASS, RDNA2_CLASS, INT8_CLASS, FP8_CLASS, b"y"]), (fsr4.FP8, fsr4.INT8, fsr4.INT8_RDNA2, fsr4.INT8_LITE)),
+        (b"\0".join([FP8_CLASS, INT8_CLASS]), (fsr4.FP8, fsr4.INT8)),  # SDK 2.3.0, FSR 4.1.1
+        (FP8_CLASS, (fsr4.FP8,)),  # SDK 2.2.0, FSR 4.1.0
+        (b"\0".join([INT8_CLASS, RDNA2_CLASS, LITE_CLASS]), (fsr4.INT8, fsr4.INT8_RDNA2, fsr4.INT8_LITE)),
+        (b".?AVffxProvider_FSR3@@", ()),
+        (b"", ()),
     ],
+    ids=["sdk-2.4", "sdk-2.3", "sdk-2.2", "int8-family-not-fp8", "fsr3-only", "nothing"],
 )
-def test_the_fetched_dlls_version_comes_from_upscaler_files(tracking, version):
-    assert fsr4.tracked_version(tracking) == version
+def test_the_models_a_dll_carries_are_its_providers_classes_in_ffxs_order(rtti, models):
+    assert fsr4.models(rtti) == models
+
+
+def test_what_is_told_of_the_fsr4_a_game_carries_is_its_dlls_version_and_models_on_amd_only():
+    rtti = b"\0".join([FP8_CLASS, INT8_CLASS])
+
+    assert fsr4.carried(True, rtti, "4.1.1.2740") == fsr4.Carried("4.1.1.2740", (fsr4.FP8, fsr4.INT8))
+    assert fsr4.carried(True, b".?AVffxProvider_FSR3@@", "3.1.5.0") == fsr4.Carried("3.1.5.0", ())  # it carries none
+    assert fsr4.carried(True, rtti, None) == fsr4.Carried(None, (fsr4.FP8, fsr4.INT8))
+    assert fsr4.carried(False, rtti, "4.1.1.2740") is None  # off AMD FSR 4 isn't the question
+    assert fsr4.carried(True, None, None) is None  # no DLL to read
 
 
 def test_only_amds_vendor_id_is_amd():
     assert fsr4.is_amd("0x1002\n")
+    assert fsr4.is_amd("0X1002")
     assert not fsr4.is_amd("0x10de\n")
     assert not fsr4.is_amd("")
 
 
+EARLIER_OPTIONS = "WINEDLLOVERRIDES=dxgi=n,b PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%"
+"""The launch options earlier versions of the plugin wrote for a game patched with dxgi.dll on a Proton that fetches FSR
+4's driver DLL."""
+PREFIX_DLL = "/home/deck/.local/share/Steam/steamapps/compatdata/730/pfx/drive_c/windows/system32/amdxcffx64.dll"
+
+
+def details(placed: list[dict], options: str = "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%") -> dict:
+    record = patch_record.PatchRecord(tuple(patch_record.Placed(p["path"], p["sha256"]) for p in placed), (), ())
+    return {**patch_record.to_json(record, True), "launch_options": options}
+
+
 @pytest.mark.parametrize(
-    ("amd", "reads", "in_prefix", "expected"),
+    ("placed", "options", "earlier"),
     [
-        (False, True, True, None),  # off AMD FSR 4 isn't the question
-        (True, True, True, fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")),  # a patch links it where OptiScaler looks
-        # There, from an earlier Proton or by hand, but a patch links nothing for one that can't fetch it: unseen.
-        (True, False, True, fsr4.State(fsr4.UNSUPPORTED, "tool")),
-        (True, True, False, fsr4.State(fsr4.WILL_FETCH, "tool")),
-        (True, False, False, fsr4.State(fsr4.UNSUPPORTED, "tool")),
+        ([{"path": "OptiScaler/amdxcffx64.dll", "sha256": f"link:{PREFIX_DLL}"}], "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", True),
+        ([{"path": "amdxcffx64.dll", "sha256": f"link:{PREFIX_DLL}"}], "", True),  # OptiScaler 0.9 keeps it in the root
+        ([], EARLIER_OPTIONS, True),
+        ([], f'WINEDLLOVERRIDES="dxgi=n,b"  {launch_options.EARLIER_FSR4_VARIABLE} SteamDeck=0 %command%', True),
+        ([{"path": "OptiScaler/amdxcffx64.dll", "sha256": "ab" * 32}], "", False),  # a copy is no driver link of ours
+        ([{"path": "OptiScaler/libxess.dll", "sha256": "link:/x/libxess.dll"}], "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", False),
+        ([], "PROTON_FSR4_UPGRADE=10 %command%", False),  # a word of the user's own, not the plugin's
     ],
+    ids=["driver-link-v10", "driver-link-v0.9", "variable", "variable-quoted", "a-copy", "nothing-earlier", "other-word"],
 )
-def test_the_state_says_what_the_game_has_or_will_get(amd, reads, in_prefix, expected):
-    assert fsr4.state(amd, "tool", reads, in_prefix, "4.1.1") == expected
+def test_an_earlier_fsr4_patch_is_told_by_its_driver_link_or_its_variable(placed, options, earlier):
+    assert marker.earlier_fsr4(details(placed, options)) is earlier
 
 
-def test_a_patched_game_whose_driver_isnt_linked_and_a_proton_that_isnt_there_are_told():
-    assert fsr4.state(True, "tool", True, True, "4.1.1", linked=False) == fsr4.State(fsr4.NOT_LINKED, "tool", "4.1.1")
-    assert fsr4.state(True, "tool", True, True, "4.1.1", linked=True) == fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")
-    # Under a Proton that can't fetch it, patching again links nothing: only a link already there counts.
-    assert fsr4.state(True, "tool", False, True, "4.1.1", linked=False) == fsr4.State(fsr4.UNSUPPORTED, "tool")
-    assert fsr4.state(True, "tool", False, True, "4.1.1", linked=True) == fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")
-    assert fsr4.state(True, "gone", False, False, None, tool_absent=True) == fsr4.State(fsr4.ABSENT, "gone")
-    assert fsr4.state(True, "gone", False, True, "4.1.1", tool_absent=True, linked=True) == fsr4.State(fsr4.ABSENT, "gone")
-
-
-def test_the_variable_is_asked_for_on_amd_with_a_proton_that_reads_it():
-    assert fsr4.wants_upgrade_variable(True, True)
-    assert not fsr4.wants_upgrade_variable(True, False)
-    assert not fsr4.wants_upgrade_variable(False, True)
-
-
-def test_the_launch_options_carry_the_variable_when_asked():
-    assert launch_options.managed("dxgi.dll", True) == "WINEDLLOVERRIDES=dxgi=n,b PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%"
-    assert launch_options.managed("OptiScaler.asi", True) == "PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%"
-    assert launch_options.is_managed(launch_options.managed("dxgi.dll", True))
+def test_a_record_that_doesnt_read_is_told_by_its_launch_options_alone():
+    assert marker.earlier_fsr4({"launch_options": EARLIER_OPTIONS})
+    assert not marker.earlier_fsr4({})
 
 
 # ── integration: through the plugin ──────────────────────────────────────────
 
 
-def test_a_game_on_a_proton_that_fetches_fsr4_gets_the_variable_and_says_so(plugin, plugin_home, steam_library, amd_gpu):
+def with_upscaler(plugin_home: Path, version_id: str, upscaler: str, data: bytes) -> None:
+    """The library version's upscaler DLL, which a game patched with it links to."""
+    write(plugin_home / "library" / "versions" / version_id / "files" / upscaler, data)
+
+
+@pytest.mark.parametrize(
+    ("version_id", "upscaler", "dll", "expected"),
+    [
+        (NIGHTLY, "OptiScaler/amd_fidelityfx_upscaler_dx12.dll", SDK_2_4,
+         {"version": "4.1.2.4555", "models": ["fp8", "int8", "int8-rdna2", "int8-lite"]}),
+        (STABLE, "amd_fidelityfx_upscaler_dx12.dll", SDK_2_3, {"version": "4.1.1.2740", "models": ["fp8", "int8"]}),
+    ],
+    ids=["nightly", "stable"],
+)
+def test_a_patched_game_on_amd_tells_the_fsr4_its_optiscaler_carries(plugin, plugin_home, steam_library, amd_gpu,
+                                                                       version_id, upscaler, dll, expected):
+    with_upscaler(plugin_home, version_id, upscaler, dll)
     steam_library.add_game("730", "Fsr Game")
-    steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=True)
-    steam_library.set_compat_tools({"730": "GE-Proton11-11"})
+    assert run(plugin.patch_game("730", "dxgi.dll", "", version_id))["status"] == "success"
 
-    status = run(plugin.get_game_status("730"))
-    patched = run(plugin.patch_game("730", "dxgi.dll", "", STABLE))
-
-    assert status["fsr4"] == {"state": "will-fetch", "tool": "GE-Proton11-11", "version": None}
-    assert patched["launch_options"] == "WINEDLLOVERRIDES=dxgi=n,b PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%"
+    assert run(plugin.get_game_status("730"))["fsr4"] == expected
 
 
-def test_once_fetched_the_status_names_the_version_in_the_prefix(plugin, plugin_home, steam_library, amd_gpu):
+def test_an_upscaler_without_fsr4_says_it_carries_none(plugin, plugin_home, steam_library, amd_gpu):
+    with_upscaler(plugin_home, NIGHTLY, "OptiScaler/amd_fidelityfx_upscaler_dx12.dll",
+                  pe_dll({".data": b".?AVffxProvider_FSR3@@", ".rsrc": fixed_file_info(3, 1, 5, 0)}))
     steam_library.add_game("730", "Fsr Game")
-    steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=True)
-    steam_library.set_compat_tools({"0": "GE-Proton11-11"})
-    steam_library.add_fsr4_to_prefix("730", "4.1.1")
+    run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))
 
-    assert run(plugin.get_game_status("730"))["fsr4"] == {"state": "in-prefix", "tool": "GE-Proton11-11", "version": "4.1.1"}
+    assert run(plugin.get_game_status("730"))["fsr4"] == {"version": "3.1.5.0", "models": []}
 
 
-@pytest.mark.parametrize("tool", ["proton_experimental", None, "GE-Proton9-20"])
-def test_a_proton_that_cant_fetch_fsr4_gets_no_variable(plugin, plugin_home, steam_library, amd_gpu, tool):
-    steam_library.add_game("730", "Older Game")
-    steam_library.add_tool("GE-Proton9-20", reads_fsr4_variable=False)
-    if tool:
-        steam_library.set_compat_tools({"730": tool})
-
-    status = run(plugin.get_game_status("730"))
-    patched = run(plugin.patch_game("730", "dxgi.dll", "", STABLE))
-
-    assert status["fsr4"] == {"state": "unsupported", "tool": tool, "version": None}
-    assert "PROTON_FSR4_UPGRADE" not in patched["launch_options"]
-
-
-def test_fsr4_an_earlier_proton_left_in_the_prefix_isnt_promised_under_one_that_cant_fetch_it(plugin, plugin_home, steam_library, amd_gpu):
-    root = steam_library.add_game("730", "Older Game")
-    steam_library.add_tool("GE-Proton9-20", reads_fsr4_variable=False)
-    steam_library.set_compat_tools({"730": "GE-Proton9-20"})
-    steam_library.add_fsr4_to_prefix("730", "4.1.1")  # fetched while the game was set to a later GE-Proton
-    unsupported = {"state": "unsupported", "tool": "GE-Proton9-20", "version": None}
-
-    assert run(plugin.get_game_status("730"))["fsr4"] == unsupported
-    run(plugin.patch_game("730", "dxgi.dll", "", STABLE))
-    assert not os.path.lexists(root / "amdxcffx64.dll")  # nothing linked where OptiScaler looks
-    assert run(plugin.get_game_status("730"))["fsr4"] == unsupported  # not "patch it again": that links nothing
-
-
-def test_off_amd_fsr4_is_not_mentioned_and_not_asked_for(plugin, plugin_home, steam_library, tmp_path):
-    add_gpu(tmp_path / "sys", "card0", "0x10de")
-    steam_library.add_game("730", "Fsr Game")
-    steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=True)
-    steam_library.set_compat_tools({"730": "GE-Proton11-11"})
+def test_an_upscaler_that_cant_be_read_tells_nothing(plugin, plugin_home, steam_library, amd_gpu):
+    steam_library.add_game("730", "Fsr Game")  # the library's upscaler is a placeholder, not a DLL
+    run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))
 
     assert run(plugin.get_game_status("730"))["fsr4"] is None
-    assert "PROTON_FSR4_UPGRADE" not in run(plugin.patch_game("730", "dxgi.dll", "", STABLE))["launch_options"]
+
+
+def test_a_game_not_patched_has_no_fsr4_to_tell(plugin, plugin_home, steam_library, amd_gpu):
+    with_upscaler(plugin_home, NIGHTLY, "OptiScaler/amd_fidelityfx_upscaler_dx12.dll", SDK_2_4)
+    steam_library.add_game("730", "Fsr Game")
+
+    assert run(plugin.get_game_status("730"))["fsr4"] is None
+
+
+def test_off_amd_fsr4_is_not_mentioned(plugin, plugin_home, steam_library, tmp_path):
+    add_gpu(tmp_path / "sys", "card0", "0x10de")
+    with_upscaler(plugin_home, NIGHTLY, "OptiScaler/amd_fidelityfx_upscaler_dx12.dll", SDK_2_4)
+    steam_library.add_game("730", "Fsr Game")
+    run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))
+
+    assert run(plugin.get_game_status("730"))["fsr4"] is None
 
 
 def test_the_boot_gpu_decides_on_a_machine_with_two(plugin, plugin_home, steam_library, tmp_path):
     add_gpu(tmp_path / "sys", "card0", "0x1002", boot_vga=False)
     add_gpu(tmp_path / "sys", "card1", "0x10de", boot_vga=True)
-    write_connector = tmp_path / "sys" / "class" / "drm" / "card1-DP-1"
-    write_connector.mkdir(parents=True)
+    (tmp_path / "sys" / "class" / "drm" / "card1-DP-1").mkdir(parents=True)  # a connector, not a card
+    with_upscaler(plugin_home, NIGHTLY, "OptiScaler/amd_fidelityfx_upscaler_dx12.dll", SDK_2_4)
     steam_library.add_game("730", "Fsr Game")
+    run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))
 
     assert run(plugin.get_game_status("730"))["fsr4"] is None
 
 
-def test_a_tool_installed_for_every_user_is_found_too(plugin, plugin_home, steam_library, amd_gpu, tmp_path):
-    steam_library.add_game("730", "Fsr Game")
-    steam_library.add_tool("proton-cachyos", reads_fsr4_variable=True, tools_dir=tmp_path / "system-compatibilitytools.d")
-    steam_library.set_compat_tools({"730": "proton-cachyos"})
-
-    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "will-fetch"
-
-
-def test_a_tool_updated_in_place_is_read_again(plugin, plugin_home, steam_library, amd_gpu):
-    import os
-
-    steam_library.add_game("730", "Fsr Game")
-    tool = steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=False)
-    steam_library.set_compat_tools({"730": "GE-Proton11-11"})
-    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "unsupported"
-
-    (tool / "proton").write_text('os.environ.get("PROTON_FSR4_UPGRADE")\n')
-    os.utime(tool / "proton", ns=(1, 2_000_000_000_000_000_000))  # a later mtime than the cached read
-
-    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "will-fetch"
-
-
-def ge_game(steam_library) -> Path:
+def test_a_patch_asks_proton_for_nothing_and_links_no_driver_dll(plugin, plugin_home, steam_library, amd_gpu):
     root = steam_library.add_game("730", "Fsr Game")
-    steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=True)
     steam_library.set_compat_tools({"730": "GE-Proton11-11"})
-    return root
-
-
-def test_the_patch_links_the_driver_dll_from_the_prefix_where_optiscaler_looks(plugin, plugin_home, steam_library, amd_gpu):
-    import os
-
-    from conftest import NIGHTLY, snapshot
-
-    root = ge_game(steam_library)
-    before = snapshot(root)
     prefix_dll = steam_library.steamapps / "compatdata" / "730" / "pfx" / "drive_c" / "windows" / "system32" / "amdxcffx64.dll"
+    write(prefix_dll, b"AMD's FSR 4 driver DLL, fetched by GE-Proton")
 
-    assert run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))["status"] == "success"
-    # Proton fetches the DLL on the first launch; until then the link leads nowhere, which harms nothing.
-    assert os.readlink(root / "OptiScaler" / "amdxcffx64.dll") == str(prefix_dll)
+    patched = run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))
 
-    assert run(plugin.unpatch_game("730"))["status"] == "success"
-    assert snapshot(root) == before
-
-
-def test_the_users_own_driver_dll_is_left_alone(plugin, plugin_home, steam_library, amd_gpu):
-    from conftest import NIGHTLY, write
-
-    root = ge_game(steam_library)
-    write(root / "OptiScaler" / "amdxcffx64.dll", b"the user's FSR 4 build")
-
-    assert run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))["status"] == "success"
-    assert (root / "OptiScaler" / "amdxcffx64.dll").read_bytes() == b"the user's FSR 4 build"
-    assert not (root / "OptiScaler" / "amdxcffx64.dll").is_symlink()
-    run(plugin.unpatch_game("730"))
-
-    assert (root / "OptiScaler" / "amdxcffx64.dll").read_bytes() == b"the user's FSR 4 build"
+    assert patched["launch_options"] == "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
+    assert not os.path.lexists(root / "OptiScaler" / "amdxcffx64.dll")
 
 
-def test_a_repatch_replaces_its_own_driver_link(plugin, plugin_home, steam_library, amd_gpu):
-    from conftest import NIGHTLY
-
-    root = ge_game(steam_library)
-    run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))
-    run(plugin.patch_game("730", "dxgi.dll", "WINEDLLOVERRIDES=dxgi=n,b PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%", NIGHTLY))
-
-    assert (root / "OptiScaler" / "amdxcffx64.dll").is_symlink()
-    assert not (root / "OptiScaler" / "amdxcffx64.dll.b").exists()
-
-
-def test_a_game_the_launch_wrapper_patched_says_fsr4_isnt_linked_until_patched_from_here(plugin, home, plugin_home, steam_library, amd_gpu):
-    from deckyscaler.application.launch_wrapper import LaunchWrapper
-
+def test_a_game_patched_the_earlier_way_says_so_until_patched_again(plugin, plugin_home, steam_library, amd_gpu):
     root = steam_library.add_game("730", "Fsr Game")
-    steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=True)
-    steam_library.set_compat_tools({"0": "GE-Proton11-11"})
-    steam_library.add_fsr4_to_prefix("730", "4.1.1")
-    LaunchWrapper(home, {"SteamAppId": "730"}).patch([str(root / "Game.exe")], "dxgi.dll", "nightly-20261023")
+    run(plugin.patch_game("730", "dxgi.dll", "", NIGHTLY))
+    # What an earlier version left: AMD's driver DLL linked from the prefix next to OptiScaler, and the variable.
+    prefix_dll = steam_library.steamapps / "compatdata" / "730" / "pfx" / "drive_c" / "windows" / "system32" / "amdxcffx64.dll"
+    write(prefix_dll, b"AMD's FSR 4 driver DLL, fetched by GE-Proton")
+    (root / "OptiScaler" / "amdxcffx64.dll").symlink_to(prefix_dll)
+    recorded = json.loads((root / "DECKYSCALER_PATCH").read_text())
+    recorded["placed"].append({"path": "OptiScaler/amdxcffx64.dll", "sha256": f"link:{prefix_dll}"})
+    recorded["launch_options"] = EARLIER_OPTIONS
+    (root / "DECKYSCALER_PATCH").write_text(json.dumps(recorded))
 
-    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "not-linked"
-    run(plugin.patch_game("730", "dxgi.dll", "", "nightly-20261023"))
-    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "in-prefix"
+    assert run(plugin.get_game_status("730"))["earlier_fsr4"] is True
+    assert run(plugin.patched_games())["games"][0]["earlier_fsr4"] is True
 
+    patched = run(plugin.patch_game("730", "dxgi.dll", EARLIER_OPTIONS, NIGHTLY))  # Steam holds what it wrote
 
-def test_a_game_set_to_a_proton_that_isnt_on_the_device_says_so(plugin, plugin_home, steam_library, amd_gpu):
-    steam_library.add_game("730", "Fsr Game")
-    steam_library.set_compat_tools({"730": "GE-Proton10-5"})
+    assert patched["launch_options"] == "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
+    assert not os.path.lexists(root / "OptiScaler" / "amdxcffx64.dll")
+    assert prefix_dll.read_bytes() == b"AMD's FSR 4 driver DLL, fetched by GE-Proton"  # Proton's own file stays
+    assert run(plugin.get_game_status("730"))["earlier_fsr4"] is False
+    assert run(plugin.patched_games())["games"][0]["earlier_fsr4"] is False
 
-    assert run(plugin.get_game_status("730"))["fsr4"] == {"state": "absent", "tool": "GE-Proton10-5", "version": None}

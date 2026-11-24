@@ -47,7 +47,9 @@ def test_the_plugins_options_are_told_by_the_proxy_the_game_is_patched_with():
     assert launch_options.is_managed("SteamDeck=0 %command%", "OptiScaler.asi")
     assert not launch_options.is_managed("SteamDeck=0 %command%", "dxgi.dll")  # a tweak of the user's own, then
     assert not launch_options.is_managed(launch_options.managed("winmm.dll"), "dxgi.dll")
-    assert launch_options.is_managed(launch_options.managed("dxgi.dll", True), "dxgi.dll")
+    earlier = "WINEDLLOVERRIDES=dxgi=n,b PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%"  # as earlier versions wrote them
+    assert launch_options.is_managed(earlier, "dxgi.dll")
+    assert not launch_options.is_managed(earlier, "winmm.dll")
     assert launch_options.is_managed("SteamDeck=0 %command%")  # with no proxy to go by: any proxy's
 
 
@@ -74,11 +76,31 @@ def test_wine_dll_overrides_append_our_entry_with_wines_separator(current, dll_n
     assert launch_options.wine_dll_overrides(current, dll_name) == expected
 
 
-@pytest.mark.parametrize("fsr4_upgrade", [False, True])
 @pytest.mark.parametrize("dll_name", ["dxgi.dll", "OptiScaler.asi"])
-def test_every_shape_the_plugin_writes_is_recognised_as_managed(dll_name, fsr4_upgrade):
+def test_every_shape_the_plugin_writes_is_recognised_as_managed(dll_name):
     # Unpatch hands the user's own options back only when it knows the current ones are the plugin's.
-    assert launch_options.is_managed(launch_options.managed(dll_name, fsr4_upgrade))
+    assert launch_options.is_managed(launch_options.managed(dll_name))
+
+
+@pytest.mark.parametrize(
+    ("options", "carries"),
+    [
+        ("WINEDLLOVERRIDES=dxgi=n,b PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%", True),
+        ('WINEDLLOVERRIDES="dxgi=n,b"   PROTON_FSR4_UPGRADE=1 SteamDeck=0 %command%', True),
+        ("PROTON_FSR4_UPGRADE=1 %command%", True),
+        ("PROTON_FSR4_UPGRADE=10 %command%", False),  # another word that starts the same
+        ("WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", False),
+        ("", False),
+        (None, False),  # Steam didn't say, or a marker from before they were kept
+    ],
+)
+def test_the_earlier_fsr4_variable_is_told_as_a_word_of_the_options(options, carries):
+    assert launch_options.carries_earlier_fsr4(options) is carries
+
+
+def test_the_plugin_no_longer_asks_proton_for_fsr4s_driver():
+    assert launch_options.managed("dxgi.dll") == "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
+    assert launch_options.managed("OptiScaler.asi") == "SteamDeck=0 %command%"
 
 
 def test_the_panel_gets_every_proxy_with_its_launch_options_and_the_wrapper_commands():

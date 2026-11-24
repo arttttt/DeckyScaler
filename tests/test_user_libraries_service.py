@@ -6,12 +6,11 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import struct
 import zipfile
 
 import pytest
 
-from conftest import NIGHTLY, FakeDownload, make_game_dir, run, write
+from conftest import NIGHTLY, FakeDownload, fixed_file_info, make_game_dir, pe_dll, run, write
 from deckyscaler.application import patcher as patcher_module
 from deckyscaler.application.user_libraries import UserLibraries
 from deckyscaler.domain import release_assets
@@ -49,17 +48,6 @@ def owner(home, content: bytes = ADDON, published: list[dict] | None = None, rep
         home, lambda repository: published if published is not None else listing(), FakeDownload(content),
         lambda *args: reports.append(args) if reports is not None else None,
     )
-
-
-def pe_with_version(high: int, low: int) -> bytes:
-    """A DLL whose resources record a file version."""
-    dos = bytearray(0x40)
-    dos[0:2] = b"MZ"
-    struct.pack_into("<I", dos, 0x3C, 0x40)
-    coff = b"PE\0\0" + struct.pack("<HHIIIHH", 0x8664, 1, 0, 0, 0, 0, 0)
-    resources = b"\0" * 8 + struct.pack("<IIII", 0xFEEF04BD, 0x00010000, high, low)
-    section = b".rsrc\0\0\0" + struct.pack("<IIII", len(resources), 0x1000, len(resources), 0x40 + len(coff) + 40) + bytes(16)
-    return bytes(dos) + coff + section + resources
 
 
 # ── downloading ──────────────────────────────────────────────────────────────
@@ -112,7 +100,7 @@ def test_a_zip_a_folder_or_a_dll_the_user_picked_is_added_once(home, plugin_home
     sdk = write(tmp_path / "XeSS_SDK_3.0.2.zip", zip_of({"bin/libxess.dll": b"x", "bin/libxess_fg.dll": b"f", "doc/a.pdf": b"d"}))
     folder = tmp_path / "Uniscaler"
     write(folder / "Uniscaler" / "ffx" / "u.dll", b"u")
-    dll = write(tmp_path / "Downloads" / "libxess.dll", pe_with_version((2 << 16) | 0, (2 << 16) | 68))
+    dll = write(tmp_path / "Downloads" / "libxess.dll", pe_dll({".rsrc": fixed_file_info(2, 0, 2, 68)}))
 
     assert libraries.add(str(sdk))["id"] == "xess-sdk-3-0-2"
     assert libraries.add(str(folder))["id"] == "uniscaler"

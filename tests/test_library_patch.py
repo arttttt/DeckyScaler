@@ -172,7 +172,7 @@ def test_the_wrapper_keeps_what_the_game_has_until_the_library_leaves_the_device
     assert not (game / "OptiScaler" / "custom").exists()
     lines = set(ini_of(game).splitlines())
     assert "FGInput=fsrfg" in lines  # the user's value again
-    assert {f"FGNvngxReplacement=auto", "DisableHudless=auto"} <= lines  # nobody's: back to OptiScaler's own
+    assert {"FGNvngxReplacement=auto", "DisableHudless=auto"} <= lines  # nobody's: back to OptiScaler's own
 
 
 def test_a_library_whose_files_went_missing_leaves_the_game_and_the_game_still_starts(plugin, plugin_home, home, tmp_path):
@@ -314,14 +314,14 @@ def test_a_folder_behind_a_linked_optiscaler_is_never_the_patchs_to_remove(plugi
     choose(plugin_home, library_choice.GLOBAL, FG, "anr")
     shared = tmp_path / "shared-optiscaler"  # one OptiScaler/ folder several games link to
     write(shared / "custom" / ANR / "dlssg" / "my-notes.txt", b"the user's own")
-    write(shared / "amdxcffx64.dll", b"FSR 4's driver, linked by another game's patch")
+    write(shared / "amdxcffx64.dll", b"another game's file in the shared folder")
     game = make_game_dir(tmp_path / "games" / "Game")
     (game / "OptiScaler").symlink_to(shared)
 
-    patched = Patcher(home).patch_directory(game, "dxgi.dll", version_id=NIGHTLY, fsr4_driver=tmp_path / "prefix" / "amdxcffx64.dll")
+    patched = Patcher(home).patch_directory(game, "dxgi.dll", version_id=NIGHTLY)
     assert patched["status"] == "success"
     assert marker_of(game)["owned_dirs"] == [] and marker_of(game)["created_dirs"] == []
 
     assert run(plugin.manual_unpatch_directory(str(game)))["status"] == "success"
     assert (shared / "custom" / ANR / "dlssg" / "my-notes.txt").read_bytes() == b"the user's own"
-    assert (shared / "amdxcffx64.dll").read_bytes() == b"FSR 4's driver, linked by another game's patch"
+    assert (shared / "amdxcffx64.dll").read_bytes() == b"another game's file in the shared folder"

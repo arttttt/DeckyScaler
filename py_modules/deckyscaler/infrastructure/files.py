@@ -85,6 +85,15 @@ def read_text(path: Path) -> str:
         return f.read()
 
 
+def read_text_or_empty(path: Path) -> str:
+    """A text file as it is, or "" when it isn't there or can't be read: for what the system may or may not say (sysfs,
+    Steam's config)."""
+    try:
+        return read_text(path)
+    except OSError:
+        return ""
+
+
 def rewrite_text(path: Path, transform: Callable[[str], str]) -> bool:
     """Apply `transform` to a text file's content; write it back only if it changed.
 

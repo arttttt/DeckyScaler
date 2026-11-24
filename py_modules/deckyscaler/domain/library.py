@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
+from pathlib import PurePosixPath
 
-from . import release_assets
+from . import bundle, release_assets
 
 STABLE = "stable"
 NIGHTLY = "nightly"
@@ -68,26 +69,31 @@ class Family:
     required: frozenset[str]
     """Files an archive of this family must contain, or it is not added to the library."""
     main_dir: str
-    """Where OptiScaler looks for its own files, such as AMD's FSR 4 driver DLL, relative to the game's
-    directory: its OptiScaler/ subfolder when there is one, else the directory itself (dllmain.cpp, MainDllPath)."""
+    """Where OptiScaler keeps its own files, relative to the game's directory: its OptiScaler/ subfolder when there is
+    one, else the directory itself (dllmain.cpp, MainDllPath)."""
     libraries: bool
     """Whether it takes the user's libraries (domain/user_libraries): custom providers, and [Libraries] paths
     relative to the game's directory, came with OptiScaler 10."""
 
+    @property
+    def upscaler(self) -> str:
+        """Where AMD's FidelityFX upscaler DLL is, relative to the game's directory: OptiScaler brings it, and with it
+        FSR 4 (domain/fsr4)."""
+        return _upscaler(self.main_dir)
+
+
+def _upscaler(main_dir: str) -> str:
+    return str(PurePosixPath(main_dir) / bundle.FSR4_UPSCALER_FILENAME)
+
+
+def _family(id: str, main_dir: str, libraries: bool) -> Family:
+    """A family whose archive holds OptiScaler, its ini and the upscaler DLL where the family keeps it."""
+    return Family(id, frozenset({"OptiScaler.dll", "OptiScaler.ini", _upscaler(main_dir)}), main_dir, libraries)
+
 
 FAMILIES = {
-    "0.9": Family(
-        "0.9",
-        frozenset({"OptiScaler.dll", "OptiScaler.ini", "amd_fidelityfx_upscaler_dx12.dll"}),
-        "",
-        libraries=False,
-    ),
-    "10": Family(
-        "10",
-        frozenset({"OptiScaler.dll", "OptiScaler.ini", "OptiScaler/amd_fidelityfx_upscaler_dx12.dll"}),
-        "OptiScaler",
-        libraries=True,
-    ),
+    "0.9": _family("0.9", "", libraries=False),
+    "10": _family("10", "OptiScaler", libraries=True),
 }
 
 

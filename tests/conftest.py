@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import shutil
+import struct
 import sys
 import threading
 import types
@@ -42,7 +43,7 @@ sys.path[:0] = [str(REPO_ROOT / "py_modules"), str(REPO_ROOT)]
 
 import main  # noqa: E402
 from deckyscaler.domain import bundle  # noqa: E402
-from deckyscaler.infrastructure import drives, proton  # noqa: E402
+from deckyscaler.infrastructure import drives, gpu, proton  # noqa: E402
 
 
 # sha256 → label of every placeholder handed out, so snapshots can name content.
@@ -79,6 +80,27 @@ def write(path: Path, data: bytes) -> Path:
     return path
 
 
+def pe_dll(sections: dict[str, bytes], outside: bytes = b"") -> bytes:
+    """A Windows PE file holding `sections` (name → raw bytes) one after another; `outside` sits between the headers
+    and the first of them."""
+    pe_offset = 0x40
+    dos = bytearray(pe_offset)
+    dos[0:2] = b"MZ"
+    struct.pack_into("<I", dos, 0x3C, pe_offset)
+    coff = b"PE\0\0" + struct.pack("<HHIIIHH", 0x8664, len(sections), 0, 0, 0, 0, 0)
+    offset = pe_offset + len(coff) + 40 * len(sections) + len(outside)
+    table = b""
+    for name, data in sections.items():
+        table += name.encode().ljust(8, b"\0") + struct.pack("<IIII", len(data), 0x1000, len(data), offset) + bytes(16)
+        offset += len(data)
+    return bytes(dos) + coff + table + outside + b"".join(sections.values())
+
+
+def fixed_file_info(major: int, minor: int, build: int, revision: int, structure: int = 0x00010000) -> bytes:
+    """Resources holding a VS_FIXEDFILEINFO with that file version."""
+    return b"\0" * 8 + struct.pack("<IIII", 0xFEEF04BD, structure, (major << 16) | minor, (build << 16) | revision)
+
+
 def install_tools(directory: Path, scripts: dict[str, str]) -> Path:
     """Executable stand-ins for command-line tools, written into `directory`."""
     for name, body in scripts.items():
@@ -112,7 +134,7 @@ def home(tmp_path, monkeypatch) -> Path:
     monkeypatch.setattr(_decky, "DECKY_PLUGIN_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.setattr(_decky, "DECKY_PLUGIN_SETTINGS_DIR", str(tmp_path / "settings"))
     # The machine running the tests has its own GPU and Proton tools; the fake world has none unless a test adds them.
-    monkeypatch.setattr(proton, "SYSFS", tmp_path / "sys")
+    monkeypatch.setattr(gpu, "SYSFS", tmp_path / "sys")
     monkeypatch.setattr(proton, "SYSTEM_TOOLS", tmp_path / "system-compatibilitytools.d")
     return home_dir
 
@@ -326,28 +348,6 @@ class SteamLibrary:
             "\t\t\t}\n\t\t}\n\t}\n}\n"
         )
         write(self.root / "config" / "config.vdf", config.encode())
-
-    def add_tool(self, name: str, reads_fsr4_variable: bool, tools_dir: Path | None = None) -> Path:
-        """A custom Proton in compatibilitytools.d whose proton script reads (or not) the FSR 4 variable."""
-        directory = (tools_dir or self.root / "compatibilitytools.d") / name
-        manifest = (
-            '"compatibilitytools"\n{\n  "compat_tools"\n  {\n'
-            f'    "{name}" // Internal name of this tool\n    {{\n'
-            f'      "install_path" "."\n      "display_name" "{name}"\n'
-            '      "from_oslist"  "windows"\n      "to_oslist"    "linux"\n    }\n  }\n}\n'
-        )
-        write(directory / "compatibilitytool.vdf", manifest.encode())
-        script = 'if os.environ.get("PROTON_FSR4_UPGRADE"):\n    pass\n' if reads_fsr4_variable else "print('proton')\n"
-        write(directory / "proton", script.encode())
-        return directory
-
-    def add_fsr4_to_prefix(self, appid: str, version: str | None) -> None:
-        """What protonfixes leaves after fetching FSR 4: the DLL in the prefix, and its version when tracked."""
-        compatdata = self.steamapps / "compatdata" / appid
-        write(compatdata / "pfx" / "drive_c" / "windows" / "system32" / "amdxcffx64.dll", b"amd fsr4 driver")
-        if version is not None:
-            tracking = {"fsr4_files": {"drive_c/windows/system32/amdxcffx64.dll": {"version": version, "md5_hash": "x"}}}
-            write(compatdata / "upscaler_files", json.dumps(tracking).encode())
 
 
 @pytest.fixture

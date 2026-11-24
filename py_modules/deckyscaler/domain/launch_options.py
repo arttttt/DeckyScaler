@@ -5,12 +5,15 @@ from __future__ import annotations
 import shlex
 
 from .bundle import DEFAULT_PROXY_DLL, PROXY_DLLS, VALID_DLL_NAMES
-from .fsr4 import UPGRADE_VARIABLE
 
 WRAPPER_PATCH = "~/deckyscaler/patch %command%"
 """Launch options that patch the game through the launch wrapper on every start."""
 WRAPPER_UNPATCH = "~/deckyscaler/unpatch %command%"
 """Launch options that unpatch the game through the wrapper on its next start."""
+
+EARLIER_FSR4_VARIABLE = "PROTON_FSR4_UPGRADE=1"
+"""What earlier versions of the plugin added to a game's launch options for Proton to fetch AMD's FSR 4 driver DLL,
+which OptiScaler's own FSR 4 has made unneeded: options with it are still the plugin's, for a patch to replace."""
 
 _ASI_PROXY = "OptiScaler.asi"
 _OUR_WRAPPERS = ("/deckyscaler/patch", "/deckyscaler/unpatch")
@@ -37,12 +40,14 @@ def wine_dll_overrides(current: str, dll_name: str) -> str:
     return f"{current};{entry}" if current else entry
 
 
-def managed(dll_name: str, fsr4_upgrade: bool = False) -> str:
-    """The Steam launch options for a game patched with the given proxy DLL; `fsr4_upgrade` also asks
-    the game's Proton to fetch FSR 4."""
+def managed(dll_name: str) -> str:
+    """The Steam launch options for a game patched with the given proxy DLL."""
+    return _options(dll_name)
+
+
+def _options(dll_name: str, *variables: str) -> str:
     entry = override_entry(dll_name)
-    variables = ([f"WINEDLLOVERRIDES={entry}"] if entry else []) + ([f"{UPGRADE_VARIABLE}=1"] if fsr4_upgrade else [])
-    return " ".join([*variables, "SteamDeck=0 %command%"])
+    return " ".join([*([f"WINEDLLOVERRIDES={entry}"] if entry else []), *variables, "SteamDeck=0 %command%"])
 
 
 def setup_json() -> dict:
@@ -64,13 +69,20 @@ def _normalized(options: str) -> str:
 
 def is_managed(options: str, patched_with: str | None = None) -> bool:
     """Whether launch options are exactly what the plugin or the original Decky Framegen writes for a game patched with
-    the proxy `patched_with` (with any proxy when None), FSR 4's upgrade variable or not, or either's launch wrapper
-    alone. Anything the user added to them makes them the user's: theirs to keep, never ours to clear."""
+    the proxy `patched_with` (with any proxy when None), with EARLIER_FSR4_VARIABLE as earlier versions wrote them or
+    not, or either's launch wrapper alone. Anything the user added to them makes them the user's: theirs to keep, never
+    ours to clear."""
     words = _normalized(options).split(" ")
     if len(words) == 2 and words[0].endswith(_WRAPPERS) and words[1].lower() == "%command%":
         return True
     proxies = [patched_with] if patched_with else sorted(VALID_DLL_NAMES)
-    return _normalized(options) in {_normalized(managed(dll, upgrade)) for dll in proxies for upgrade in (False, True)}
+    ours = {_normalized(_options(dll, *earlier)) for dll in proxies for earlier in ((), (EARLIER_FSR4_VARIABLE,))}
+    return _normalized(options) in ours
+
+
+def carries_earlier_fsr4(options: str | None) -> bool:
+    """Whether launch options hold EARLIER_FSR4_VARIABLE, as earlier versions of the plugin wrote it."""
+    return options is not None and EARLIER_FSR4_VARIABLE in _normalized(options).split(" ")
 
 
 def without_wrapper(options: str | None) -> str | None:

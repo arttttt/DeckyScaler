@@ -1,96 +1,55 @@
-"""FSR 4 under Proton: whether a game gets AMD's FSR 4 driver DLL, and how to ask Proton for it.
+"""FSR 4 as OptiScaler brings it: AMD's FidelityFX upscaler DLL in OptiScaler's own archive, and the models it holds.
 
-On Linux FSR 4 needs amdxcffx64.dll, which neither OptiScaler's archives nor Valve's Proton ship.
-Proton builds with protonfixes' upscaler support (GE-Proton, Proton-CachyOS, Proton-EM) download it
-into the game's prefix on launch when UPGRADE_VARIABLE is set, and record its version in the
-game's compatdata/upscaler_files. OptiScaler then finds it and offers FSR 4.
+OptiScaler 10's nightlies since 2026-10-28 ship FidelityFX SDK 2.4.0, FSR 4.1.2, with a model for every GPU OptiScaler
+runs FSR 4 on; it picks the GPU's itself. Under Proton nothing else is needed: AMD's driver DLL (amdxcffx64.dll), which
+some Protons fetch, holds an older FSR 4 with fewer models, and earlier versions of the plugin linked it into games.
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
 AMD_VENDOR = "0x1002"
-UPGRADE_VARIABLE = "PROTON_FSR4_UPGRADE"
-"""What a Proton build with upscaler support reads to fetch FSR 4; current GE-Proton covers RDNA 3 with it too."""
-DLL = "amdxcffx64.dll"
-PREFIX_DLL = f"pfx/drive_c/windows/system32/{DLL}"
-"""Where the DLL lands, relative to the game's compatdata directory."""
-TRACKING_FILE = "upscaler_files"
-_TRACKED_DLL = f"drive_c/windows/system32/{DLL}"
 
-IN_PREFIX = "in-prefix"
-"""In the prefix, where OptiScaler sees it: the game's patch linked it, or a patch from the plugin would."""
-NOT_LINKED = "not-linked"
-"""In the prefix, but the game's patch didn't link it where OptiScaler looks (the launch wrapper's patch doesn't), and
-a patch from the plugin would."""
-WILL_FETCH = "will-fetch"
-UNSUPPORTED = "unsupported"
-ABSENT = "absent"
-"""The game is set to a Proton that isn't on the device."""
+FP8 = "fp8"
+INT8 = "int8"
+INT8_RDNA2 = "int8-rdna2"
+INT8_LITE = "int8-lite"
+RTTI_SECTION = ".data"
+"""The section of AMD's FidelityFX upscaler DLL that names its providers' classes (MSVC's run-time type information)."""
+_MODEL_CLASSES = (
+    (FP8, b".?AVffxProvider_FSR4@@"),
+    (INT8, b".?AVffxProvider_FSR4_Int8@@"),
+    (INT8_RDNA2, b".?AVffxProvider_FSR4_Int8_Navi2@@"),
+    (INT8_LITE, b".?AVffxProvider_FSR4Lite_Int8@@"),
+)
+"""Each FSR 4 model and the class of its provider, in the order FFX checks them (OptiScaler's fsr4/FSR4Models.cpp)."""
+
+
+def models(rtti: bytes) -> tuple[str, ...]:
+    """The FSR 4 models an upscaler DLL carries, told by its providers' classes in its RTTI_SECTION, without running it.
+    OptiScaler picks the GPU's model among them: INT8 Lite for the Steam Deck and Ryzen APUs, INT8 for RDNA 3 cards,
+    INT8 RDNA2 for RDNA 2 cards, FP8 for RDNA 4."""
+    return tuple(model for model, name in _MODEL_CLASSES if name in rtti)
+
+
+@dataclass(frozen=True)
+class Carried:
+    """The FSR 4 a patched game's OptiScaler carries: its upscaler DLL's version, which is FSR 4's (4.1.2.4555), and the
+    models the DLL holds."""
+
+    version: str | None
+    models: tuple[str, ...]
+
+
+def carried(amd_gpu: bool, rtti: bytes | None, version: str | None) -> Carried | None:
+    """What to tell of the FSR 4 a patched game's OptiScaler carries, from its upscaler DLL's RTTI_SECTION and version:
+    nothing off AMD, where FSR 4 isn't the question, nor without a DLL to read (`rtti` None)."""
+    if not amd_gpu or rtti is None:
+        return None
+    return Carried(version, models(rtti))
 
 
 def is_amd(vendor: str) -> bool:
     """Whether a PCI vendor id (as sysfs gives it, e.g. "0x1002\\n") is AMD's."""
     return vendor.strip().lower() == AMD_VENDOR
-
-
-def reads_upgrade_variable(source: str) -> bool:
-    """Whether a Proton build's script or protonfixes code reads the FSR 4 upgrade variable."""
-    return UPGRADE_VARIABLE in source
-
-
-def tracked_version(tracking: str) -> str | None:
-    """The FSR 4 DLL's version protonfixes recorded in upscaler_files, or None."""
-    try:
-        data = json.loads(tracking)
-    except ValueError:
-        return None
-    entry = data.get("fsr4_files", {}).get(_TRACKED_DLL) if isinstance(data, dict) else None
-    version = entry.get("version") if isinstance(entry, dict) else None
-    return str(version) if version else None
-
-
-@dataclass(frozen=True)
-class State:
-    """A game's FSR 4 under Proton: the DLL is in its prefix where OptiScaler sees it, or would once patched again
-    (with the version when recorded), its Proton will fetch it on launch, its Proton can't, or its Proton isn't on the
-    device. `tool` is the Proton's name, None for Steam's default."""
-
-    kind: str
-    tool: str | None
-    version: str | None = None
-
-
-def state(
-    amd_gpu: bool,
-    tool: str | None,
-    tool_reads_variable: bool,
-    dll_in_prefix: bool,
-    version: str | None,
-    tool_absent: bool = False,
-    linked: bool | None = None,
-) -> State | None:
-    """What to tell the user about FSR 4 for a game; None off AMD, where FSR 4 isn't the question. `tool_absent`: the
-    game is set to a Proton that isn't on the device. `linked`: whether the game's patch linked the DLL where
-    OptiScaler looks, None for a game that isn't patched.
-
-    OptiScaler loads the DLL only from where it looks, never from the prefix, and a patch links it there only when it
-    asks Proton for it (wants_upgrade_variable). So the DLL in the prefix counts only when linked, or when a patch
-    would link it: under a Proton that can't fetch it (an earlier one did, or a copy by hand), it is that Proton's
-    case, whatever the prefix holds."""
-    if not amd_gpu:
-        return None
-    if tool_absent:
-        return State(ABSENT, tool)
-    if dll_in_prefix and (linked or wants_upgrade_variable(amd_gpu, tool_reads_variable)):
-        return State(NOT_LINKED if linked is False else IN_PREFIX, tool, version)
-    if tool_reads_variable:
-        return State(WILL_FETCH, tool)
-    return State(UNSUPPORTED, tool)
-
-
-def wants_upgrade_variable(amd_gpu: bool, tool_reads_variable: bool) -> bool:
-    """Whether a patch adds UPGRADE_VARIABLE to the game's launch options."""
-    return amd_gpu and tool_reads_variable

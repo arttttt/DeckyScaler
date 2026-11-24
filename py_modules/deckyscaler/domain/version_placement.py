@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
-from . import fsr4
 from .bundle import VALID_DLL_NAMES
 from .library import FAMILIES, Family, Installed
 from .patch_record import PatchRecord, covers
@@ -26,9 +25,6 @@ class Request:
     dll_name: str
     reset_ini: bool = False
     """Replace the game's OptiScaler.ini with the version's instead of keeping it."""
-    fsr4_driver: str | None = None
-    """Where the game's Proton puts AMD's FSR 4 driver DLL (an absolute path; it may not be there yet).
-    OptiScaler loads that DLL only from its own directory, never by name, so a patch links it there."""
     libraries: tuple[Copy, ...] = ()
     """The copies of the user's libraries picked for the game (domain/library_placement)."""
     same_as_backup: frozenset[str] = frozenset()
@@ -103,14 +99,5 @@ def plan_patch(entries: frozenset[str], files: frozenset[str], family: Family, r
 
     operations += [Link(path, path) for path in sorted(linked_files(files))]
 
-    driver = driver_path(family)
-    # A DLL already there is the user's own choice of FSR 4: it stays, and nothing is linked over it.
-    if request.fsr4_driver and driver not in entries:
-        operations.append(Link(request.fsr4_driver, driver))
     operations += request.libraries
     return preserving_existing(tuple(operations), entries, request.same_as_backup)
-
-
-def driver_path(family: Family) -> str:
-    """Where in the game's directory OptiScaler looks for AMD's FSR 4 driver DLL."""
-    return str(PurePosixPath(family.main_dir) / fsr4.DLL)

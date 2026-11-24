@@ -3,10 +3,10 @@ zip's members, a DLL's file version."""
 
 from __future__ import annotations
 
-import struct
 import zipfile
 
 import pytest
+from conftest import fixed_file_info, pe_dll
 
 from deckyscaler.domain import user_libraries as ul
 from deckyscaler.domain.library_choice import Choices
@@ -63,25 +63,9 @@ def test_what_isnt_a_zip_says_so(tmp_path):
 # ── a DLL's file version ─────────────────────────────────────────────────────
 
 
-def _pe(resources: bytes, outside: bytes = b"") -> bytes:
-    """A PE file with one section, .rsrc, holding `resources`; `outside` sits between the headers and it."""
-    pe_offset = 0x40
-    dos = bytearray(pe_offset)
-    dos[0:2] = b"MZ"
-    struct.pack_into("<I", dos, 0x3C, pe_offset)
-    coff = b"PE\0\0" + struct.pack("<HHIIIHH", 0x8664, 1, 0, 0, 0, 0, 0)
-    data_offset = pe_offset + len(coff) + 40 + len(outside)
-    section = b".rsrc\0\0\0" + struct.pack("<IIII", len(resources), 0x1000, len(resources), data_offset) + bytes(16)
-    return bytes(dos) + coff + section + outside + resources
-
-
-def _fixed_info(structure: int, high: int, low: int) -> bytes:
-    return b"\0" * 8 + struct.pack("<IIII", 0xFEEF04BD, structure, high, low)
-
-
 def test_a_dlls_file_version_comes_from_its_resources(tmp_path):
     path = tmp_path / "libxess.dll"
-    path.write_bytes(_pe(_fixed_info(0x00010000, (2 << 16) | 0, (2 << 16) | 68)))
+    path.write_bytes(pe_dll({".rsrc": fixed_file_info(2, 0, 2, 68)}))
 
     assert dll_version.file_version(path) == "2.0.2.68"
 
@@ -89,10 +73,10 @@ def test_a_dlls_file_version_comes_from_its_resources(tmp_path):
 @pytest.mark.parametrize(
     "data",
     [
-        _pe(b"\0" * 32, outside=_fixed_info(0x00010000, 1, 1)),  # the signature by chance outside the resources
-        _pe(_fixed_info(0x7C81E575, 1, 1)),  # not a version structure
-        _pe(b"\0" * 32),
-        b"XX" + _pe(_fixed_info(0x00010000, 1, 1))[2:],  # a version where no DLL starts
+        pe_dll({".rsrc": b"\0" * 32}, outside=fixed_file_info(0, 1, 0, 1)),  # the signature by chance outside the resources
+        pe_dll({".rsrc": fixed_file_info(0, 1, 0, 1, structure=0x7C81E575)}),  # not a version structure
+        pe_dll({".rsrc": b"\0" * 32}),
+        b"XX" + pe_dll({".rsrc": fixed_file_info(0, 1, 0, 1)})[2:],  # a version where no DLL starts
         b"MZ" + b"\0" * 10,
         b"not a dll",
     ],
