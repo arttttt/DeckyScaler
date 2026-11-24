@@ -21,8 +21,12 @@ TRACKING_FILE = "upscaler_files"
 _TRACKED_DLL = f"drive_c/windows/system32/{DLL}"
 
 IN_PREFIX = "in-prefix"
+NOT_LINKED = "not-linked"
+"""In the prefix, but the game's patch didn't link it where OptiScaler looks (the launch wrapper's patch doesn't)."""
 WILL_FETCH = "will-fetch"
 UNSUPPORTED = "unsupported"
+ABSENT = "absent"
+"""The game is set to a Proton that isn't on the device."""
 
 
 def is_amd(vendor: str) -> bool:
@@ -56,12 +60,24 @@ class State:
     version: str | None = None
 
 
-def state(amd_gpu: bool, tool: str | None, tool_reads_variable: bool, dll_in_prefix: bool, version: str | None) -> State | None:
-    """What to tell the user about FSR 4 for a game; None off AMD, where FSR 4 isn't the question."""
+def state(
+    amd_gpu: bool,
+    tool: str | None,
+    tool_reads_variable: bool,
+    dll_in_prefix: bool,
+    version: str | None,
+    tool_absent: bool = False,
+    linked: bool | None = None,
+) -> State | None:
+    """What to tell the user about FSR 4 for a game; None off AMD, where FSR 4 isn't the question. `tool_absent`: the
+    game is set to a Proton that isn't on the device. `linked`: whether the game's patch linked the DLL where
+    OptiScaler looks, None for a game that isn't patched."""
     if not amd_gpu:
         return None
     if dll_in_prefix:
-        return State(IN_PREFIX, tool, version)
+        return State(NOT_LINKED if linked is False else IN_PREFIX, tool, version)
+    if tool_absent:
+        return State(ABSENT, tool)
     if tool_reads_variable:
         return State(WILL_FETCH, tool)
     return State(UNSUPPORTED, tool)

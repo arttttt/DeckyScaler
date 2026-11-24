@@ -152,6 +152,15 @@ describe("steam game view", () => {
     });
   });
 
+  it("tells FSR 4 the game's patch didn't link, and a Proton that isn't on the device", () => {
+    expect(fsr4Line({ state: "not-linked", tool: "GE-Proton10-25", version: "4.1.1" })).toBe(
+      "FSR 4 4.1.1 is in this game's Proton prefix, but it isn't linked into the game: patch it again from here.",
+    );
+    expect(fsr4Line({ state: "absent", tool: "GE-Proton10-5", version: null })).toBe(
+      "GE-Proton10-5 isn't on this device: pick another Proton in the game's Properties → Compatibility.",
+    );
+  });
+
   it("names the user's libraries a patched game has", () => {
     const withLibraries: GameStatus = { ...patched, libraries: [{ slot: "frame-generation", id: "anr", label: "ANR V.B19" }] };
 

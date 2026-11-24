@@ -79,13 +79,21 @@ export const quickPatchWith = (status: GameStatus | null, launch: ProxyDllView, 
 });
 
 /** A game's FSR 4 under Proton, as the backend reads it; null off AMD. */
-export type Fsr4State = { state: "in-prefix" | "will-fetch" | "unsupported"; tool: string | null; version: string | null };
+export type Fsr4State = {
+  state: "in-prefix" | "not-linked" | "will-fetch" | "unsupported" | "absent";
+  tool: string | null;
+  version: string | null;
+};
 
-/** What the panel says about FSR 4 for a game: whether its Proton has it, will fetch it, or can't. */
+/** What the panel says about FSR 4 for a game: whether its Proton has it (and the game's patch links it), will fetch
+ *  it, can't, or isn't on the device. */
 export const fsr4Line = (fsr4: Fsr4State | null | undefined): string | null => {
   if (!fsr4) return null;
   const proton = fsr4.tool ?? "Steam's default Proton";
-  if (fsr4.state === "in-prefix") return `FSR 4${fsr4.version ? ` ${fsr4.version}` : ""} is in this game's Proton prefix.`;
+  const inPrefix = `FSR 4${fsr4.version ? ` ${fsr4.version}` : ""} is in this game's Proton prefix`;
+  if (fsr4.state === "in-prefix") return `${inPrefix}.`;
+  if (fsr4.state === "not-linked") return `${inPrefix}, but it isn't linked into the game: patch it again from here.`;
+  if (fsr4.state === "absent") return `${proton} isn't on this device: pick another Proton in the game's Properties → Compatibility.`;
   if (fsr4.state === "will-fetch") return `${proton} downloads FSR 4 on the game's first launch after patching.`;
   return `${proton} can't provide FSR 4. Choose GE-Proton or Proton-CachyOS for this game.`;
 };

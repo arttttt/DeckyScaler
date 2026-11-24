@@ -46,6 +46,14 @@ def test_the_state_says_what_the_game_has_or_will_get(amd, reads, in_prefix, exp
     assert fsr4.state(amd, "tool", reads, in_prefix, "4.1.1") == expected
 
 
+def test_a_patched_game_whose_driver_isnt_linked_and_a_proton_that_isnt_there_are_told():
+    assert fsr4.state(True, "tool", True, True, "4.1.1", linked=False) == fsr4.State(fsr4.NOT_LINKED, "tool", "4.1.1")
+    assert fsr4.state(True, "tool", True, True, "4.1.1", linked=True) == fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")
+    assert fsr4.state(True, "gone", False, False, None, tool_absent=True) == fsr4.State(fsr4.ABSENT, "gone")
+    # What is in the prefix is there, whatever the game is set to now.
+    assert fsr4.state(True, "gone", False, True, "4.1.1", tool_absent=True) == fsr4.State(fsr4.IN_PREFIX, "gone", "4.1.1")
+
+
 def test_the_variable_is_asked_for_on_amd_with_a_proton_that_reads_it():
     assert fsr4.wants_upgrade_variable(True, True)
     assert not fsr4.wants_upgrade_variable(True, False)
@@ -185,3 +193,24 @@ def test_a_repatch_replaces_its_own_driver_link(plugin, plugin_home, steam_libra
 
     assert (root / "OptiScaler" / "amdxcffx64.dll").is_symlink()
     assert not (root / "OptiScaler" / "amdxcffx64.dll.b").exists()
+
+
+def test_a_game_the_launch_wrapper_patched_says_fsr4_isnt_linked_until_patched_from_here(plugin, home, plugin_home, steam_library, amd_gpu):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    root = steam_library.add_game("730", "Fsr Game")
+    steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=True)
+    steam_library.set_compat_tools({"0": "GE-Proton11-11"})
+    steam_library.add_fsr4_to_prefix("730", "4.1.1")
+    LaunchWrapper(home, {"SteamAppId": "730"}).patch([str(root / "Game.exe")], "dxgi.dll", "nightly-20261023")
+
+    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "not-linked"
+    run(plugin.patch_game("730", "dxgi.dll", "", "nightly-20261023"))
+    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "in-prefix"
+
+
+def test_a_game_set_to_a_proton_that_isnt_on_the_device_says_so(plugin, plugin_home, steam_library, amd_gpu):
+    steam_library.add_game("730", "Fsr Game")
+    steam_library.set_compat_tools({"730": "GE-Proton10-5"})
+
+    assert run(plugin.get_game_status("730"))["fsr4"] == {"state": "absent", "tool": "GE-Proton10-5", "version": None}

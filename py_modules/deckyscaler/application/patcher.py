@@ -13,6 +13,7 @@ from pathlib import Path
 
 from deckyscaler.domain import (
     bundle,
+    compat_tools,
     exe_target,
     fsr4,
     ini,
@@ -544,15 +545,17 @@ class Patcher:
     def _is_running(self, game: steam_library.InstalledGame) -> bool:
         return self._running_executable(steam_library.executables(game.install_path)) is not None
 
-    def _fsr4(self, game: steam_library.InstalledGame) -> tuple[fsr4.State | None, Path | None]:
+    def _fsr4(self, game: steam_library.InstalledGame, linked: bool | None = None) -> tuple[fsr4.State | None, Path | None]:
         """The game's FSR 4 under Proton, and — when a patch should ask Proton to fetch it — where in the
-        game's prefix the DLL lands."""
+        game's prefix the DLL lands. `linked`: whether the game's patch has the DLL linked where OptiScaler looks
+        (None for a game that isn't patched)."""
         amd = proton.amd_gpu()
         tool = proton.compat_tool(self.home, game.appid)
         tool_dir = proton.tool_directory(self.home, tool) if tool else None
         reads_variable = tool_dir is not None and proton.reads_upgrade_variable(tool_dir)
+        absent = tool is not None and tool_dir is None and not compat_tools.is_valves(tool)
         prefix = proton.compatdata(game.library_path, game.appid)
-        state = fsr4.state(amd, tool, reads_variable, proton.dll_in_prefix(prefix), proton.tracked_version(prefix))
+        state = fsr4.state(amd, tool, reads_variable, proton.dll_in_prefix(prefix), proton.tracked_version(prefix), absent, linked)
         return state, proton.prefix_dll(prefix) if fsr4.wants_upgrade_variable(amd, reads_variable) else None
 
     def _patch_target(self, game: steam_library.InstalledGame) -> tuple[Path, Path | None]:
@@ -629,6 +632,10 @@ class Patcher:
         # The marker sits in the directory it patched; the path written into it can go stale.
         target_dir = marker_path.parent
         dll_present = (target_dir / dll_name).exists()
+        family = library.FAMILIES.get(str(metadata.get("family")))
+        if family is not None:
+            # A patch the launch wrapper made doesn't link FSR 4's driver: OptiScaler can't see it though it's there.
+            unpatched["fsr4"] = _fsr4_json(self._fsr4(game, os.path.lexists(target_dir / version_placement.driver_path(family)))[0])
         version = metadata.get("optiscaler_version")
         installed = self.library.installed()
         if dll_present:
