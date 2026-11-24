@@ -152,6 +152,13 @@ describe("steam game view", () => {
     });
   });
 
+  it("tells a game the launch wrapper patches at each launch", () => {
+    expect(steamGameView({ ...base, status: { ...patched, by_wrapper: true } }).versionLine).toBe(
+      "stable-0.9.4. Patched at each launch by the launch wrapper.",
+    );
+    expect(steamGameView({ ...base, status: patched }).versionLine).toBe("stable-0.9.4");
+  });
+
   it("tells to verify the game before unpatching when a backup is gone", () => {
     expect(steamGameView({ ...base, status: { ...patched, lost_backups: ["dxgi.dll", "libxess.dll"] } }).versionLine).toBe(
       "stable-0.9.4. The backup of dxgi.dll, libxess.dll is gone: Unpatch can't put the game's own back. Verify the game's files in Steam first.",
@@ -167,6 +174,15 @@ describe("steam game view", () => {
   it("tells files of the patch gone or changed since", () => {
     expect(steamGameView({ ...base, status: { ...patched, changed_files: ["OptiScaler/libxess.dll"] } }).versionLine).toBe(
       "stable-0.9.4. Some of its files are gone or changed since the patch; patch again to put them back.",
+    );
+  });
+
+  it("tells FSR 4 the game's patch didn't link, and a Proton that isn't on the device", () => {
+    expect(fsr4Line({ state: "not-linked", tool: "GE-Proton10-25", version: "4.1.1" })).toBe(
+      "FSR 4 4.1.1 is in this game's Proton prefix, but it isn't linked into the game: patch it again from here.",
+    );
+    expect(fsr4Line({ state: "absent", tool: "GE-Proton10-5", version: null })).toBe(
+      "GE-Proton10-5 isn't on this device: pick another Proton in the game's Properties → Compatibility.",
     );
   });
 

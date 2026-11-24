@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Generic, Protocol, TypeVar
 
 from deckyscaler.infrastructure.files import read_json, write_json
+from deckyscaler.infrastructure.staging import Staging
 
 
 class Entry(Protocol):
@@ -22,11 +23,12 @@ class Entry(Protocol):
 E = TypeVar("E", bound=Entry)
 
 
-class EntryStore(Generic[E]):
+class EntryStore(Staging, Generic[E]):
     def __init__(self, root: Path, items_dirname: str, entry_filename: str):
         self.root = root
         self.items_dir = root / items_dirname
         self.partial_dir = root / ".partial"
+        self.lock_dir = root
         self.entry_filename = entry_filename
 
     def item_dir(self, item_id: str) -> Path:

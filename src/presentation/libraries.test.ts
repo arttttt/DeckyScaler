@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameLibraryChoice, LibrarySource, UserLibraries, UserLibrary } from "../api";
+import type { LibrariesApplied, GameLibraryChoice, LibrarySource, UserLibraries, UserLibrary } from "../api";
 import {
   ADD_HINT,
   FOLLOW,
@@ -124,6 +124,8 @@ describe("the block on the OptiScaler page", () => {
         applied: [
           { name: "Hades II", appid: "1145350", launch_options: "~/deckyscaler/patch %command%" },
           { name: "/games/x", appid: "", launch_options: null },
+          { name: "Portal 2", appid: "620", launch_options: null },  // left as they are
+          { name: "Hades", appid: "1145360" } as unknown as LibrariesApplied["applied"][number],  // none said: left too
         ],
         skipped: [],
         failed: [],

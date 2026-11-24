@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -37,13 +38,25 @@ def test_only_amds_vendor_id_is_amd():
     ("amd", "reads", "in_prefix", "expected"),
     [
         (False, True, True, None),  # off AMD FSR 4 isn't the question
-        (True, False, True, fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")),  # there already, whatever the Proton now
+        (True, True, True, fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")),  # a patch links it where OptiScaler looks
+        # There, from an earlier Proton or by hand, but a patch links nothing for one that can't fetch it: unseen.
+        (True, False, True, fsr4.State(fsr4.UNSUPPORTED, "tool")),
         (True, True, False, fsr4.State(fsr4.WILL_FETCH, "tool")),
         (True, False, False, fsr4.State(fsr4.UNSUPPORTED, "tool")),
     ],
 )
 def test_the_state_says_what_the_game_has_or_will_get(amd, reads, in_prefix, expected):
     assert fsr4.state(amd, "tool", reads, in_prefix, "4.1.1") == expected
+
+
+def test_a_patched_game_whose_driver_isnt_linked_and_a_proton_that_isnt_there_are_told():
+    assert fsr4.state(True, "tool", True, True, "4.1.1", linked=False) == fsr4.State(fsr4.NOT_LINKED, "tool", "4.1.1")
+    assert fsr4.state(True, "tool", True, True, "4.1.1", linked=True) == fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")
+    # Under a Proton that can't fetch it, patching again links nothing: only a link already there counts.
+    assert fsr4.state(True, "tool", False, True, "4.1.1", linked=False) == fsr4.State(fsr4.UNSUPPORTED, "tool")
+    assert fsr4.state(True, "tool", False, True, "4.1.1", linked=True) == fsr4.State(fsr4.IN_PREFIX, "tool", "4.1.1")
+    assert fsr4.state(True, "gone", False, False, None, tool_absent=True) == fsr4.State(fsr4.ABSENT, "gone")
+    assert fsr4.state(True, "gone", False, True, "4.1.1", tool_absent=True, linked=True) == fsr4.State(fsr4.ABSENT, "gone")
 
 
 def test_the_variable_is_asked_for_on_amd_with_a_proton_that_reads_it():
@@ -94,6 +107,19 @@ def test_a_proton_that_cant_fetch_fsr4_gets_no_variable(plugin, plugin_home, ste
 
     assert status["fsr4"] == {"state": "unsupported", "tool": tool, "version": None}
     assert "PROTON_FSR4_UPGRADE" not in patched["launch_options"]
+
+
+def test_fsr4_an_earlier_proton_left_in_the_prefix_isnt_promised_under_one_that_cant_fetch_it(plugin, plugin_home, steam_library, amd_gpu):
+    root = steam_library.add_game("730", "Older Game")
+    steam_library.add_tool("GE-Proton9-20", reads_fsr4_variable=False)
+    steam_library.set_compat_tools({"730": "GE-Proton9-20"})
+    steam_library.add_fsr4_to_prefix("730", "4.1.1")  # fetched while the game was set to a later GE-Proton
+    unsupported = {"state": "unsupported", "tool": "GE-Proton9-20", "version": None}
+
+    assert run(plugin.get_game_status("730"))["fsr4"] == unsupported
+    run(plugin.patch_game("730", "dxgi.dll", "", STABLE))
+    assert not os.path.lexists(root / "amdxcffx64.dll")  # nothing linked where OptiScaler looks
+    assert run(plugin.get_game_status("730"))["fsr4"] == unsupported  # not "patch it again": that links nothing
 
 
 def test_off_amd_fsr4_is_not_mentioned_and_not_asked_for(plugin, plugin_home, steam_library, tmp_path):
@@ -185,3 +211,24 @@ def test_a_repatch_replaces_its_own_driver_link(plugin, plugin_home, steam_libra
 
     assert (root / "OptiScaler" / "amdxcffx64.dll").is_symlink()
     assert not (root / "OptiScaler" / "amdxcffx64.dll.b").exists()
+
+
+def test_a_game_the_launch_wrapper_patched_says_fsr4_isnt_linked_until_patched_from_here(plugin, home, plugin_home, steam_library, amd_gpu):
+    from deckyscaler.application.launch_wrapper import LaunchWrapper
+
+    root = steam_library.add_game("730", "Fsr Game")
+    steam_library.add_tool("GE-Proton11-11", reads_fsr4_variable=True)
+    steam_library.set_compat_tools({"0": "GE-Proton11-11"})
+    steam_library.add_fsr4_to_prefix("730", "4.1.1")
+    LaunchWrapper(home, {"SteamAppId": "730"}).patch([str(root / "Game.exe")], "dxgi.dll", "nightly-20261023")
+
+    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "not-linked"
+    run(plugin.patch_game("730", "dxgi.dll", "", "nightly-20261023"))
+    assert run(plugin.get_game_status("730"))["fsr4"]["state"] == "in-prefix"
+
+
+def test_a_game_set_to_a_proton_that_isnt_on_the_device_says_so(plugin, plugin_home, steam_library, amd_gpu):
+    steam_library.add_game("730", "Fsr Game")
+    steam_library.set_compat_tools({"730": "GE-Proton10-5"})
+
+    assert run(plugin.get_game_status("730"))["fsr4"] == {"state": "absent", "tool": "GE-Proton10-5", "version": None}

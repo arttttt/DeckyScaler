@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from deckyscaler.domain import library_choice, user_libraries
 from deckyscaler.infrastructure.entry_store import EntryStore
-from deckyscaler.infrastructure.files import read_json, replace_json
+from deckyscaler.infrastructure.files import locked, read_json, replace_json
 
 
 class UserLibraryStore(EntryStore[user_libraries.Library]):
@@ -34,13 +35,19 @@ class UserLibraryStore(EntryStore[user_libraries.Library]):
 
 
 class LibraryChoicesStore:
-    """The one file keeping which libraries go into games, written whole."""
+    """The one file keeping which libraries go into games, written whole, one change at a time: each RPC runs in its own
+    thread, and two changes reading it at once would lose one."""
 
     def __init__(self, path: Path):
         self.path = path
+        self.lock_path = path.with_name(path.name + ".lock")
 
     def read(self) -> library_choice.Choices:
         return library_choice.parse(read_json(self.path))
 
-    def write(self, choices: library_choice.Choices) -> None:
-        replace_json(self.path, library_choice.to_json(choices))
+    def change(self, edit: Callable[[library_choice.Choices], library_choice.Choices]) -> library_choice.Choices:
+        """Read the choices, edit them and write them back, no other change in between: what they are now."""
+        with locked(self.lock_path):
+            choices = edit(self.read())
+            replace_json(self.path, library_choice.to_json(choices))
+            return choices

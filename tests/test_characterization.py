@@ -146,12 +146,11 @@ def test_steam_version_switch_and_status(plugin, plugin_home, steam_library, tmp
     recorder.record("status unpatched", run(plugin.get_game_status("100")))
     recorder.record("patch nightly", run(plugin.patch_game("100", "dxgi.dll", "", NIGHTLY)))
     recorder.record("status nightly", run(plugin.get_game_status("100")))
-    recorder.record(
-        "repatch stable",
-        run(plugin.patch_game("100", "dxgi.dll", "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", STABLE)),
-    )
+    repatched = run(plugin.patch_game("100", "dxgi.dll", "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", STABLE))
+    recorder.record("repatch stable", repatched)
     recorder.record("status stable", run(plugin.get_game_status("100")))
-    recorder.record("unpatch", run(plugin.unpatch_game("100")))
+    # Steam holds the options the patch answered with; Unpatch is handed those.
+    recorder.record("unpatch", run(plugin.unpatch_game("100", repatched["launch_options"])))
 
     assert_golden("steam_version_switch_and_status", recorder.steps)
 
@@ -162,11 +161,9 @@ def test_steam_launch_options_survive_repatch(plugin, plugin_home, steam_library
 
     recorder.record("patch", run(plugin.patch_game("200", "dxgi.dll", "gamemoderun %command% -dx12", STABLE)))
     # Steam now holds our managed options; a re-patch passes those back in.
-    recorder.record(
-        "repatch with winmm",
-        run(plugin.patch_game("200", "winmm.dll", "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", STABLE)),
-    )
-    recorder.record("unpatch", run(plugin.unpatch_game("200")))
+    repatched = run(plugin.patch_game("200", "winmm.dll", "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%", STABLE))
+    recorder.record("repatch with winmm", repatched)
+    recorder.record("unpatch", run(plugin.unpatch_game("200", repatched["launch_options"])))
 
     assert_golden("steam_launch_options_survive_repatch", recorder.steps)
 
@@ -179,8 +176,9 @@ def test_steam_target_directory_moves_between_patches(plugin, plugin_home, steam
     # A game update adds the real Unreal executable deeper in the tree.
     write(root / "Binaries" / "Win64" / "MovingGame-Win64-Shipping.exe", game_file("MovingGame-Win64-Shipping.exe"))
     recorder.record("game update")
-    recorder.record("repatch", run(plugin.patch_game("300", "dxgi.dll", "", STABLE)))
-    recorder.record("unpatch", run(plugin.unpatch_game("300")))
+    repatched = run(plugin.patch_game("300", "dxgi.dll", "", STABLE))
+    recorder.record("repatch", repatched)
+    recorder.record("unpatch", run(plugin.unpatch_game("300", repatched["launch_options"])))
 
     assert_golden("steam_target_directory_moves_between_patches", recorder.steps)
 

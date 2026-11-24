@@ -49,6 +49,9 @@ export const patchChoice = (
   };
 };
 
+/** How a game the launch wrapper patched is told apart: Unpatch alone doesn't keep it unpatched. */
+export const WRAPPER_ROUTE = "Patched at each launch by the launch wrapper.";
+
 /** Why to verify a game in Steam before unpatching it: the game's own files its patch set aside lost their backup. */
 export const lostBackups = (lost: string[]): string =>
   `The backup of ${lost.join(", ")} is gone: Unpatch can't put the game's own back. Verify the game's files in Steam first.`;
@@ -64,6 +67,7 @@ export const gameVersionLine = (status: {
   newer_version?: string | null;
   lacks_version_files?: boolean;
   version_incomplete?: boolean;
+  by_wrapper?: boolean;
   changed_files?: string[];
   lost_backups?: string[];
   proxy_taken_back?: boolean;
@@ -71,6 +75,7 @@ export const gameVersionLine = (status: {
 } | null): string | null => {
   if (!status?.patched) return null;
   const notes = [
+    ...(status.by_wrapper ? [WRAPPER_ROUTE] : []),
     ...(status.lost_backups?.length ? [lostBackups(status.lost_backups)] : []),
     ...(status.proxy_taken_back ? [proxyTakenBack(status.dll_name ?? "Its proxy")] : []),
     ...(status.changed_files?.length ? ["Some of its files are gone or changed since the patch; patch again to put them back."] : []),
@@ -94,13 +99,21 @@ export const quickPatchWith = (status: GameStatus | null, launch: ProxyDllView, 
 });
 
 /** A game's FSR 4 under Proton, as the backend reads it; null off AMD. */
-export type Fsr4State = { state: "in-prefix" | "will-fetch" | "unsupported"; tool: string | null; version: string | null };
+export type Fsr4State = {
+  state: "in-prefix" | "not-linked" | "will-fetch" | "unsupported" | "absent";
+  tool: string | null;
+  version: string | null;
+};
 
-/** What the panel says about FSR 4 for a game: whether its Proton has it, will fetch it, or can't. */
+/** What the panel says about FSR 4 for a game: whether its Proton has it (and the game's patch links it), will fetch
+ *  it, can't, or isn't on the device. */
 export const fsr4Line = (fsr4: Fsr4State | null | undefined): string | null => {
   if (!fsr4) return null;
   const proton = fsr4.tool ?? "Steam's default Proton";
-  if (fsr4.state === "in-prefix") return `FSR 4${fsr4.version ? ` ${fsr4.version}` : ""} is in this game's Proton prefix.`;
+  const inPrefix = `FSR 4${fsr4.version ? ` ${fsr4.version}` : ""} is in this game's Proton prefix`;
+  if (fsr4.state === "in-prefix") return `${inPrefix}.`;
+  if (fsr4.state === "not-linked") return `${inPrefix}, but it isn't linked into the game: patch it again from here.`;
+  if (fsr4.state === "absent") return `${proton} isn't on this device: pick another Proton in the game's Properties → Compatibility.`;
   if (fsr4.state === "will-fetch") return `${proton} downloads FSR 4 on the game's first launch after patching.`;
   return `${proton} can't provide FSR 4. Choose GE-Proton or Proton-CachyOS for this game.`;
 };
@@ -113,6 +126,8 @@ export type GameStatus = {
   install_found?: boolean;
   patched?: boolean;
   dll_name?: string | null;
+  /** Whether the launch wrapper patched it, at a start: it patches it again at each one. */
+  by_wrapper?: boolean;
   /** What its marker is: DeckyScaler's record (whole, unfinished, or damaged), or the original Decky Framegen's. */
   record?: "ok" | "incomplete" | "damaged" | "upstream" | null;
   optiscaler_version?: string | null;
