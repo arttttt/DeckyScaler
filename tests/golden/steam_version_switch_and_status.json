@@ -90,6 +90,7 @@
   {
     "result": {
       "appid": "100",
+      "by_wrapper": false,
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,
@@ -253,6 +254,7 @@
   {
     "result": {
       "appid": "100",
+      "by_wrapper": false,
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,

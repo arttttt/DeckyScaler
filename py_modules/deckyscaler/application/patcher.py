@@ -76,13 +76,22 @@ def _patched_by_upstream(directory: Path) -> bool:
     return upstream.is_file() and _marker_of(directory) != upstream and not (directory / bundle.MARKER_FILENAME).is_file()
 
 
-def _options_left(current: str | None, after: str | None) -> str:
-    """What an unpatch that leaves a game's launch options as they are says of them."""
+def _options_left(current: str | None, after: str | None, by_wrapper: bool) -> str:
+    """What an unpatch says of a game's launch options: the launch wrapper taken out of them, or why they were left."""
     if after is not None:
-        return ""
+        return " The launch wrapper's command is out of its launch options." if launch_options.without_wrapper(current) is not None else ""
     if current is None:
-        return " Steam didn't say what its launch options are, so they were left as they are."
+        unknown = " Steam didn't say what its launch options are, so they were left as they are."
+        return unknown + (" If the launch wrapper is still in them, it patches the game again at its next start." if by_wrapper else "")
+    if by_wrapper:
+        return " Its launch options no longer start it through the launch wrapper."
     return " Its launch options were changed since it was patched, so they were left as they are."
+
+
+WRAPPER_COMES_BACK = (
+    " The launch wrapper still starts this game, so it patches it again at its next start: take ~/deckyscaler/patch out "
+    "of how the game is started to keep it unpatched."
+)
 
 
 def _error(message: str) -> dict:
@@ -124,6 +133,7 @@ class Patcher:
         version_id: str | None = None,
         reset_ini: bool = False,
         steam_game: marker.SteamGame | None = None,
+        through: str | None = None,
         fsr4_driver: Path | None = None,
         unless_current: bool = False,
         settings_appid: str | None = None,
@@ -161,9 +171,16 @@ class Patcher:
         version_files = files.files_under(source)
         if unless_current and not reset_ini and self._patched_as(directory, entry.id, dll_name, placed, version_files):
             log.info(f"{directory} is already patched with OptiScaler {entry.id}, {dll_name}")
-            if patch_record.placed_by(patch_record.parse(files.read_json(marker_path)), plan.INI_FILENAME):
+            current = files.read_json(recorded_in)
+            if through and current.get("through") != through:
+                # A patch the wrapper now starts (made from the panel, or before routes were kept) is the wrapper's.
+                files.replace_json(recorded_in, {**current, "through": through})
+            if patch_record.placed_by(patch_record.parse(current), plan.INI_FILENAME):
                 self.apply_settings(directory, source, settings_appid)
             return {"status": "success", "message": f"OptiScaler {entry.version} is in {directory}.", "optiscaler_version": entry.id}
+        if through == marker.WRAPPER and steam_game is None:
+            # Looked up only when the marker is written: a start that changes nothing scans no Steam library.
+            steam_game = self.wrapper_game(directory, settings_appid)
 
         carried_over: frozenset[str] = frozenset()
         previous = patch_record.parse(previous_details)
@@ -225,6 +242,7 @@ class Patcher:
                 steam_game=steam_game,
                 libraries=placement.recorded,
                 library_layer=placement.layer,
+                through=through,
             )
             # The record lands before the first file does, so even an interrupted patch can be undone.
             files.replace_json(marker_path, {**details, **patch_record.to_json(recorded, complete=False)})
@@ -276,6 +294,16 @@ class Patcher:
         installed = self.user_libraries.installed()
         chosen = library_choice.to_patch_with(self.library_choices.read(), appid, recorded, installed)
         return library_choice.to_place(chosen, installed, family)
+
+    def wrapper_game(self, directory: Path, appid: str | None) -> marker.SteamGame | None:
+        """The Steam game the launch wrapper starts (`appid`, from SteamAppId), for its patch's marker: the user's own
+        launch options a patch from the panel kept stay kept, as the wrapper never reads them. None for a game Steam's
+        libraries don't hold (a shortcut, another launcher)."""
+        game = steam_library.find_game(self.home, appid) if appid else None
+        if game is None:
+            return None
+        recorded = files.read_json(_marker_of(directory))
+        return marker.SteamGame(appid, game.name, str(recorded.get("original_launch_options") or ""))
 
     def _plugin_dirs(self) -> tuple[str, ...]:
         """The folders of a game only the plugin's libraries fill, for every family that takes libraries."""
@@ -439,6 +467,7 @@ class Patcher:
                 "patched_at": details.get("patched_at"),
                 "record": patch_record.state(details),
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
+                "by_wrapper": marker.through_wrapper(details),
                 "libraries": details.get("libraries") or [],
             })
         return {
@@ -490,8 +519,12 @@ class Patcher:
             return _error(str(exc))
         if confirmed_reset and self._unpatch_mode(_marker_of(target)) == RESET:
             return self._reset_directory(target)
+        by_wrapper = marker.through_wrapper(files.read_json(_marker_of(target)))
         # Decky Framegen's marker is refused there: its patch needs the confirmed reset.
-        return self.unpatch_directory(target)
+        result = self.unpatch_directory(target)
+        if result["status"] == "success" and by_wrapper:
+            return {**result, "message": result["message"] + "." + WRAPPER_COMES_BACK}
+        return result
 
     def preview_unpatch_directory(self, directory: str) -> dict:
         try:
@@ -662,6 +695,7 @@ class Patcher:
             **self._against_version(metadata, installed, {}),
             "fsr4": unpatched["fsr4"],
             "libraries": metadata.get("libraries") or [],
+            "by_wrapper": marker.through_wrapper(metadata),
             "record": record,
             "message": message,
         }
@@ -704,18 +738,26 @@ class Patcher:
                 return moved
         log.info(f"[DeckyScaler] patch_game: appid={appid} dll={dll_name} target={target_dir} exe={target_exe}")
         fsr4_driver = self._fsr4(game)[1]
-        managed_options = launch_options.managed(dll_name, fsr4_driver is not None)
+        # A game the launch wrapper starts stays its: patched from here too, its launch options aren't the plugin's to
+        # set, or the wrapper would be dropped from them without a word.
+        by_wrapper = marker.started_by_wrapper(current_launch_options, existing)
+        managed_options = "" if by_wrapper else launch_options.managed(dll_name, fsr4_driver is not None)
         result = self.patch_directory(
             target_dir,
             dll_name,
             version_id=version_id,
             steam_game=marker.SteamGame(str(appid), game.name, original_options, managed_options),
+            through=marker.WRAPPER if by_wrapper else None,
             fsr4_driver=fsr4_driver,
         )
         if result["status"] != "success":
             return result
 
-        options = marker.launch_options_after_patch(existing.get("launch_options"), managed_options, current_launch_options)
+        options = (
+            None
+            if by_wrapper
+            else marker.launch_options_after_patch(existing.get("launch_options"), managed_options, current_launch_options)
+        )
         log.info(f"[DeckyScaler] patch_game success: appid={appid} launch_options={options}")
         return {
             "status": "success",
@@ -726,7 +768,8 @@ class Patcher:
             "launch_options": options,
             "original_launch_options": original_options,
             "optiscaler_version": result.get("optiscaler_version"),
-            "message": f"Patched {game.name} with OptiScaler {result.get('optiscaler_version')} using {dll_name}.",
+            "message": f"Patched {game.name} with OptiScaler {result.get('optiscaler_version')} using {dll_name}."
+            + (" The launch wrapper stays in its launch options." if by_wrapper else ""),
         }
 
     def unpatch_game(self, appid: str, current_launch_options: str | None = None, confirmed_reset: bool = False) -> dict:
@@ -770,7 +813,8 @@ class Patcher:
             "appid": str(appid),
             "name": game.name,
             "launch_options": options,
-            "message": f"Unpatched {game.name}." + _options_left(current_launch_options, options),
+            "message": f"Unpatched {game.name}."
+            + _options_left(current_launch_options, options, marker.through_wrapper(metadata)),
         }
 
     # ── unpatching what Decky Framegen patched ──────────────────────

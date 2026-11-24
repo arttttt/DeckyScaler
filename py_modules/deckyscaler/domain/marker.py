@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import library_choice, settings_layers
-from .launch_options import is_managed
+from .launch_options import is_managed, without_wrapper
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,7 @@ def build(
     steam_game: SteamGame | None = None,
     libraries: tuple[dict, ...] = (),
     library_layer: settings_layers.LibraryLayer | None = None,
+    through: str | None = None,
 ) -> dict:
     """The marker's details; every patch writes one, a Steam patch also records the game.
 
@@ -47,6 +48,7 @@ def build(
         "target_dir": str(target_dir),
         "original_launch_options": steam_game.original_launch_options if steam_game else "",
         **({"launch_options": steam_game.launch_options} if steam_game else {}),
+        **({"through": through} if through else {}),
         "backed_up_files": backed_up_files,
         "optiscaler_version": optiscaler_version,
         "family": family,
@@ -54,6 +56,21 @@ def build(
         "libraries": list(libraries),
         "library_settings": settings_layers.library_layer_json(library_layer or {}),
     }
+
+
+WRAPPER = "wrapper"
+"""The route of a patch the launch wrapper made, at a game's start: it patches the game again at each one."""
+
+
+def through_wrapper(details: dict) -> bool:
+    """Whether a marker's patch was made by the launch wrapper (a marker from before routes were kept says nothing)."""
+    return details.get("through") == WRAPPER
+
+
+def started_by_wrapper(current: str | None, details: dict) -> bool:
+    """Whether a game starts through the launch wrapper: its launch options hold it, or, when Steam didn't say what they
+    are, its marker's patch was the wrapper's."""
+    return without_wrapper(current) is not None if current is not None else through_wrapper(details)
 
 
 def shown_name(details: dict, directory: Path) -> str:
@@ -97,7 +114,11 @@ def original_launch_options(current: str | None, stored: str | None, patched_wit
 def launch_options_after_unpatch(current: str | None, stored: str | None, patched_with: str | None) -> str | None:
     """A game's launch options once it is unpatched, or None to leave them as they are: the user's own come back, or
     none, while the current ones are still exactly the plugin's for its proxy (`patched_with`, any when unknown); ones
-    the user changed since aren't the plugin's to touch, nor ones Steam didn't say."""
+    the user changed since aren't the plugin's to touch, nor ones Steam didn't say. The launch wrapper is always taken
+    out of them, or it would patch the game again at its next start."""
+    rest = without_wrapper(current)
+    if rest:
+        return rest  # the user's own around the launch wrapper: theirs stays, the wrapper goes
     if current is None or not is_managed(current, patched_with):
         return None
     return stored if stored and not is_managed(stored, patched_with) else ""

@@ -188,7 +188,7 @@ export const chooseOutcome = (answer: { status: string; message?: string } | nul
 /** The Steam games applying patched again, with the launch options Steam is to set for them. */
 export const launchOptionsToSet = (answer: LibrariesApplied | null): { appid: number; options: string }[] =>
   (answer?.applied ?? []).flatMap((game) =>
-    game.appid && game.launch_options !== null ? [{ appid: Number(game.appid), options: game.launch_options }] : [],
+    game.appid && typeof game.launch_options === "string" ? [{ appid: Number(game.appid), options: game.launch_options }] : [],
   );
 
 /** What applying the choice came to: the games patched again, those left alone while running, those that failed,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shlex
+
 from .bundle import DEFAULT_PROXY_DLL, PROXY_DLLS, VALID_DLL_NAMES
 from .fsr4 import UPGRADE_VARIABLE
 
@@ -11,8 +13,10 @@ WRAPPER_UNPATCH = "~/deckyscaler/unpatch %command%"
 """Launch options that unpatch the game through the wrapper on its next start."""
 
 _ASI_PROXY = "OptiScaler.asi"
-_WRAPPERS = ("/deckyscaler/patch", "/deckyscaler/unpatch", "/fgmod/fgmod")
-"""The launch wrapper's scripts, this plugin's and the original Decky Framegen's, by whatever path they are given."""
+_OUR_WRAPPERS = ("/deckyscaler/patch", "/deckyscaler/unpatch")
+"""This plugin's launch wrapper's scripts, by whatever path they are given."""
+_WRAPPERS = (*_OUR_WRAPPERS, "/fgmod/fgmod")
+"""The launch wrapper's scripts, this plugin's and the original Decky Framegen's."""
 
 
 def override_entry(dll_name: str) -> str | None:
@@ -67,3 +71,18 @@ def is_managed(options: str, patched_with: str | None = None) -> bool:
         return True
     proxies = [patched_with] if patched_with else sorted(VALID_DLL_NAMES)
     return _normalized(options) in {_normalized(managed(dll, upgrade)) for dll in proxies for upgrade in (False, True)}
+
+
+def without_wrapper(options: str | None) -> str | None:
+    """Launch options with this plugin's launch wrapper taken out and the rest as the user wrote it ("" when nothing
+    but %command% is left), or None when the wrapper isn't in them, or Steam didn't say what they are."""
+    if options is None:
+        return None
+    try:
+        words = shlex.split(options, posix=False)  # quotes stay in the words: the rest comes back as written
+    except ValueError:
+        return None
+    rest = [word for word in words if not word.strip("\"'").endswith(_OUR_WRAPPERS)]
+    if len(rest) == len(words):
+        return None
+    return "" if [word.lower() for word in rest] in ([], ["%command%"]) else " ".join(rest)
