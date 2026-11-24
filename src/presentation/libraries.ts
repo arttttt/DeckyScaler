@@ -14,7 +14,7 @@ import type {
   UserLibraryResult,
 } from "../api";
 import { ReleaseDownload, ReleaseRowView, actionOutcome, byteSize, downloadRows, listingMessage } from "./releases";
-import { count, plural } from "./words";
+import { count, listed, plural } from "./words";
 
 /**
  * The user's libraries, shaped like the OptiScaler versions block: a summary, a choice per slot for every game,
@@ -147,7 +147,7 @@ export const librariesBlockView = (state: LibrariesBlockState): LibrariesBlockVi
 };
 
 /** What a source's library is for, in a sentence's middle: "frame generation". */
-const servesText = (slots: LibrarySlot[]): string => slots.map((slot) => slotLabel(slot).toLowerCase()).join(" and ");
+const servesText = (slots: LibrarySlot[]): string => listed(slots.map((slot) => slotLabel(slot).toLowerCase()));
 
 /** What Download libraries brings, said under its button before the dialog opens. */
 export const sourcesLine = (sources: LibrarySource[] | null): string | null =>
