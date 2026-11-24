@@ -543,13 +543,13 @@ def test_a_placed_link_leading_nowhere_is_changed_but_fsr4s_driver_is_told_on_it
 
 def test_a_game_whose_backup_is_gone_says_so_before_and_after_unpatching(plugin, plugin_home, steam_library):
     root = steam_library.add_game("960", "Backup Game", {"libxess.dll": game_file("libxess.dll")})
-    run(plugin.patch_game("960", "dxgi.dll", "", STABLE))
+    patched = run(plugin.patch_game("960", "dxgi.dll", "", STABLE))
     assert run(plugin.get_game_status("960"))["lost_backups"] == []  # its backup is there
     (root / "libxess.dll.b").unlink()  # the game's own, set aside: gone
 
     assert run(plugin.get_game_status("960"))["lost_backups"] == ["libxess.dll"]
     assert run(plugin.patched_games())["games"][0]["lost_backups"] == ["libxess.dll"]
-    unpatched = run(plugin.unpatch_game("960"))
+    unpatched = run(plugin.unpatch_game("960", patched["launch_options"]))  # what Steam holds
     assert unpatched["message"] == (
         "Unpatched Backup Game. No backup of libxess.dll was left, so the game's own couldn't be put back: "
         "restore it with Steam's Verify integrity of game files."
