@@ -31,10 +31,18 @@ def _link_identity(target: str) -> str:
     return f"{patch_record.LINK_PREFIX}{target}"
 
 
+def _recorded_paths(patch: patch_record.PatchRecord) -> list[str]:
+    """The paths a recorded patch names: what it placed, its backups, and the originals it set aside as them."""
+    named = [item.path for item in patch.placed]
+    for backup in patch.backups:
+        named += [backup.backup, backup.original]
+    return list(dict.fromkeys(named))
+
+
 def current_state(directory: Path, patch: patch_record.PatchRecord) -> dict[str, str | None]:
-    """The identity now of every file a recorded patch placed or backed up that is still there: a symlink's
+    """The identity now of every file a recorded patch placed, backed up or set aside that is still there: a symlink's
     target (even a dangling one), a file's sha256."""
-    paths = [item.path for item in patch.placed] + [backup.backup for backup in patch.backups]
+    paths = _recorded_paths(patch)
     state: dict[str, str | None] = {}
     for path in paths:
         full = directory / path
@@ -74,10 +82,10 @@ def directories_under(directory: Path, roots: tuple[str, ...]) -> frozenset[str]
 
 
 def placed_kinds(directory: Path, patch: patch_record.PatchRecord) -> dict[str, str | None]:
-    """What each file a recorded patch placed, and each backup it made, is now, without reading any: a link by where
-    it points while that is there, patch_record.FILE for a file, None when it is gone or a link leads nowhere."""
+    """What each file a recorded patch placed, backed up or set aside is now, without reading any: a link by where it
+    points while that is there, patch_record.FILE for a file, None when it is gone or a link leads nowhere."""
     kinds: dict[str, str | None] = {}
-    for path in [*(item.path for item in patch.placed), *(backup.backup for backup in patch.backups)]:
+    for path in _recorded_paths(patch):
         full = directory / path
         if full.is_symlink():
             kinds[path] = _link_identity(os.readlink(full)) if full.exists() else None

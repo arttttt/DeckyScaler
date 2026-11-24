@@ -152,6 +152,9 @@ def test_the_games_own_files_unpatch_cant_put_back_are_those_whose_backup_is_gon
     # left where it is; a link leading nowhere, still the patch's, goes.
     read = {**gone, "dxgi.dll": "link:/elsewhere/dxgi.dll", "a.dll": "6" * 64}
     assert patch_record.unrestorable(patch, read) == ("libxess.dll", "winmm.dll")
+    # Where the patch placed nothing, anything there is the game's own, put back since (a verify): nothing is lost.
+    assert patch_record.unrestorable(patch, {**told, "winmm.dll": patch_record.FILE}) == ("libxess.dll", "a.dll")
+    assert patch_record.unrestorable(patch, {**read, "winmm.dll": "7" * 64}) == ("libxess.dll",)
     assert {op.name for op in patch_record.plan_unpatch(patch, read, marker="m")} == {"libxess.dll", "m"}  # what Unpatch takes
 
 
@@ -592,6 +595,19 @@ def test_a_proxy_leading_nowhere_without_its_backup_is_told_before_unpatching_as
         "restore it with Steam's Verify integrity of game files."
     )
     assert not (root / "dxgi.dll").is_symlink() and not (root / "dxgi.dll").exists()
+
+
+def test_a_proxy_of_the_games_own_set_aside_and_put_back_by_a_verify_is_not_lost(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("962", "Version Game", {"version.dll": game_file("version.dll")})
+    patched = run(plugin.patch_game("962", "dxgi.dll", "", STABLE))
+    assert not (root / "version.dll").exists() and (root / "version.dll.b").is_file()  # set aside, nothing in its place
+    (root / "version.dll.b").unlink()
+    write(root / "version.dll", game_file("version.dll"))  # Steam's Verify puts the game's own back
+
+    assert run(plugin.get_game_status("962"))["lost_backups"] == []
+    assert run(plugin.patched_games())["games"][0]["lost_backups"] == []
+    assert run(plugin.unpatch_game("962", patched["launch_options"]))["message"] == "Unpatched Version Game."
+    assert (root / "version.dll").read_bytes() == game_file("version.dll")
 
 
 def test_after_a_verify_the_games_own_proxy_is_told_and_the_patch_set_aside_as_its_backup_is_matched(plugin, plugin_home, tmp_path):
