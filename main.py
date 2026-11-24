@@ -136,10 +136,10 @@ class Plugin:
             self._patcher().patch_game, appid, dll_name, current_launch_options, version_id or None
         )
 
-    async def preview_unpatch_game(self, appid: str, current_launch_options: str = "") -> dict:
+    async def preview_unpatch_game(self, appid: str, current_launch_options: str | None = None) -> dict:
         return await asyncio.to_thread(self._patcher().preview_unpatch_game, appid, current_launch_options)
 
-    async def unpatch_game(self, appid: str, current_launch_options: str = "", confirmed_reset: bool = False) -> dict:
+    async def unpatch_game(self, appid: str, current_launch_options: str | None = None, confirmed_reset: bool = False) -> dict:
         return await asyncio.to_thread(self._patcher().unpatch_game, appid, current_launch_options, confirmed_reset)
 
     # ── OptiScaler library ────────────────────────────────────────────────────

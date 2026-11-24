@@ -47,6 +47,7 @@
         "family": "10",
         "format": 2,
         "game_name": "Version Game",
+        "launch_options": "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%",
         "libraries": [],
         "library_settings": {},
         "optiscaler_version": "nightly-20261023",
@@ -89,6 +90,8 @@
   {
     "result": {
       "appid": "100",
+      "by_wrapper": false,
+      "changed_files": [],
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,
@@ -119,6 +122,7 @@
         "family": "10",
         "format": 2,
         "game_name": "Version Game",
+        "launch_options": "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%",
         "libraries": [],
         "library_settings": {},
         "optiscaler_version": "nightly-20261023",
@@ -186,6 +190,7 @@
         "family": "0.9",
         "format": 2,
         "game_name": "Version Game",
+        "launch_options": "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%",
         "libraries": [],
         "library_settings": {},
         "optiscaler_version": "stable-0.9.4",
@@ -250,6 +255,8 @@
   {
     "result": {
       "appid": "100",
+      "by_wrapper": false,
+      "changed_files": [],
       "dll_name": "dxgi.dll",
       "fsr4": null,
       "install_found": true,
@@ -281,6 +288,7 @@
         "family": "0.9",
         "format": 2,
         "game_name": "Version Game",
+        "launch_options": "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%",
         "libraries": [],
         "library_settings": {},
         "optiscaler_version": "stable-0.9.4",

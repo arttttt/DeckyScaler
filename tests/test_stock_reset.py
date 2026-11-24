@@ -88,6 +88,7 @@ def test_a_file_restored_from_its_backup_is_not_reported_as_removed():
     [
         (OURS, "mangohud %command%", "mangohud %command%"),
         (OURS, "", ""),
+        (OURS, OURS, ""),  # an older build stored ours as the user's: none are
         ('WINEDLLOVERRIDES="dxgi=n,b" SteamDeck=0 %command%', "", ""),
         ("~/fgmod/fgmod %command%", "", ""),
         # The user changed them since: not the plugin's to touch.
@@ -96,7 +97,9 @@ def test_a_file_restored_from_its_backup_is_not_reported_as_removed():
     ],
 )
 def test_launch_options_go_back_to_the_users_own_only_when_the_plugin_wrote_them(current, stored, expected):
-    assert stock_reset.launch_options_after_reset(current, stored) == expected
+    from deckyscaler.domain import marker
+
+    assert marker.launch_options_after_unpatch(current, stored, None) == expected
 
 
 # ── integration: the plugin, on one game the user picked ─────────────────────
@@ -237,3 +240,12 @@ def test_a_reset_that_fails_midway_answers_with_the_error(plugin, tmp_path, monk
     monkeypatch.setattr(game_directory, "execute", crash)
 
     assert run(plugin.manual_unpatch_directory(str(game), True)) == {"status": "error", "message": "device went to sleep"}
+
+
+def test_a_reset_tells_the_plugins_options_by_the_proxy_the_originals_marker_names(plugin, steam_library):
+    steam_library.add_game("740", "Asi Tweak Game", {"FRAMEGEN_PATCH": OLD_MARKER, "dxgi.dll": b"old opti"})
+
+    # The user's own tweak, written since: the options the original writes for dxgi.dll are other ones.
+    preview = run(plugin.preview_unpatch_game("740", "SteamDeck=0 %command%"))
+
+    assert preview["status"] == "success" and preview["launch_options"] is None

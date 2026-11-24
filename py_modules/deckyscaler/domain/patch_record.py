@@ -67,14 +67,18 @@ def record(
     carried_over: frozenset[str] = frozenset(),
     rewritten: frozenset[str] = frozenset(),
     owned_dirs: tuple[str, ...] = (),
+    links: frozenset[str] = frozenset(),
 ) -> PatchRecord:
     """The record of a patch plan, made before it runs.
 
-    `entries` is the game directory before the patch; `bundle_hashes` maps every bundle file the
+    `entries` is the game directory before the patch, by path, every directory a placed file goes into among them
+    when it was there (a directory not among them is the patch's own); `bundle_hashes` maps every bundle file the
     plan copies to its sha256. `carried_over` names files a
     previous patch placed that this one keeps as they are (the user's OptiScaler.ini settings).
     `rewritten` names placed files a program rewrites besides OptiScaler.ini, and `owned_dirs` directories
-    whose every file is the patch's: only those the patch creates are recorded as its own.
+    whose every file is the patch's: only those the patch creates are recorded as its own. `links` names the links
+    among `entries`: what is behind one (a folder shared with other games) isn't listed, so nothing at or below one
+    is the patch's.
     """
     placed: dict[str, Placed] = {path: Placed(path, None) for path in sorted(carried_over)}
     backups: list[Backup] = []
@@ -95,7 +99,7 @@ def record(
             str(parent)
             for item in placed
             for parent in PurePosixPath(item).parents
-            if str(parent) != "." and str(parent).split("/")[0] not in entries
+            if str(parent) != "." and str(parent) not in entries and not any(parent.is_relative_to(link) for link in links)
         },
         key=lambda path: (-path.count("/"), path),
     )
@@ -103,10 +107,12 @@ def record(
     return PatchRecord(tuple(placed.values()), tuple(backups), tuple(created), owned)
 
 
-def made_by_the_plugin(links: dict[str, str], plugin_home: str) -> tuple[str, ...]:
-    """The links in a game (`links` maps a link's path to its target) pointing into the plugin's home: only a patch of
-    the plugin's makes one, a backup's name included."""
-    return tuple(sorted(path for path, target in links.items() if PurePosixPath(target).is_relative_to(plugin_home)))
+def made_by_the_plugin(contents: dict[str, str | None], plugin_home: str) -> tuple[str, ...]:
+    """The links in a game (`contents` maps each entry's path to its target, None for what isn't a link) pointing into
+    the plugin's home: only a patch of the plugin's makes one, a backup's name included."""
+    return tuple(
+        sorted(path for path, target in contents.items() if target is not None and PurePosixPath(target).is_relative_to(plugin_home))
+    )
 
 
 def left_behind(links: tuple[str, ...], dirs: tuple[str, ...] = ()) -> tuple[Operation | RemoveDirIfEmpty, ...]:
@@ -182,6 +188,23 @@ def intact(patch: PatchRecord, current: dict[str, str | None]) -> bool:
     OptiScaler rewrites, only has to be there)."""
     return all(
         item.path in current and (item.sha256 is None or current[item.path] == item.sha256) for item in patch.placed
+    )
+
+
+FILE = "file"
+"""What a placed path is now when it is a file of its own, told without reading it (game_directory.placed_kinds)."""
+
+
+def changed(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
+    """The files a patch placed that aren't as it placed them, told without reading any (`now` maps each placed path
+    to a link's identity while its target is there, FILE for a file, None when it is gone): gone, a link leading
+    nowhere, a link replaced by a file (a game update put its own there), or a link pointing elsewhere. A copy, or a
+    file a program rewrites, only has to be there."""
+    return tuple(
+        item.path
+        for item in patch.placed
+        if now.get(item.path) is None
+        or (item.sha256 is not None and item.sha256.startswith(LINK_PREFIX) and now[item.path] != item.sha256)
     )
 
 

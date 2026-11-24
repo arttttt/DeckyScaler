@@ -23,6 +23,8 @@ const game = (overrides: Partial<PatchedGame>): PatchedGame => ({
   version_incomplete: false,
   patched_at: "2026-10-23T18:04:00+00:00",
   record: "ok",
+  by_wrapper: false,
+  changed_files: [],
   own_settings: false,
   ...overrides,
 });
@@ -85,10 +87,24 @@ describe("the Games page", () => {
     ]);
   });
 
+  it("tells a game the launch wrapper patches at each launch", () => {
+    expect(rowOf(game({ by_wrapper: true })).lines).toEqual([
+      "OptiScaler 10.0.0-pre1 · 2026-10-23 via dxgi.dll, patched 2026-10-23",
+      "Patched at each launch by the launch wrapper.",
+    ]);
+  });
+
   it("says what is wrong with a patch and what to do", () => {
     expect(rowOf(game({ dll_present: false })).lines[1]).toBe("dxgi.dll is missing: patch it again.");
     expect(rowOf(game({ record: "incomplete", dll_present: false })).lines[1]).toBe("The patch didn't finish: unpatch it, then patch again.");
     expect(rowOf(game({ record: "damaged", dll_present: false })).lines[1]).toBe("Its patch record is damaged: patch it again to repair it.");
+    expect(rowOf(game({ changed_files: ["OptiScaler/libxess.dll"] })).lines[1]).toBe(
+      "Some of its files are gone or changed since the patch: patch it again.",
+    );
+    expect(rowOf(game({ changed_files: ["OptiScaler/libxess.dll"], dll_present: false })).lines[1]).toBe("dxgi.dll is missing: patch it again.");
+    expect(rowOf(game({ changed_files: ["OptiScaler/libxess.dll"], version_incomplete: true })).lines[1]).toBe(
+      "Some of its files are gone or changed since the patch: patch it again.",
+    ); // the game's own patch first: its version may well be whole
     expect(rowOf(game({ lacks_version_files: true })).lines[1]).toBe("Its OptiScaler version has files this patch lacks: patch it again.");
     expect(rowOf(game({ lacks_version_files: true, dll_present: false })).lines[1]).toBe("dxgi.dll is missing: patch it again.");
     expect(rowOf(game({ version_incomplete: true, lacks_version_files: true })).lines[1]).toBe(
