@@ -132,7 +132,9 @@ def test_a_version_that_cant_be_read_with_certainty_is_unsupported(change, reaso
     assert newest_nightly(change).unsupported == reason
 
 
-@pytest.mark.parametrize("suffix", ["_beta", "_b7b07d"], ids=["word", "short-hash"])
+@pytest.mark.parametrize(
+    "suffix", ["_beta", "_b7b07d", "_B7B07D2D", f"_{'a' * 41}"], ids=["word", "short-hash", "upper-case", "longer-than-sha"]
+)
 def test_a_nightly_whose_name_carries_anything_but_a_commit_after_the_date_is_not_offered(suffix):
     name = f"OptiScaler_v10.0.0-pre1_20261023{suffix}.7z"
 
