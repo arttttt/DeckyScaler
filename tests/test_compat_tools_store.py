@@ -137,7 +137,7 @@ def test_every_tool_steam_would_find_is_listed_whoever_installed_it(tmp_path):
     assert CompatToolsStore(tmp_path / "missing").installed() == []
 
 
-def test_a_folder_steam_would_list_no_tool_for_is_listed_apart_but_never_a_link_a_file_ours_or_the_systems(tmp_path):
+def test_a_folder_steam_would_list_no_tool_for_and_a_plain_file_are_listed_apart_but_never_a_link_ours_or_the_systems(tmp_path):
     tools, system, elsewhere = tools_dir(tmp_path), tmp_path / "system", tmp_path / "elsewhere"
     build_tree(tools)
     write(tools / "not-a-tool" / "readme.txt", b"")
@@ -150,8 +150,13 @@ def test_a_folder_steam_would_list_no_tool_for_is_listed_apart_but_never_a_link_
     build_tree(tools / PARTIAL_DIRNAME / "GE-Proton11-13-x86_64")
     write(system / "system-leftover" / "readme.txt", b"")  # never this device's own to remove
 
+    write(tools / "registers-one-elsewhere.vdf", b"")  # a manifest may register a tool kept elsewhere: never one
+    write(tmp_path / "kept-elsewhere.tar.gz", b"")
+    (tools / "linked-file").symlink_to(tmp_path / "kept-elsewhere.tar.gz")  # a link: never the plugin's to remove
+
     store = CompatToolsStore(tools, system)
-    assert [tool.folder for tool in store.others()] == ["dangling-manifest", "empty-manifest", "not-a-tool"]
+    # A plain file is listed too, to remove: an archive copied there, a note.
+    assert [tool.folder for tool in store.others()] == ["dangling-manifest", "empty-manifest", "not-a-tool", "stray.tar.gz"]
     assert all(tool.names == frozenset() and not tool.system for tool in store.others())
     assert [tool.folder for tool in store.installed()] == [TOOL]  # each folder is one or the other, never both
     assert CompatToolsStore(tmp_path / "missing").others() == []
@@ -287,3 +292,54 @@ def test_the_tools_users_chose_come_from_the_installs_config(steam_library):
 
     assert chosen.games == {"730": TOOL} and chosen.global_tool == "proton_experimental"
     assert proton.forced_mappings(steam_library.root.parent).games == {}
+
+
+def test_a_tool_whose_launch_file_is_gone_is_listed_with_what_it_misses(tmp_path):
+    tools = tools_dir(tmp_path)
+    build_tree(tools)
+    cut_short = tools / "GE-Proton11-13-x86_64"
+    write(cut_short / "compatibilitytool.vdf", manifest("GE-Proton11-13-x86_64"))  # a removal stopped after the files
+    write(cut_short / "toolmanifest.vdf", b'"manifest" { "commandline" "/proton %verb%" }')
+    luxtorpeda = tools / "luxtorpeda"
+    write(luxtorpeda / "compatibilitytool.vdf", manifest("luxtorpeda"))
+    write(luxtorpeda / "toolmanifest.vdf", b'"manifest" { "commandline" "/luxtorpeda.sh %verb%" }')
+    write(luxtorpeda / "luxtorpeda.sh", b"#!/bin/sh\n")
+    no_manifest = tools / "old-tool"
+    write(no_manifest / "compatibilitytool.vdf", manifest("old-tool"))  # no toolmanifest.vdf: Steam knows nothing to run
+    names_none = tools / "quiet-tool"
+    write(names_none / "compatibilitytool.vdf", manifest("quiet-tool"))
+    write(names_none / "toolmanifest.vdf", b'"manifest" { "version" "2" }')  # names nothing to run: not accused
+    elsewhere = tools / "kept-in-a-subfolder"
+    write(elsewhere / "compatibilitytool.vdf", manifest("kept-in-a-subfolder").replace(b'"install_path" "."', b'"install_path" "dist"'))
+    write(elsewhere / "dist" / "toolmanifest.vdf", b'"manifest" { "commandline" "/proton %verb%" }')
+    write(elsewhere / "dist" / "proton", b"#!/bin/sh\n")
+    two = tools / "two-tools"
+    write(two / "compatibilitytool.vdf", (
+        '"compatibilitytools" { "compat_tools" {'
+        ' "first" { "install_path" "a" "display_name" "first" }'
+        ' "second" { "install_path" "b" "display_name" "second" } } }'
+    ).encode())
+    write(two / "a" / "toolmanifest.vdf", b'"manifest" { "commandline" "/run-a %verb%" }')
+    write(two / "a" / "run-a", b"")
+    write(two / "b" / "toolmanifest.vdf", b'"manifest" { "commandline" "/run-b %verb%" }')  # its run-b is gone
+
+    missing = {tool.folder: tool.missing for tool in CompatToolsStore(tools).installed()}
+
+    assert missing == {
+        TOOL: None, "GE-Proton11-13-x86_64": "proton", "luxtorpeda": None, "old-tool": "toolmanifest.vdf",
+        "quiet-tool": None, "kept-in-a-subfolder": None, "two-tools": "run-b",
+    }
+
+
+def test_a_plain_file_is_sized_and_removed_but_a_link_never(tmp_path):
+    tools = tools_dir(tmp_path)
+    write(tools / "GE-Proton11-13-x86_64.tar.gz", b"x" * 1234)
+    (tools / "linked.tar.gz").symlink_to(tmp_path / "elsewhere.tar.gz")
+    store = CompatToolsStore(tools)
+    archive_file = next(tool for tool in store.others() if tool.folder == "GE-Proton11-13-x86_64.tar.gz")
+
+    assert store.size(archive_file) == 1234
+    store.remove("GE-Proton11-13-x86_64.tar.gz")
+    assert not (tools / "GE-Proton11-13-x86_64.tar.gz").exists()
+    with pytest.raises(ValueError):
+        store.remove("linked.tar.gz")

@@ -57,6 +57,8 @@ export type MoveOfferView = {
 
 export type ProtonPageView = {
   summary: string;
+  /** The tools games are set to that aren't on the device, one line each; the one for every game first. */
+  unresolved: string[];
   /** Builds came or went since Steam started: the page says so above its Restart Steam button. */
   restart: boolean;
   moves: MoveOfferView[];
@@ -90,8 +92,17 @@ const moveOffer = (offer: ProtonMove, state: MoveState): MoveOfferView => {
   };
 };
 
+/** Where the games set to a tool that isn't on the device are told: Steam can't run them with it. */
+const unresolvedLines = (unresolved: InstalledProton["unresolved"]): string[] => [
+  ...(unresolved.global ? [`Every game without its own choice is set to ${unresolved.global}, which isn't on this device.`] : []),
+  ...unresolved.tools
+    .map(({ tool, games }) => ({ tool, names: sortedNames(shownGames(games)) }))
+    .filter(({ names }) => names.length > 0)
+    .map(({ tool, names }) => `Set to ${tool}, which isn't on this device: ${names.join(", ")}. Pick another one in the game's Properties → Compatibility.`),
+];
+
 export const protonPageView = (installed: InstalledProton | null, move: MoveState = null): ProtonPageView => {
-  const base = { hint: CHOOSING_HINT, moves: [], moveMessage: move?.message ?? null };
+  const base = { hint: CHOOSING_HINT, moves: [], moveMessage: move?.message ?? null, unresolved: [] };
   if (installed === null) return { ...base, summary: "Loading…", restart: false, dialogsEnabled: false };
   if (installed.problem) return { ...base, summary: problemText(installed.problem), restart: false, dialogsEnabled: false };
   // The device's own builds come newest first; the system's are Steam's to keep.
@@ -103,6 +114,7 @@ export const protonPageView = (installed: InstalledProton | null, move: MoveStat
       : "No Proton build is installed yet.",
     restart: installed.restart_needed,
     moves: installed.moves.map((offer) => moveOffer(offer, move)).filter((offer) => offer.move.games.length > 0),
+    unresolved: unresolvedLines(installed.unresolved),
     dialogsEnabled: true,
   };
 };
@@ -216,6 +228,10 @@ const removable = (tool: InstalledProtonTool): boolean => !tool.system && !tool.
 /** A linked build is still a build the user's games run on: its row keeps what it is, its size and its games. */
 const describeTool = (tool: InstalledProtonTool): string => {
   if (tool.system) return "Installed system-wide · can't be removed here";
+  if (tool.missing) {
+    const linked = tool.linked ? ["linked from another folder: mend it there"] : [];
+    return [`Not whole: its ${tool.missing} is missing, so games set to it can't start`, ...linked, ...sized(tool.size), usedBy(tool)].join(" · ");
+  }
   const linked = tool.linked ? ["linked from another folder, can't be removed here"] : [];
   return [tool.build_label ?? "Not installed by DeckyScaler", ...linked, ...sized(tool.size), usedBy(tool)].join(" · ");
 };
