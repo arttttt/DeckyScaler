@@ -38,6 +38,16 @@ def test_the_models_a_dll_carries_are_its_providers_classes_in_ffxs_order(rtti, 
     assert fsr4.models(rtti) == models
 
 
+def test_what_is_told_of_the_fsr4_a_game_carries_is_its_dlls_version_and_models_on_amd_only():
+    rtti = b"\0".join([FP8_CLASS, INT8_CLASS])
+
+    assert fsr4.carried(True, rtti, "4.1.1.2740") == fsr4.Carried("4.1.1.2740", (fsr4.FP8, fsr4.INT8))
+    assert fsr4.carried(True, b".?AVffxProvider_FSR3@@", "3.1.5.0") == fsr4.Carried("3.1.5.0", ())  # it carries none
+    assert fsr4.carried(True, rtti, None) == fsr4.Carried(None, (fsr4.FP8, fsr4.INT8))
+    assert fsr4.carried(False, rtti, "4.1.1.2740") is None  # off AMD FSR 4 isn't the question
+    assert fsr4.carried(True, None, None) is None  # no DLL to read
+
+
 def test_only_amds_vendor_id_is_amd():
     assert fsr4.is_amd("0x1002\n")
     assert fsr4.is_amd("0X1002")

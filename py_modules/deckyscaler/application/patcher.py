@@ -104,13 +104,15 @@ def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
 
-def _carried_fsr4(upscaler: Path) -> dict | None:
-    """The FSR 4 a game's OptiScaler carries, read from its upscaler DLL without running it: the DLL's version, which is
-    FSR 4's, and its models (fsr4.models); None when there is no DLL to read."""
-    rtti = pe_file.sections(upscaler, frozenset({fsr4.RTTI_SECTION})).get(fsr4.RTTI_SECTION)
-    if rtti is None:
+def _carried_fsr4(target_dir: Path, family: library.Family | None) -> dict | None:
+    """The FSR 4 a patched game's OptiScaler carries, read from its upscaler DLL without running it, as fsr4.carried
+    tells it; None too for a patch of a family the plugin doesn't know, which says nowhere to look."""
+    if family is None:
         return None
-    return {"version": dll_version.file_version(upscaler), "models": list(fsr4.models(rtti))}
+    upscaler = target_dir / family.upscaler
+    rtti = pe_file.sections(upscaler, frozenset({fsr4.RTTI_SECTION})).get(fsr4.RTTI_SECTION)
+    carried = fsr4.carried(gpu.amd_gpu(), rtti, dll_version.file_version(upscaler))
+    return None if carried is None else {"version": carried.version, "models": list(carried.models)}
 
 
 class Patcher:
@@ -713,8 +715,7 @@ class Patcher:
             "newer_version": library.newer_in_channel(installed, version),
             **self._against_version(metadata, installed, {}),
             **self._against_its_files(target_dir, metadata),
-            # FSR 4 comes with the game's OptiScaler; off AMD it isn't the question.
-            "fsr4": _carried_fsr4(target_dir / family.upscaler) if family is not None and gpu.amd_gpu() else None,
+            "fsr4": _carried_fsr4(target_dir, family),
             "libraries": metadata.get("libraries") or [],
             "by_wrapper": marker.through_wrapper(metadata),
             "record": record,

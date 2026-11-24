@@ -7,6 +7,8 @@ some Protons fetch, holds an older FSR 4 with fewer models, and earlier versions
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 AMD_VENDOR = "0x1002"
 
 FP8 = "fp8"
@@ -29,6 +31,23 @@ def models(rtti: bytes) -> tuple[str, ...]:
     OptiScaler picks the GPU's model among them: INT8 Lite for the Steam Deck and Ryzen APUs, INT8 for RDNA 3 cards,
     INT8 RDNA2 for RDNA 2 cards, FP8 for RDNA 4."""
     return tuple(model for model, name in _MODEL_CLASSES if name in rtti)
+
+
+@dataclass(frozen=True)
+class Carried:
+    """The FSR 4 a patched game's OptiScaler carries: its upscaler DLL's version, which is FSR 4's (4.1.2.4555), and the
+    models the DLL holds."""
+
+    version: str | None
+    models: tuple[str, ...]
+
+
+def carried(amd_gpu: bool, rtti: bytes | None, version: str | None) -> Carried | None:
+    """What to tell of the FSR 4 a patched game's OptiScaler carries, from its upscaler DLL's RTTI_SECTION and version:
+    nothing off AMD, where FSR 4 isn't the question, nor without a DLL to read (`rtti` None)."""
+    if not amd_gpu or rtti is None:
+        return None
+    return Carried(version, models(rtti))
 
 
 def is_amd(vendor: str) -> bool:
