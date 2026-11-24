@@ -49,6 +49,9 @@ export const patchChoice = (
   };
 };
 
+/** How a game the launch wrapper patched is told apart: Unpatch alone doesn't keep it unpatched. */
+export const WRAPPER_ROUTE = "Patched at each launch by the launch wrapper.";
+
 /** What a patched game runs, and whether a later build of its channel is waiting in the library. */
 export const gameVersionLine = (status: {
   patched?: boolean;
@@ -56,10 +59,12 @@ export const gameVersionLine = (status: {
   newer_version?: string | null;
   lacks_version_files?: boolean;
   version_incomplete?: boolean;
+  by_wrapper?: boolean;
   changed_files?: string[];
 } | null): string | null => {
   if (!status?.patched) return null;
   const notes = [
+    ...(status.by_wrapper ? [WRAPPER_ROUTE] : []),
     ...(status.changed_files?.length ? ["Some of its files are gone or changed since the patch; patch again to put them back."] : []),
     ...(status.newer_version ? [`${status.newer_version} is in the library; choose it and patch again to update.`] : []),
     ...(status.version_incomplete ? ["This version is missing files; download it again from the OptiScaler page."] : []),
@@ -100,6 +105,8 @@ export type GameStatus = {
   install_found?: boolean;
   patched?: boolean;
   dll_name?: string | null;
+  /** Whether the launch wrapper patched it, at a start: it patches it again at each one. */
+  by_wrapper?: boolean;
   /** What its marker is: DeckyScaler's record (whole, unfinished, or damaged), or the original Decky Framegen's. */
   record?: "ok" | "incomplete" | "damaged" | "upstream" | null;
   optiscaler_version?: string | null;

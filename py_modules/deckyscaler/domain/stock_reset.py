@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import bundle, launch_options, marker
+from . import bundle
 from .patch_plan import (
     BACKUP_SUFFIX,
     UPSTREAM_UNINSTALLER_FILENAME,
@@ -76,14 +76,3 @@ def plan(entries: frozenset[str], plugin_entries: frozenset[str], marked_elsewhe
     )
     unrecoverable = tuple(name for name in removed if name in MAYBE_THE_GAMES)
     return ResetPlan(found, operations, removed, restored, unrecoverable)
-
-
-def launch_options_after_reset(current: str, stored_original: str) -> str | None:
-    """The game's launch options after a reset, or None to leave them as they are.
-
-    Options the plugin wrote give way to the user's own (from the marker when it has them);
-    options the user has since changed are not the plugin's to touch.
-    """
-    if not launch_options.is_managed(current):
-        return None
-    return marker.original_launch_options(current, stored_original)

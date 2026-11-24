@@ -45,18 +45,18 @@ def current_state(directory: Path, patch: patch_record.PatchRecord) -> dict[str,
     return state
 
 
-def links(directory: Path, dirs: tuple[str, ...]) -> dict[str, str]:
-    """Every symlink right in each of `dirs` of a game directory ("" for its own), by its path in the game, with where
-    it points. A directory reached through a link is never looked into."""
-    found: dict[str, str] = {}
+def contents(directory: Path, dirs: tuple[str, ...]) -> dict[str, str | None]:
+    """Every entry right in each of `dirs` of a game directory ("" for its own), by its path in the game, with where
+    it points when it is a link (None for a file or a directory). A directory reached through a link is never looked
+    into."""
+    found: dict[str, str | None] = {}
     for name in dirs:
         relative = PurePosixPath(name)
         folder = directory / relative
         if any((directory / step).is_symlink() for step in (relative, *relative.parents) if str(step) != ".") or not folder.is_dir():
             continue
         for entry in os.scandir(folder):
-            if entry.is_symlink():
-                found[str(relative / entry.name)] = os.readlink(entry.path)
+            found[str(relative / entry.name)] = os.readlink(entry.path) if entry.is_symlink() else None
     return found
 
 

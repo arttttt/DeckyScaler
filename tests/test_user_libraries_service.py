@@ -273,3 +273,15 @@ def test_a_patched_game_says_when_its_choice_needs_patching_again(plugin, home, 
     assert run(plugin.user_library_game_choice("1234"))["pending"] is True
     run(plugin.patch_game("1234", "dxgi.dll", "", NIGHTLY))
     assert run(plugin.user_library_game_choice("1234"))["pending"] is False
+
+
+def test_applying_to_a_steam_game_leaves_launch_options_its_last_patch_set(plugin, home, plugin_home, steam_library):
+    owner(home).install(ul.ANR, "anr-v-b19")
+    steam_library.add_game("620", "Portal 2")
+    run(plugin.patch_game("620", "dxgi.dll", "", NIGHTLY))
+    run(plugin.user_library_choose("global", FG, "anr-v-b19"))
+
+    applied = run(plugin.user_libraries_apply())["applied"]
+
+    # Steam's aren't read: they are the plugin's, or the user's edit since; neither is the plugin's to set again.
+    assert applied == [{"name": "Portal 2", "appid": "620", "launch_options": None}]

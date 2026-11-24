@@ -6,6 +6,7 @@ Steam compares tool names case-insensitively; the names here keep the case Steam
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from . import keyvalues
@@ -80,3 +81,27 @@ def custom_tools(manifest: keyvalues.KeyValues) -> dict[str, str]:
         for name, entry in tools.items()
         if isinstance(entry, dict)
     }
+
+
+def launch_target(toolmanifest: keyvalues.KeyValues) -> str | None:
+    """The file a tool's toolmanifest.vdf has Steam run, relative to the tool's install path: the first word of its
+    commandline (else of commandline_waitforexitandrun), without the leading "/". Every Proton names `proton`; other
+    tools their own script. None when it names none."""
+    manifest = keyvalues.find(toolmanifest, "manifest")
+    if not isinstance(manifest, dict):
+        return None
+    for key in ("commandline", "commandline_waitforexitandrun"):
+        line = manifest.get(key)
+        if isinstance(line, str) and line.split():
+            return line.split()[0].lstrip("/") or None
+    return None
+
+
+_VALVES = re.compile(r"proton_(experimental|hotfix|\d+(_\d+)*)|steamlinuxruntime(_\w+)?")
+"""Valve's own tools' internal names (proton_experimental, proton_9, proton_6_3, steamlinuxruntime_sniper): Steam keeps them as
+apps of its own, outside compatibilitytools.d, and fetches one when a game needs it."""
+
+
+def is_valves(name: str) -> bool:
+    """Whether a tool name is one of Valve's own, which no compatibilitytools.d holds."""
+    return _VALVES.fullmatch(name.lower()) is not None

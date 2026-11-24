@@ -279,7 +279,10 @@ def test_the_wrapper_and_the_plugin_patch_a_game_identically(wrapper, plugin, tm
     wrapper.run("patch", str(by_wrapper / "Game.exe"), env=env)
     run(plugin.manual_patch_directory(str(by_plugin), "winmm.dll", "nightly-20261023"))
 
-    assert describe_tree(by_wrapper) == describe_tree(by_plugin)
+    wrapper_tree, plugin_tree = describe_tree(by_wrapper), describe_tree(by_plugin)
+    # The one difference, by design: the wrapper's patch records that it patches the game at each start.
+    assert wrapper_tree["DECKYSCALER_PATCH"].pop("through") == "wrapper"
+    assert wrapper_tree == plugin_tree
 
 
 def test_a_missing_python_is_reported_instead_of_guessed_around(wrapper, tmp_path):

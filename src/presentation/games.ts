@@ -1,4 +1,5 @@
 import type { AwayGame, InstalledLibrary, PatchedGame, PatchedGames } from "../api";
+import { WRAPPER_ROUTE } from "./patching";
 import { versionLabel } from "./releases";
 
 export type GameRowView = {
@@ -38,6 +39,7 @@ const row = (game: PatchedGame, library: InstalledLibrary | null): GameRowView =
   const patchedOn = game.patched_at ? `, patched ${game.patched_at.slice(0, 10)}` : "";
   const lines = [
     `OptiScaler ${versionName(library, game.version_id)} via ${game.dll_name}${patchedOn}`,
+    ...(game.by_wrapper ? [WRAPPER_ROUTE] : []),
     ...(game.newer_version ? [`${versionName(library, game.newer_version)} is in the library: patch again to update.`] : []),
     ...(game.own_settings ? ["Has settings of its own."] : []),
     ...[problem(game)].filter((line): line is string => line !== null),
