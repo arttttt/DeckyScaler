@@ -172,7 +172,7 @@ def test_the_wrapper_keeps_what_the_game_has_until_the_library_leaves_the_device
     assert not (game / "OptiScaler" / "custom").exists()
     lines = set(ini_of(game).splitlines())
     assert "FGInput=fsrfg" in lines  # the user's value again
-    assert {f"FGNvngxReplacement=auto", "DisableHudless=auto"} <= lines  # nobody's: back to OptiScaler's own
+    assert {"FGNvngxReplacement=auto", "DisableHudless=auto"} <= lines  # nobody's: back to OptiScaler's own
 
 
 def test_a_library_whose_files_went_missing_leaves_the_game_and_the_game_still_starts(plugin, plugin_home, home, tmp_path):

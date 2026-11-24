@@ -26,7 +26,6 @@ from deckyscaler.domain import (
     settings_layers,
     steam,
     stock_reset,
-    user_libraries,
     version_placement,
 )
 from deckyscaler.domain import patch_plan as plan
