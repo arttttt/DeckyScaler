@@ -147,7 +147,9 @@ def _version(channel: Channel, release: dict) -> Available:
     published_at = str(release.get("published_at") or "")
     if len(matches) != 1:
         reason = SEVERAL_ARCHIVES if matches else NO_ARCHIVE
-        return Available(f"{channel.id}-{tag}", channel.id, tag, "", published_at, None, "", "", 0, reason)
+        # Named by its tag, which for a nightly already starts with the channel's name (nightly-20261123).
+        unread_id = f"{channel.id}-{tag.removeprefix(f'{channel.id}-')}"
+        return Available(unread_id, channel.id, tag, "", published_at, None, "", "", 0, reason)
     asset, match = matches[0]
     version, date = match.group(1), match.group(2)
     digest = release_assets.sha256(asset)

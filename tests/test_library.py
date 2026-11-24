@@ -141,6 +141,12 @@ def test_a_nightly_whose_name_carries_anything_but_a_commit_after_the_date_is_no
     assert newest_nightly(lambda r: r["assets"][0].update(name=name)).unsupported == library.NO_ARCHIVE
 
 
+def test_a_nightly_without_an_archive_is_named_as_a_readable_one_would_be():
+    unread = newest_nightly(lambda r: r.update(assets=[]))
+
+    assert (unread.id, unread.unsupported) == ("nightly-20261023", library.NO_ARCHIVE)
+
+
 def test_drafts_and_releases_of_the_other_kind_are_not_listed():
     listing = nightly()
     listing[0]["draft"] = True
