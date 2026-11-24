@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import shutil
+import struct
 import sys
 import threading
 import types
@@ -77,6 +78,27 @@ def write(path: Path, data: bytes) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return path
+
+
+def pe_dll(sections: dict[str, bytes], outside: bytes = b"") -> bytes:
+    """A Windows PE file holding `sections` (name → raw bytes) one after another; `outside` sits between the headers
+    and the first of them."""
+    pe_offset = 0x40
+    dos = bytearray(pe_offset)
+    dos[0:2] = b"MZ"
+    struct.pack_into("<I", dos, 0x3C, pe_offset)
+    coff = b"PE\0\0" + struct.pack("<HHIIIHH", 0x8664, len(sections), 0, 0, 0, 0, 0)
+    offset = pe_offset + len(coff) + 40 * len(sections) + len(outside)
+    table = b""
+    for name, data in sections.items():
+        table += name.encode().ljust(8, b"\0") + struct.pack("<IIII", len(data), 0x1000, len(data), offset) + bytes(16)
+        offset += len(data)
+    return bytes(dos) + coff + table + outside + b"".join(sections.values())
+
+
+def fixed_file_info(major: int, minor: int, build: int, revision: int, structure: int = 0x00010000) -> bytes:
+    """Resources holding a VS_FIXEDFILEINFO with that file version."""
+    return b"\0" * 8 + struct.pack("<IIII", 0xFEEF04BD, structure, (major << 16) | minor, (build << 16) | revision)
 
 
 def install_tools(directory: Path, scripts: dict[str, str]) -> Path:
