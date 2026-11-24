@@ -222,13 +222,15 @@ describe("steam game view", () => {
 });
 
 describe("FSR 4 line", () => {
-  it("says whether the game's Proton has FSR 4, will download it, or can't", () => {
+  it("says whether the game's Proton has FSR 4, will download it, or can't, and how to see FSR 4 render", () => {
+    const watermark =
+      "To see it render rather than FSR 3, turn on Fsr4EnableWatermark in OptiScaler settings: FSR 4 then shows its watermark in the game.";
     expect(fsr4Line({ state: "in-prefix", tool: "GE-Proton11-11", version: "4.1.1" })).toBe(
-      "FSR 4 4.1.1 is in this game's Proton prefix.",
+      `FSR 4 4.1.1 is in this game's Proton prefix. ${watermark}`,
     );
-    expect(fsr4Line({ state: "in-prefix", tool: null, version: null })).toBe("FSR 4 is in this game's Proton prefix.");
+    expect(fsr4Line({ state: "in-prefix", tool: null, version: null })).toBe(`FSR 4 is in this game's Proton prefix. ${watermark}`);
     expect(fsr4Line({ state: "will-fetch", tool: "GE-Proton11-11", version: null })).toBe(
-      "GE-Proton11-11 downloads FSR 4 on the game's first launch after patching.",
+      `GE-Proton11-11 downloads FSR 4 on the game's first launch after patching. ${watermark}`,
     );
     expect(fsr4Line({ state: "unsupported", tool: "proton_experimental", version: null })).toBe(
       "proton_experimental can't provide FSR 4. Choose GE-Proton or Proton-CachyOS for this game.",
