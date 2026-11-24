@@ -500,6 +500,8 @@ export type PatchedGame = {
   record: "ok" | "incomplete" | "damaged";
   /** Patched by the launch wrapper, at a start: it patches the game again at each one. */
   by_wrapper: boolean;
+  /** Files its patch placed, other than the proxy, that are gone or not as placed: patching again puts them back. */
+  changed_files: string[];
   own_settings: boolean;
 };
 

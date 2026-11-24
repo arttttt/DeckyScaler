@@ -191,6 +191,23 @@ def intact(patch: PatchRecord, current: dict[str, str | None]) -> bool:
     )
 
 
+FILE = "file"
+"""What a placed path is now when it is a file of its own, told without reading it (game_directory.placed_kinds)."""
+
+
+def changed(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
+    """The files a patch placed that aren't as it placed them, told without reading any (`now` maps each placed path
+    to a link's identity while its target is there, FILE for a file, None when it is gone): gone, a link leading
+    nowhere, a link replaced by a file (a game update put its own there), or a link pointing elsewhere. A copy, or a
+    file a program rewrites, only has to be there."""
+    return tuple(
+        item.path
+        for item in patch.placed
+        if now.get(item.path) is None
+        or (item.sha256 is not None and item.sha256.startswith(LINK_PREFIX) and now[item.path] != item.sha256)
+    )
+
+
 def covers(patch: PatchRecord, paths: frozenset[str]) -> bool:
     """Whether the patch placed every one of `paths`: a version's files that came back after it was patched while
     some were gone (`version_placement.linked_files`) are not in the game until it is patched again."""

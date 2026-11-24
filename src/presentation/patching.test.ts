@@ -159,6 +159,12 @@ describe("steam game view", () => {
     expect(steamGameView({ ...base, status: patched }).versionLine).toBe("stable-0.9.4");
   });
 
+  it("tells files of the patch gone or changed since", () => {
+    expect(steamGameView({ ...base, status: { ...patched, changed_files: ["OptiScaler/libxess.dll"] } }).versionLine).toBe(
+      "stable-0.9.4. Some of its files are gone or changed since the patch; patch again to put them back.",
+    );
+  });
+
   it("names the user's libraries a patched game has", () => {
     const withLibraries: GameStatus = { ...patched, libraries: [{ slot: "frame-generation", id: "anr", label: "ANR V.B19" }] };
 

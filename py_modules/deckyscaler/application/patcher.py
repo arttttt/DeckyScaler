@@ -427,6 +427,16 @@ class Patcher:
         doesn't reach them until the drive is back."""
         return sorted(name for _, name in self._indexed()[1])
 
+    def _against_its_files(self, directory: Path, details: dict) -> list[str]:
+        """The files a game's patch placed that aren't as it placed them (patch_record.changed), but its proxy and
+        FSR 4's driver, told on their own: the proxy by its name, the driver by the game's Proton."""
+        recorded = patch_record.parse(details)
+        if recorded is None:
+            return []
+        family = library.FAMILIES.get(str(details.get("family")))
+        aside = {details.get("dll_name") or bundle.DEFAULT_PROXY_DLL, *([version_placement.driver_path(family)] if family else [])}
+        return [path for path in patch_record.changed(recorded, game_directory.placed_kinds(directory, recorded)) if path not in aside]
+
     def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:
         """What a patched game's version, while still in the library, says of the game: whether the game lacks files
         the version holds now (patched while they were gone, it gets them only when patched again, which the launch
@@ -464,6 +474,7 @@ class Patcher:
                 "version_id": version,
                 "newer_version": library.newer_in_channel(installed, version),
                 **self._against_version(details, installed, seen),
+                "changed_files": self._against_its_files(directory, details),
                 "patched_at": details.get("patched_at"),
                 "record": patch_record.state(details),
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
@@ -693,6 +704,7 @@ class Patcher:
             "optiscaler_version": version,
             "newer_version": library.newer_in_channel(installed, version),
             **self._against_version(metadata, installed, {}),
+            "changed_files": self._against_its_files(target_dir, metadata),
             "fsr4": unpatched["fsr4"],
             "libraries": metadata.get("libraries") or [],
             "by_wrapper": marker.through_wrapper(metadata),

@@ -60,10 +60,12 @@ export const gameVersionLine = (status: {
   lacks_version_files?: boolean;
   version_incomplete?: boolean;
   by_wrapper?: boolean;
+  changed_files?: string[];
 } | null): string | null => {
   if (!status?.patched) return null;
   const notes = [
     ...(status.by_wrapper ? [WRAPPER_ROUTE] : []),
+    ...(status.changed_files?.length ? ["Some of its files are gone or changed since the patch; patch again to put them back."] : []),
     ...(status.newer_version ? [`${status.newer_version} is in the library; choose it and patch again to update.`] : []),
     ...(status.version_incomplete ? ["This version is missing files; download it again from the OptiScaler page."] : []),
     ...(status.lacks_version_files ? ["This version has files the patch lacks; patch again to add them."] : []),
@@ -111,6 +113,8 @@ export type GameStatus = {
   newer_version?: string | null;
   /** Its version holds files its patch didn't place: patching again adds them. */
   lacks_version_files?: boolean;
+  /** Files its patch placed, other than the proxy, that are gone or not as placed. */
+  changed_files?: string[];
   /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
   version_incomplete?: boolean;
   fsr4?: Fsr4State | null;
