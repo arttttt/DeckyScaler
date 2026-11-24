@@ -14,6 +14,28 @@ from deckyscaler.domain import fsr4, launch_options
 # ── unit: rules ──────────────────────────────────────────────────────────────
 
 
+# The class names of the four providers as AMD's upscaler DLL names them (FidelityFX SDK 2.4.0, FSR 4.1.2).
+FP8_CLASS, INT8_CLASS = b".?AVffxProvider_FSR4@@", b".?AVffxProvider_FSR4_Int8@@"
+RDNA2_CLASS, LITE_CLASS = b".?AVffxProvider_FSR4_Int8_Navi2@@", b".?AVffxProvider_FSR4Lite_Int8@@"
+
+
+@pytest.mark.parametrize(
+    ("rtti", "models"),
+    [
+        (b"\0".join([b"x", LITE_CLASS, RDNA2_CLASS, INT8_CLASS, FP8_CLASS, b"y"]), (fsr4.FP8, fsr4.INT8, fsr4.INT8_RDNA2, fsr4.INT8_LITE)),
+        (b"\0".join([FP8_CLASS, INT8_CLASS]), (fsr4.FP8, fsr4.INT8)),  # SDK 2.3.0, FSR 4.1.1
+        (FP8_CLASS, (fsr4.FP8,)),  # SDK 2.2.0, FSR 4.1.0
+        (b"\0".join([INT8_CLASS, RDNA2_CLASS, LITE_CLASS]), (fsr4.INT8, fsr4.INT8_RDNA2, fsr4.INT8_LITE)),
+        (b".?AVffxProvider_FSR3@@", ()),
+        (b"", ()),
+    ],
+    ids=["sdk-2.4", "sdk-2.3", "sdk-2.2", "int8-family-not-fp8", "fsr3-only", "nothing"],
+)
+def test_the_models_a_dll_carries_are_its_providers_classes_in_ffxs_order(rtti, models):
+    assert fsr4.models(rtti) == models
+
+
+
 @pytest.mark.parametrize(
     ("tracking", "version"),
     [

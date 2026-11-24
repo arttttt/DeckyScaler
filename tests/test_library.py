@@ -76,6 +76,12 @@ def test_stable_lists_older_releases_as_unsupported_and_skips_its_old_prerelease
     assert older == [("stable-v0.7.9", library.NO_ARCHIVE), ("stable-v0.7.8", library.NO_ARCHIVE)]
 
 
+def test_each_family_keeps_the_upscaler_where_its_archive_must_have_it():
+    assert library.FAMILIES["10"].upscaler == "OptiScaler/amd_fidelityfx_upscaler_dx12.dll"
+    assert library.FAMILIES["0.9"].upscaler == "amd_fidelityfx_upscaler_dx12.dll"
+    assert all(family.upscaler in family.required for family in library.FAMILIES.values())
+
+
 # ── nightly channel ──────────────────────────────────────────────────────────
 
 
