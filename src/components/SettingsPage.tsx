@@ -2,18 +2,16 @@ import { ButtonItem, ConfirmModal, DialogBody, DropdownItem, Field, PanelSection
 import { useDraft } from "../hooks/useDraft";
 import { SettingsPage as Page, useSettings } from "../hooks/useSettings";
 import { RESET_GAME_CONFIRMATION, RESET_GAME_LABEL, SettingRow, searchRows } from "../presentation/settings";
+import { multiline } from "./MultilineText";
 
 type OnChange = (section: string, key: string, picked: string) => void;
-
-// Comment blocks keep their line breaks.
-const describe = (text: string) => (text ? <span style={{ whiteSpace: "pre-line" }}>{text}</span> : undefined);
 
 function SettingText({ row, value, disabled, onChange }: { row: SettingRow; value: string; disabled: boolean; onChange: OnChange }) {
   const { draft, setDraft, onCommit } = useDraft(value, (text) => onChange(row.section, row.key, text));
   return (
     <TextField
       label={row.label}
-      description={describe(row.description)}
+      description={multiline(row.description)}
       value={draft}
       disabled={disabled}
       onChange={(event) => setDraft(event.target.value)}
@@ -30,7 +28,7 @@ function SettingItem({ row, disabled, onChange }: { row: SettingRow; disabled: b
       {control.kind === "dropdown" ? (
         <DropdownItem
           label={row.label}
-          description={describe(row.description)}
+          description={multiline(row.description)}
           rgOptions={control.options}
           selectedOption={control.selected}
           disabled={disabled}
@@ -39,7 +37,7 @@ function SettingItem({ row, disabled, onChange }: { row: SettingRow; disabled: b
       ) : control.kind === "text" ? (
         <SettingText row={row} value={control.value} disabled={disabled} onChange={onChange} />
       ) : (
-        <Field label={row.label} description={describe(row.description)} />
+        <Field label={row.label} description={multiline(row.description)} />
       )}
     </PanelSectionRow>
   );
