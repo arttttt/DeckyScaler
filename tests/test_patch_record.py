@@ -143,8 +143,16 @@ def test_the_games_own_files_unpatch_cant_put_back_are_those_whose_backup_is_gon
     assert patch_record.unrestorable(patch, whole) == ()
     gone = {path: kind for path, kind in whole.items() if not path.endswith(".b")}
     assert patch_record.unrestorable(patch, gone) == ("dxgi.dll", "libxess.dll", "a.dll", "winmm.dll")
-    # The game put its own back where a link was (a verify): nothing of it is lost; nor is anything where nothing is.
-    assert patch_record.unrestorable(patch, {**gone, "dxgi.dll": patch_record.FILE, "libxess.dll": None}) == ("a.dll", "winmm.dll")
+    # Told without reading: the game put its own back where a link was (a verify), and Unpatch leaves it: nothing is
+    # lost. A link gone or leading nowhere leaves the game without its own, and a file where a copy was can't be told
+    # from the copy, which Unpatch takes.
+    told = {**gone, "dxgi.dll": patch_record.FILE, "libxess.dll": None, "a.dll": patch_record.FILE}
+    assert patch_record.unrestorable(patch, told) == ("libxess.dll", "a.dll", "winmm.dll")
+    # Told by content, as Unpatch reads it: a game update's own file over the copy, or a link pointing elsewhere, is
+    # left where it is; a link leading nowhere, still the patch's, goes.
+    read = {**gone, "dxgi.dll": "link:/elsewhere/dxgi.dll", "a.dll": "6" * 64}
+    assert patch_record.unrestorable(patch, read) == ("libxess.dll", "winmm.dll")
+    assert {op.name for op in patch_record.plan_unpatch(patch, read, marker="m")} == {"libxess.dll", "m"}  # what Unpatch takes
 
 
 def test_the_record_round_trips_through_the_marker_and_old_markers_have_none():
@@ -554,6 +562,22 @@ def test_a_game_whose_backup_is_gone_says_so_before_and_after_unpatching(plugin,
         "Unpatched Backup Game. No backup of libxess.dll was left, so the game's own couldn't be put back: "
         "restore it with Steam's Verify integrity of game files."
     )
+
+
+def test_a_proxy_leading_nowhere_without_its_backup_is_told_before_unpatching_as_unpatching_tells_it(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("961", "Dangling Game", {"dxgi.dll": game_file("dxgi.dll")})
+    patched = run(plugin.patch_game("961", "dxgi.dll", "", STABLE))
+    (root / "dxgi.dll").resolve().unlink()  # the library's file the proxy links to: gone
+    (root / "dxgi.dll.b").unlink()
+
+    assert run(plugin.get_game_status("961"))["lost_backups"] == ["dxgi.dll"]
+    assert run(plugin.patched_games())["games"][0]["lost_backups"] == ["dxgi.dll"]
+    unpatched = run(plugin.unpatch_game("961", patched["launch_options"]))
+    assert unpatched["message"] == (
+        "Unpatched Dangling Game. No backup of dxgi.dll was left, so the game's own couldn't be put back: "
+        "restore it with Steam's Verify integrity of game files."
+    )
+    assert not (root / "dxgi.dll").is_symlink() and not (root / "dxgi.dll").exists()
 
 
 def test_after_a_verify_the_games_own_proxy_is_told_and_the_patch_set_aside_as_its_backup_is_matched(plugin, plugin_home, tmp_path):

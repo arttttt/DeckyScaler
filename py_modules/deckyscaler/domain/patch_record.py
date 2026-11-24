@@ -212,23 +212,30 @@ def taken_back(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...
     )
 
 
+def _someone_elses(item: Placed, there: str | None) -> bool:
+    """Whether what is at a placed path now is someone else's, which Unpatch leaves where it is: not what the patch
+    placed there. `there` is what the path is now (a link's identity, a file's sha256, or FILE; None when gone). A file
+    a program rewrites (no content recorded) stays the patch's; so does a file where a copy was, told without reading
+    it (FILE), as it can't be told from the copy."""
+    if item.sha256 is None or there is None:
+        return False
+    if there == FILE:
+        return item.sha256.startswith(LINK_PREFIX)
+    return there != item.sha256
+
+
 def unrestorable(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
-    """The files of the game's own a patch set aside that Unpatch can't put back: their backup is gone, and what is in
-    their place is still the patch's (or nothing of it was placed there), so the game's own is lost until Steam
-    verifies it. `now` is what each placed path and backup is (a link's identity, a file's, or FILE; None or absent
-    when gone). A file the game put in a link's place since is the game's: nothing of it is lost."""
+    """The files of the game's own a patch set aside that Unpatch can't put back: their backup is gone, and nothing of
+    someone else's is in their place (_someone_elses: what Unpatch leaves), so the game is without its own until Steam
+    verifies it. `now` is what each placed path and backup is (a link's identity, a file's sha256, or FILE; None or
+    absent when gone, or for a link leading nowhere told without reading)."""
     placed = {item.path: item for item in patch.placed}
-    lost = []
-    for backup in patch.backups:
-        if now.get(backup.backup) is not None:
-            continue
-        item = placed.get(backup.original)
-        if item is not None:
-            there = now.get(item.path)
-            if there is None or (item.sha256 is not None and item.sha256.startswith(LINK_PREFIX) and there != item.sha256):
-                continue
-        lost.append(backup.original)
-    return tuple(lost)
+    return tuple(
+        backup.original
+        for backup in patch.backups
+        if now.get(backup.backup) is None
+        and not (backup.original in placed and _someone_elses(placed[backup.original], now.get(backup.original)))
+    )
 
 
 def covers(patch: PatchRecord, paths: frozenset[str]) -> bool:
@@ -254,8 +261,7 @@ def plan_unpatch(
     for item in patch.placed:
         if item.path not in current or item.path in keep:
             continue
-        replaced = item.sha256 is not None and current[item.path] != item.sha256
-        if replaced and item.path not in backed_up:
+        if _someone_elses(item, current[item.path]) and item.path not in backed_up:
             continue
         operations.append(DeleteFile(item.path))
     for backup in patch.backups:
