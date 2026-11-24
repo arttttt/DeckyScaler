@@ -98,6 +98,7 @@ def test_a_tools_launch_file_is_the_first_word_of_its_command_line(toolmanifest,
     [
         ("proton_experimental", True), ("proton_hotfix", True), ("proton_9", True), ("Proton_10", True),
         ("steamlinuxruntime", True), ("steamlinuxruntime_sniper", True),
+        ("proton_6_3", True), ("proton_5_13", True), ("proton_4_11", True), ("proton_3_7_8", True),  # older Protons
         ("GE-Proton10-5", False), ("proton-cachyos", False), ("proton_9_custom", False), ("my_proton_9", False),
     ],
 )

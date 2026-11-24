@@ -213,8 +213,14 @@ describe("the manage dialog", () => {
 
     expect(protonManageView({ installed: installed({ tools: [cut] }), busy: null, message: null }).rows[0]).toEqual({
       id: GE.id, label: GE.id,
-      description: "Not whole: its launch file proton is missing, so games set to it can't start · 1.6 GB · used by 2 games",
+      description: "Not whole: its proton is missing, so games set to it can't start · 1.6 GB · used by 2 games",
       action: { label: "Remove", enabled: true },
+    });
+    const linked = { ...GE, missing: "proton", linked: true };
+    expect(protonManageView({ installed: installed({ tools: [linked] }), busy: null, message: null }).rows[0]).toEqual({
+      id: GE.id, label: GE.id,
+      description: "Not whole: its proton is missing, so games set to it can't start · linked from another folder: mend it there · 1.6 GB · used by 2 games",
+      action: null,
     });
   });
 

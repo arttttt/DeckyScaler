@@ -97,8 +97,8 @@ def launch_target(toolmanifest: keyvalues.KeyValues) -> str | None:
     return None
 
 
-_VALVES = re.compile(r"proton_(experimental|hotfix|\d+)|steamlinuxruntime(_\w+)?")
-"""Valve's own tools' internal names (proton_experimental, proton_9, steamlinuxruntime_sniper): Steam keeps them as
+_VALVES = re.compile(r"proton_(experimental|hotfix|\d+(_\d+)*)|steamlinuxruntime(_\w+)?")
+"""Valve's own tools' internal names (proton_experimental, proton_9, proton_6_3, steamlinuxruntime_sniper): Steam keeps them as
 apps of its own, outside compatibilitytools.d, and fetches one when a game needs it."""
 
 

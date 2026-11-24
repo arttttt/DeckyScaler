@@ -229,7 +229,8 @@ const removable = (tool: InstalledProtonTool): boolean => !tool.system && !tool.
 const describeTool = (tool: InstalledProtonTool): string => {
   if (tool.system) return "Installed system-wide · can't be removed here";
   if (tool.missing) {
-    return [`Not whole: its launch file ${tool.missing} is missing, so games set to it can't start`, ...sized(tool.size), usedBy(tool)].join(" · ");
+    const linked = tool.linked ? ["linked from another folder: mend it there"] : [];
+    return [`Not whole: its ${tool.missing} is missing, so games set to it can't start`, ...linked, ...sized(tool.size), usedBy(tool)].join(" · ");
   }
   const linked = tool.linked ? ["linked from another folder, can't be removed here"] : [];
   return [tool.build_label ?? "Not installed by DeckyScaler", ...linked, ...sized(tool.size), usedBy(tool)].join(" · ");

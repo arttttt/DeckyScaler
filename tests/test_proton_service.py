@@ -488,3 +488,16 @@ def test_games_set_to_a_proton_that_isnt_on_the_device_are_listed_valves_own_asi
     assert [(row["tool"], [game["name"] for game in row["games"]]) for row in unresolved["tools"]] == [
         ("GE-Proton10-5", ["Killing Floor", "Portal 2"]),
     ]
+
+
+def test_a_linked_build_that_isnt_whole_is_to_be_mended_where_it_is_kept(world, tmp_path):
+    kept = build_tree(tmp_path / "sdcard", NEWEST)
+    (kept / "proton").unlink()
+    world.tools.mkdir(parents=True, exist_ok=True)
+    os.symlink(kept, world.tools / NEWEST)
+
+    assert world.proton(FakeDownload(world.archive)).install(pb.GE_PROTON, NEWEST) == {
+        "status": "error",
+        "message": f"{NEWEST} is a link to a build kept elsewhere, and that build isn't whole (its proton is missing): "
+        "mend it where it is kept, or take the link out of compatibilitytools.d.",
+    }

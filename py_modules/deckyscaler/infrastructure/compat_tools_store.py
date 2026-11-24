@@ -34,14 +34,19 @@ def _declared(manifest: Path) -> frozenset[str]:
 
 
 def _missing(folder: Path) -> str | None:
-    """The file a tool's toolmanifest.vdf has Steam run, under its install path, when it isn't there; None when it is,
-    or the tool names none (nothing proves it broken)."""
-    tool_manifest, manifest = _read(folder / TOOL_MANIFEST), _read(folder / MANIFEST)
-    target = compat_tools.launch_target(tool_manifest) if tool_manifest is not None else None
-    if target is None:
-        return None
-    install_path = next(iter(compat_tools.custom_tools(manifest).values()), ".") if manifest is not None else "."
-    return None if (folder / install_path / target).exists() else target
+    """What a tool misses to start a game: for each tool its compatibilitytool.vdf declares, the toolmanifest.vdf in
+    its install path, which says what Steam runs (an archive without one isn't installed either), then that file. None
+    when every tool has both, or a toolmanifest names nothing to run (nothing proves the tool broken)."""
+    manifest = _read(folder / MANIFEST)
+    for install_path in (compat_tools.custom_tools(manifest).values() if manifest is not None else ()):
+        tool_dir = folder / install_path
+        tool_manifest = _read(tool_dir / TOOL_MANIFEST)
+        if tool_manifest is None:
+            return TOOL_MANIFEST
+        target = compat_tools.launch_target(tool_manifest)
+        if target is not None and not (tool_dir / target).exists():
+            return target
+    return None
 
 
 def _modified(directory: Path) -> float:

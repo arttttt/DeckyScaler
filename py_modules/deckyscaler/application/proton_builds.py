@@ -191,6 +191,11 @@ class ProtonBuilds:
         tools = store.installed()
         known = next((tool for tool in tools if tool.known_as(tool_name)), None)
         if known is not None and known.missing:
+            if known.linked:
+                return _error(
+                    f"{tool_name} is a link to a build kept elsewhere, and that build isn't whole (its {known.missing} is "
+                    "missing): mend it where it is kept, or take the link out of compatibilitytools.d."
+                )
             return _error(
                 f"{tool_name} is there but not whole (its {known.missing} is missing): remove it under Manage installed…, "
                 "then download it again."
