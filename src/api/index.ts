@@ -191,6 +191,8 @@ export type InstalledProton = {
   /** Builds came or went since Steam started: it lists them only after a restart. */
   restart_needed: boolean;
   moves: ProtonMove[];
+  /** Tools the user chose in Steam that aren't on the device (Valve's own aside): for every game, and per game. */
+  unresolved: { global: string | null; tools: { tool: string; games: ProtonGame[] }[] };
 };
 
 export type ProtonListing =

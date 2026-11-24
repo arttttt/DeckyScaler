@@ -36,13 +36,14 @@ const SYSTEM: InstalledProtonTool = {
 };
 const installed = (overrides: Partial<InstalledProton> = {}): InstalledProton => ({
   status: "success", problem: null, tools: [GE, OTHER, SYSTEM], others: [], installed_bytes: 3_000_000_000, restart_needed: false, moves: [],
+  unresolved: { global: null, tools: [] },
   ...overrides,
 });
 
 describe("the Proton page", () => {
   it("counts the installed builds, or says there is none, and always says where a game's Proton is chosen", () => {
     expect(protonPageView(installed())).toEqual({
-      summary: "2 builds installed. Newest: GE-Proton11-12-x86_64.", restart: false, moves: [], moveMessage: null,
+      summary: "2 builds installed. Newest: GE-Proton11-12-x86_64.", restart: false, moves: [], moveMessage: null, unresolved: [],
       dialogsEnabled: true, hint: CHOOSING_HINT,
     });
     expect(protonPageView(installed({ tools: [GE] })).summary).toBe("1 build installed. Newest: GE-Proton11-12-x86_64.");
@@ -363,5 +364,27 @@ describe("restarting Steam", () => {
       lines: ["Steam closes and opens again, and then lists its Proton builds as they are now.", "A running game closes with it."],
       okLabel: "Restart",
     });
+  });
+});
+
+
+describe("tools games are set to that aren't on the device", () => {
+  it("are told on the page, the one for every game first, the games by name, and the nameless left out", () => {
+    const view = protonPageView(installed({
+      unresolved: {
+        global: "GE-Proton11-11-x86_64",
+        tools: [
+          { tool: "GE-Proton10-5", games: [{ appid: "620", name: "Portal 2", kind: "steam" }, { appid: "1250", name: "Killing Floor", kind: "steam" }] },
+          { tool: "GE-Proton9-1", games: [{ appid: "999", name: null, kind: "unknown" }] },
+        ],
+      },
+    }));
+
+    expect(view.unresolved).toEqual([
+      "Every game without its own choice is set to GE-Proton11-11-x86_64, which isn't on this device.",
+      "Set to GE-Proton10-5, which isn't on this device: Killing Floor, Portal 2. Pick another one in the game's Properties → Compatibility.",
+    ]);
+    expect(protonPageView(installed()).unresolved).toEqual([]);
+    expect(protonPageView(null).unresolved).toEqual([]);
   });
 });

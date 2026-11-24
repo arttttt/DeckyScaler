@@ -6,6 +6,7 @@ Steam compares tool names case-insensitively; the names here keep the case Steam
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from . import keyvalues
@@ -94,3 +95,13 @@ def launch_target(toolmanifest: keyvalues.KeyValues) -> str | None:
         if isinstance(line, str) and line.split():
             return line.split()[0].lstrip("/") or None
     return None
+
+
+_VALVES = re.compile(r"proton_(experimental|hotfix|\d+)|steamlinuxruntime(_\w+)?")
+"""Valve's own tools' internal names (proton_experimental, proton_9, steamlinuxruntime_sniper): Steam keeps them as
+apps of its own, outside compatibilitytools.d, and fetches one when a game needs it."""
+
+
+def is_valves(name: str) -> bool:
+    """Whether a tool name is one of Valve's own, which no compatibilitytools.d holds."""
+    return _VALVES.fullmatch(name.lower()) is not None

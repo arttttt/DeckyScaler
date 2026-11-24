@@ -142,7 +142,7 @@ def test_without_a_steam_to_install_into_nothing_is_written_and_the_frontend_is_
 
     assert proton.install(pb.GE_PROTON, NEWEST) == {"status": "error", "problem": steam.NO_STEAM}
     assert proton.installed() == {"status": "success", "problem": steam.NO_STEAM, "tools": [], "others": [], "installed_bytes": 0,
-                                  "restart_needed": False, "moves": []}
+                                  "restart_needed": False, "moves": [], "unresolved": {"global": None, "tools": []}}
     assert proton.versions(pb.GE_PROTON)["problem"] == steam.NO_STEAM
     assert world.tree() == []
 
@@ -474,3 +474,17 @@ def test_a_build_there_but_not_whole_is_listed_so_and_refused_until_removed(worl
         "message": f"{NEWEST} is there but not whole (its proton is missing): remove it under Manage installed…, then download it again.",
     }
     assert download.urls == []
+
+
+def test_games_set_to_a_proton_that_isnt_on_the_device_are_listed_valves_own_aside(world, steam_library):
+    build_tree(world.tools, NEWEST)
+    steam_library.add_game("620", "Portal 2")
+    steam_library.add_game("1250", "Killing Floor")
+    steam_library.set_compat_tools({"0": "GE-Proton11-11-x86_64", "620": "GE-Proton10-5", "1250": "GE-Proton10-5", "730": NEWEST, "440": "proton_experimental"})
+
+    unresolved = world.proton().installed()["unresolved"]
+
+    assert unresolved["global"] == "GE-Proton11-11-x86_64"
+    assert [(row["tool"], [game["name"] for game in row["games"]]) for row in unresolved["tools"]] == [
+        ("GE-Proton10-5", ["Killing Floor", "Portal 2"]),
+    ]

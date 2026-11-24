@@ -113,7 +113,7 @@ class ProtonBuilds:
         active = self._active(clients)
         if active.root is None:
             return {"status": "success", "problem": active.problem, "tools": [], "others": [], "installed_bytes": 0,
-                    "restart_needed": False, "moves": []}
+                    "restart_needed": False, "moves": [], "unresolved": {"global": None, "tools": []}}
         store = self._store(active.root)
         forced = proton.forced_mappings(active.root)
         name = self._namer(active.root)
@@ -137,6 +137,11 @@ class ProtonBuilds:
                 "missing": tool.missing,
             })
         others = [row_of(tool) for tool in store.others()]
+        absent = proton_builds.unresolved(forced, tools)
+        unresolved = {
+            "global": absent.global_tool,
+            "tools": [{"tool": tool, "games": name(list(appids))} for tool, appids in absent.games],
+        }
         own = (
             sum(row["size"] for row in rows if not row["system"]) + sum(row["size"] for row in others) if with_sizes else None
         )
@@ -144,7 +149,7 @@ class ProtonBuilds:
         # Steam takes a game's move only to a build it lists, which a restart due means it doesn't yet.
         moves = [] if restart else self._offers(tools, forced, name)
         return {"status": "success", "problem": None, "tools": rows, "others": others, "installed_bytes": own,
-                "restart_needed": restart, "moves": moves}
+                "restart_needed": restart, "moves": moves, "unresolved": unresolved}
 
     def _published(self, build_id: str) -> list[proton_builds.Release]:
         return proton_builds.available(build_id, self.list_releases(proton_builds.BUILDS[build_id].repository))

@@ -91,3 +91,15 @@ def test_names_keep_the_case_steam_wrote_them_in_and_junk_is_no_choice():
 )
 def test_a_tools_launch_file_is_the_first_word_of_its_command_line(toolmanifest, target):
     assert compat_tools.launch_target(keyvalues.parse(toolmanifest)) == target
+
+
+@pytest.mark.parametrize(
+    ("name", "valves"),
+    [
+        ("proton_experimental", True), ("proton_hotfix", True), ("proton_9", True), ("Proton_10", True),
+        ("steamlinuxruntime", True), ("steamlinuxruntime_sniper", True),
+        ("GE-Proton10-5", False), ("proton-cachyos", False), ("proton_9_custom", False), ("my_proton_9", False),
+    ],
+)
+def test_valves_own_tools_are_told_by_their_names(name, valves):
+    assert compat_tools.is_valves(name) is valves
