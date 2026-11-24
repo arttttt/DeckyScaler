@@ -52,6 +52,14 @@ export const patchChoice = (
 /** How a game the launch wrapper patched is told apart: Unpatch alone doesn't keep it unpatched. */
 export const WRAPPER_ROUTE = "Patched at each launch by the launch wrapper.";
 
+/** Why to verify a game in Steam before unpatching it: the game's own files its patch set aside lost their backup. */
+export const lostBackups = (lost: string[]): string =>
+  `The backup of ${lost.join(", ")} is gone: Unpatch can't put the game's own back. Verify the game's files in Steam first.`;
+
+/** Why a game whose proxy file is there doesn't load OptiScaler: the game's own took the patch's place back. */
+export const proxyTakenBack = (dll: string): string =>
+  `The game's own ${dll} is back, after a verify or an update: patch it again.`;
+
 /** What a patched game runs, and whether a later build of its channel is waiting in the library. */
 export const gameVersionLine = (status: {
   patched?: boolean;
@@ -61,10 +69,15 @@ export const gameVersionLine = (status: {
   version_incomplete?: boolean;
   by_wrapper?: boolean;
   changed_files?: string[];
+  lost_backups?: string[];
+  proxy_taken_back?: boolean;
+  dll_name?: string | null;
 } | null): string | null => {
   if (!status?.patched) return null;
   const notes = [
     ...(status.by_wrapper ? [WRAPPER_ROUTE] : []),
+    ...(status.lost_backups?.length ? [lostBackups(status.lost_backups)] : []),
+    ...(status.proxy_taken_back ? [proxyTakenBack(status.dll_name ?? "Its proxy")] : []),
     ...(status.changed_files?.length ? ["Some of its files are gone or changed since the patch; patch again to put them back."] : []),
     ...(status.newer_version ? [`${status.newer_version} is in the library; choose it and patch again to update.`] : []),
     ...(status.version_incomplete ? ["This version is missing files; download it again from the OptiScaler page."] : []),
@@ -123,6 +136,10 @@ export type GameStatus = {
   lacks_version_files?: boolean;
   /** Files its patch placed, other than the proxy, that are gone or not as placed. */
   changed_files?: string[];
+  /** The game's own files its patch set aside whose backup is gone. */
+  lost_backups?: string[];
+  /** The game's own file is back where the patch linked its proxy. */
+  proxy_taken_back?: boolean;
   /** Files a game gets from its version are gone from the version: downloading it again brings them back. */
   version_incomplete?: boolean;
   fsr4?: Fsr4State | null;

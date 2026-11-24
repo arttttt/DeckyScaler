@@ -208,6 +208,47 @@ def changed(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
     )
 
 
+def taken_back(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
+    """The links a patch placed whose place a file took since (`now` as for `changed`): a game update, or Steam's
+    Verify putting the game's own back."""
+    return tuple(
+        item.path
+        for item in patch.placed
+        if item.sha256 is not None and item.sha256.startswith(LINK_PREFIX) and now.get(item.path) == FILE
+    )
+
+
+def _someone_elses(item: Placed | None, there: str | None) -> bool:
+    """Whether what is at a path of the game now is someone else's, which Unpatch leaves where it is: not what the
+    patch placed there (`item`, None when it placed nothing there, so anything there is someone else's). `there` is
+    what the path is now (a link's identity, a file's sha256, or FILE; None when gone). A file a program rewrites (no
+    content recorded) stays the patch's; so does a file where a copy was, told without reading it (FILE), as it can't
+    be told from the copy."""
+    if there is None:
+        return False
+    if item is None:
+        return True
+    if item.sha256 is None:
+        return False
+    if there == FILE:
+        return item.sha256.startswith(LINK_PREFIX)
+    return there != item.sha256
+
+
+def unrestorable(patch: PatchRecord, now: dict[str, str | None]) -> tuple[str, ...]:
+    """The files of the game's own a patch set aside that Unpatch can't put back: their backup is gone, and nothing of
+    someone else's is in their place (_someone_elses: what Unpatch leaves, or the game's own put back where the patch
+    placed nothing), so the game is without its own until Steam verifies it. `now` is what each placed path, backup
+    and original is (a link's identity, a file's sha256, or FILE; None or absent when gone, or for a link leading
+    nowhere told without reading)."""
+    placed = {item.path: item for item in patch.placed}
+    return tuple(
+        backup.original
+        for backup in patch.backups
+        if now.get(backup.backup) is None and not _someone_elses(placed.get(backup.original), now.get(backup.original))
+    )
+
+
 def covers(patch: PatchRecord, paths: frozenset[str]) -> bool:
     """Whether the patch placed every one of `paths`: a version's files that came back after it was patched while
     some were gone (`version_placement.linked_files`) are not in the game until it is patched again."""
@@ -231,8 +272,7 @@ def plan_unpatch(
     for item in patch.placed:
         if item.path not in current or item.path in keep:
             continue
-        replaced = item.sha256 is not None and current[item.path] != item.sha256
-        if replaced and item.path not in backed_up:
+        if _someone_elses(item, current[item.path]) and item.path not in backed_up:
             continue
         operations.append(DeleteFile(item.path))
     for backup in patch.backups:

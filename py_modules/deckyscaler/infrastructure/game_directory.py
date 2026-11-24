@@ -31,10 +31,18 @@ def _link_identity(target: str) -> str:
     return f"{patch_record.LINK_PREFIX}{target}"
 
 
+def _recorded_paths(patch: patch_record.PatchRecord) -> list[str]:
+    """The paths a recorded patch names: what it placed, its backups, and the originals it set aside as them."""
+    named = [item.path for item in patch.placed]
+    for backup in patch.backups:
+        named += [backup.backup, backup.original]
+    return list(dict.fromkeys(named))
+
+
 def current_state(directory: Path, patch: patch_record.PatchRecord) -> dict[str, str | None]:
-    """The identity now of every file a recorded patch placed or backed up that is still there: a symlink's
+    """The identity now of every file a recorded patch placed, backed up or set aside that is still there: a symlink's
     target (even a dangling one), a file's sha256."""
-    paths = [item.path for item in patch.placed] + [backup.backup for backup in patch.backups]
+    paths = _recorded_paths(patch)
     state: dict[str, str | None] = {}
     for path in paths:
         full = directory / path
@@ -74,16 +82,28 @@ def directories_under(directory: Path, roots: tuple[str, ...]) -> frozenset[str]
 
 
 def placed_kinds(directory: Path, patch: patch_record.PatchRecord) -> dict[str, str | None]:
-    """What each file a recorded patch placed is now, without reading any: a link by where it points while that is
-    there, patch_record.FILE for a file, None when it is gone or a link leads nowhere."""
+    """What each file a recorded patch placed, backed up or set aside is now, without reading any: a link by where it
+    points while that is there, patch_record.FILE for a file, None when it is gone or a link leads nowhere."""
     kinds: dict[str, str | None] = {}
-    for item in patch.placed:
-        full = directory / item.path
+    for path in _recorded_paths(patch):
+        full = directory / path
         if full.is_symlink():
-            kinds[item.path] = _link_identity(os.readlink(full)) if full.exists() else None
+            kinds[path] = _link_identity(os.readlink(full)) if full.exists() else None
         else:
-            kinds[item.path] = patch_record.FILE if full.is_file() else None
+            kinds[path] = patch_record.FILE if full.is_file() else None
     return kinds
+
+
+def same_as_backup(directory: Path, entries: frozenset[str]) -> frozenset[str]:
+    """The files among `entries` with a backup beside them (X.b) of the same content; a link is never one."""
+    return frozenset(
+        name
+        for name in entries
+        if f"{name}{plan.BACKUP_SUFFIX}" in entries
+        and not (directory / name).is_symlink()
+        and not (directory / f"{name}{plan.BACKUP_SUFFIX}").is_symlink()
+        and files.files_match(directory / name, directory / f"{name}{plan.BACKUP_SUFFIX}")
+    )
 
 
 def listing(directory: Path) -> tuple[frozenset[str], frozenset[str]]:

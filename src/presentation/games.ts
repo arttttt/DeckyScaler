@@ -1,5 +1,5 @@
 import type { AwayGame, InstalledLibrary, PatchedGame, PatchedGames } from "../api";
-import { WRAPPER_ROUTE } from "./patching";
+import { WRAPPER_ROUTE, lostBackups, proxyTakenBack } from "./patching";
 import { versionLabel } from "./releases";
 
 export type GameRowView = {
@@ -28,7 +28,9 @@ const versionName = (library: InstalledLibrary | null, id: string | null): strin
 const problem = (game: PatchedGame): string | null => {
   if (game.record === "damaged") return "Its patch record is damaged: patch it again to repair it.";
   if (game.record === "incomplete") return "The patch didn't finish: unpatch it, then patch again.";
+  if (game.lost_backups.length) return lostBackups(game.lost_backups); // first: Unpatch would lose them for good
   if (!game.dll_present) return `${game.dll_name} is missing: patch it again.`;
+  if (game.proxy_taken_back) return proxyTakenBack(game.dll_name);
   if (game.changed_files.length) return "Some of its files are gone or changed since the patch: patch it again.";
   if (game.version_incomplete) return "Its OptiScaler version is missing files: download it again from the OptiScaler page.";
   if (game.lacks_version_files) return "Its OptiScaler version has files this patch lacks: patch it again.";

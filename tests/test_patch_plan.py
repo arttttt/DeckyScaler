@@ -19,6 +19,25 @@ def test_a_file_deep_in_the_directory_a_link_or_a_copy_would_take_is_backed_up_f
     assert copy == (Move("OptiScaler/custom/U/u.dll", "OptiScaler/custom/U/u.dll.b"), Copy("/lib/u.dll", "OptiScaler/custom/U/u.dll"))
 
 
+def test_a_file_with_a_backup_beside_it_is_set_aside_when_the_same_and_refused_when_not():
+    from deckyscaler.domain.patch_plan import Link, PlanError
+
+    link = (Link("OptiScaler.dll", "dxgi.dll"),)
+    entries = frozenset({"dxgi.dll", "dxgi.dll.b"})
+
+    # The same as its backup: that is the backup already, set aside over it.
+    assert preserving_existing(link, entries, frozenset({"dxgi.dll"})) == (Move("dxgi.dll", "dxgi.dll.b"), *link)
+    with pytest.raises(PlanError) as refused:
+        preserving_existing(link, entries)
+    assert str(refused.value) == (  # which to keep and which to delete, and a way out when neither can be told
+        "dxgi.dll is there, and so is a different dxgi.dll.b, and DeckyScaler can't tell which is the game's own: keep "
+        "that one as dxgi.dll, delete the other, then patch again. Can't tell either? Delete both, and Steam's Verify "
+        "integrity of game files puts the game's own back."
+    )
+    # A removal keeps the old behaviour: the backup is the original.
+    assert preserving_existing((DeleteFile("dxgi.dll"),), entries) == (DeleteFile("dxgi.dll"),)
+
+
 def test_a_file_a_copy_would_overwrite_is_backed_up_first():
     operations = preserving_existing((Copy("x.dll", "x.dll"),), frozenset({"x.dll"}))
 

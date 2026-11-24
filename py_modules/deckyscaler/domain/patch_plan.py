@@ -67,13 +67,17 @@ class PlanError(Exception):
     """A plan cannot be made; the message is shown to the user."""
 
 
-def preserving_existing(operations: tuple[Operation, ...], entries: frozenset[str]) -> tuple[Operation, ...]:
+def preserving_existing(
+    operations: tuple[Operation, ...], entries: frozenset[str], same_as_backup: frozenset[str] = frozenset()
+) -> tuple[Operation, ...]:
     """The plan with every file that was in the directory kept as a backup before it is removed or overwritten.
 
     A repatch undoes the previous patch first, so whatever is in the directory now is not the
     patch's. The backup tables above name the usual cases; this makes it hold for every file.
-    A file that already has a backup beside it keeps the old behaviour (the backup is the original),
-    and a backup itself is never deleted.
+    A file a removal takes that already has a backup beside it keeps the old behaviour (the backup is the original),
+    and a backup itself is never deleted. A file a link or a copy takes, with a backup beside it (Steam's Verify put
+    the game's own back over a lost patch's): the same as its backup (`same_as_backup`) is set aside over it, as that
+    is the backup already; another one is refused, as which one is the game's own can't be told.
     """
     present = set(entries)
     kept: list[Operation] = []
@@ -91,9 +95,14 @@ def preserving_existing(operations: tuple[Operation, ...], entries: frozenset[st
                 continue
             case DeleteFile(name):
                 present.discard(name)
-            case Copy(_, destination) | Link(_, destination) if (
-                destination in present and f"{destination}{BACKUP_SUFFIX}" not in present
-            ):
+            case Copy(_, destination) | Link(_, destination) if destination in present:
+                if f"{destination}{BACKUP_SUFFIX}" in present and destination not in same_as_backup:
+                    raise PlanError(
+                        f"{destination} is there, and so is a different {destination}{BACKUP_SUFFIX}, and DeckyScaler "
+                        f"can't tell which is the game's own: keep that one as {destination}, delete the other, then "
+                        "patch again. Can't tell either? Delete both, and Steam's Verify integrity of game files puts "
+                        "the game's own back."
+                    )
                 kept.append(Move(destination, f"{destination}{BACKUP_SUFFIX}"))
                 present.add(f"{destination}{BACKUP_SUFFIX}")
         kept.append(operation)

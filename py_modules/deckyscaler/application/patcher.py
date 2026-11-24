@@ -95,6 +95,13 @@ WRAPPER_COMES_BACK = (
 )
 
 
+def _lost_said(lost: list[str]) -> str:
+    """What an unpatch says of the game's own files it couldn't put back, their backup gone."""
+    if not lost:
+        return ""
+    return f" No backup of {', '.join(lost)} was left, so the game's own couldn't be put back: restore it with Steam's Verify integrity of game files."
+
+
 def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
@@ -220,7 +227,8 @@ class Patcher:
                 entries |= {driver}  # behind a linked folder too, where nothing is listed
             placement = self.placement(to_place, family)
             request = version_placement.Request(
-                dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies
+                dll_name, reset_ini or repairing, str(fsr4_driver) if fsr4_driver else None, placement.copies,
+                game_directory.same_as_backup(directory, entries),
             )
             operations = version_placement.plan_patch(entries, version_files, family, request)
             log.info(f"Patching {directory} with OptiScaler {entry.id}, {dll_name}, libraries {list(placed)}")
@@ -372,6 +380,7 @@ class Patcher:
             return _error(DAMAGED_RECORD)
         try:
             current = game_directory.current_state(directory, recorded)
+            lost = patch_record.unrestorable(recorded, current)
             operations = patch_record.plan_unpatch(recorded, current, keep, marker_path.name)
             game_directory.execute(operations, directory, self.plugin_home)
         except PermissionError as exc:
@@ -383,7 +392,9 @@ class Patcher:
         # What a marker write cut short staged goes with the marker.
         files.staged(directory / bundle.MARKER_FILENAME).unlink(missing_ok=True)
         self._forget(directory)
-        return {"status": "success", "message": f"OptiScaler files removed from {directory}"}
+        lost = [] if keep else list(lost)  # a repatch puts its own back over them
+        message = f"OptiScaler files removed from {directory}" + ("." + _lost_said(lost) if lost else "")
+        return {"status": "success", "message": message, "lost_backups": lost}
 
     # The index of patched directories follows the markers: an entry is added once a marker is
     # written and dropped once it is gone, but kept while its drive is out. Failing to update it never fails a patch.
@@ -428,15 +439,24 @@ class Patcher:
         doesn't reach them until the drive is back."""
         return sorted(name for _, name in self._indexed()[1])
 
-    def _against_its_files(self, directory: Path, details: dict) -> list[str]:
-        """The files a game's patch placed that aren't as it placed them (patch_record.changed), but its proxy and
-        FSR 4's driver, told on their own: the proxy by its name, the driver by the game's Proton."""
+    def _against_its_files(self, directory: Path, details: dict) -> dict:
+        """What a game's files say of its patch, without reading any: the files it placed that aren't as it placed them
+        (patch_record.changed), but its proxy and FSR 4's driver, told on their own (the proxy by its name, and whether
+        the game's own took its place back; the driver by the game's Proton); and the game's own files Unpatch can't
+        put back, their backup gone."""
         recorded = patch_record.parse(details)
         if recorded is None:
-            return []
+            return {"changed_files": [], "lost_backups": [], "proxy_taken_back": False}
         family = library.FAMILIES.get(str(details.get("family")))
-        aside = {details.get("dll_name") or bundle.DEFAULT_PROXY_DLL, *([version_placement.driver_path(family)] if family else [])}
-        return [path for path in patch_record.changed(recorded, game_directory.placed_kinds(directory, recorded)) if path not in aside]
+        proxy = details.get("dll_name") or bundle.DEFAULT_PROXY_DLL
+        aside = {proxy, *([version_placement.driver_path(family)] if family else [])}
+        now = game_directory.placed_kinds(directory, recorded)
+        return {
+            "changed_files": [path for path in patch_record.changed(recorded, now) if path not in aside],
+            "lost_backups": list(patch_record.unrestorable(recorded, now)),
+            # The game's own proxy back in its place (Steam's Verify): OptiScaler doesn't load, though a file is there.
+            "proxy_taken_back": proxy in patch_record.taken_back(recorded, now),
+        }
 
     def _against_version(self, details: dict, installed: list[library.Installed], seen: dict[str, frozenset[str]]) -> dict:
         """What a patched game's version, while still in the library, says of the game: whether the game lacks files
@@ -475,7 +495,7 @@ class Patcher:
                 "version_id": version,
                 "newer_version": library.newer_in_channel(installed, version),
                 **self._against_version(details, installed, seen),
-                "changed_files": self._against_its_files(directory, details),
+                **self._against_its_files(directory, details),
                 "patched_at": details.get("patched_at"),
                 "record": patch_record.state(details),
                 "own_settings": bool(appid) and bool(self.settings.game_layer(appid)),
@@ -711,7 +731,7 @@ class Patcher:
             "optiscaler_version": version,
             "newer_version": library.newer_in_channel(installed, version),
             **self._against_version(metadata, installed, {}),
-            "changed_files": self._against_its_files(target_dir, metadata),
+            **self._against_its_files(target_dir, metadata),
             "fsr4": unpatched["fsr4"],
             "libraries": metadata.get("libraries") or [],
             "by_wrapper": marker.through_wrapper(metadata),
@@ -833,7 +853,8 @@ class Patcher:
             "name": game.name,
             "launch_options": options,
             "message": f"Unpatched {game.name}."
-            + _options_left(current_launch_options, options, marker.through_wrapper(metadata)),
+            + _options_left(current_launch_options, options, marker.through_wrapper(metadata))
+            + _lost_said(result["lost_backups"]),
         }
 
     # ── unpatching what Decky Framegen patched ──────────────────────

@@ -132,6 +132,33 @@ def test_a_placed_file_gone_or_not_as_placed_is_told_without_reading_it():
     )
 
 
+def test_the_games_own_files_unpatch_cant_put_back_are_those_whose_backup_is_gone():
+    patch = PatchRecord(
+        placed=(Placed("dxgi.dll", "link:/lib/OptiScaler.dll"), Placed("libxess.dll", "link:/lib/libxess.dll"), Placed("a.dll", "1" * 64)),
+        backups=(Backup("dxgi.dll", "dxgi.dll.b"), Backup("libxess.dll", "libxess.dll.b"), Backup("a.dll", "a.dll.b"), Backup("winmm.dll", "winmm.dll.b")),
+        created_dirs=(),
+    )
+    whole = {"dxgi.dll": "link:/lib/OptiScaler.dll", "libxess.dll": "link:/lib/libxess.dll", "a.dll": "1" * 64,
+             "dxgi.dll.b": "2" * 64, "libxess.dll.b": "3" * 64, "a.dll.b": "4" * 64, "winmm.dll.b": "5" * 64}
+
+    assert patch_record.unrestorable(patch, whole) == ()
+    gone = {path: kind for path, kind in whole.items() if not path.endswith(".b")}
+    assert patch_record.unrestorable(patch, gone) == ("dxgi.dll", "libxess.dll", "a.dll", "winmm.dll")
+    # Told without reading: the game put its own back where a link was (a verify), and Unpatch leaves it: nothing is
+    # lost. A link gone or leading nowhere leaves the game without its own, and a file where a copy was can't be told
+    # from the copy, which Unpatch takes.
+    told = {**gone, "dxgi.dll": patch_record.FILE, "libxess.dll": None, "a.dll": patch_record.FILE}
+    assert patch_record.unrestorable(patch, told) == ("libxess.dll", "a.dll", "winmm.dll")
+    # Told by content, as Unpatch reads it: a game update's own file over the copy, or a link pointing elsewhere, is
+    # left where it is; a link leading nowhere, still the patch's, goes.
+    read = {**gone, "dxgi.dll": "link:/elsewhere/dxgi.dll", "a.dll": "6" * 64}
+    assert patch_record.unrestorable(patch, read) == ("libxess.dll", "winmm.dll")
+    # Where the patch placed nothing, anything there is the game's own, put back since (a verify): nothing is lost.
+    assert patch_record.unrestorable(patch, {**told, "winmm.dll": patch_record.FILE}) == ("libxess.dll", "a.dll")
+    assert patch_record.unrestorable(patch, {**read, "winmm.dll": "7" * 64}) == ("libxess.dll",)
+    assert {op.name for op in patch_record.plan_unpatch(patch, read, marker="m")} == {"libxess.dll", "m"}  # what Unpatch takes
+
+
 def test_the_record_round_trips_through_the_marker_and_old_markers_have_none():
     recorded = PatchRecord((Placed("dxgi.dll", "a" * 64), Placed("OptiScaler.ini", None)), (Backup("x", "x.b"),), ("d",))
     marker = {"dll_name": "dxgi.dll", **patch_record.to_json(recorded, complete=True)}
@@ -560,6 +587,84 @@ def test_a_placed_link_leading_nowhere_is_changed_but_fsr4s_driver_is_told_on_it
     (plugin_home / "library" / "versions" / NIGHTLY / "files" / "OptiScaler" / "libxess.dll").unlink()
 
     assert run(plugin.patched_games())["games"][0]["changed_files"] == ["OptiScaler/libxess.dll"]
+
+
+def test_a_game_whose_backup_is_gone_says_so_before_and_after_unpatching(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("960", "Backup Game", {"libxess.dll": game_file("libxess.dll")})
+    patched = run(plugin.patch_game("960", "dxgi.dll", "", STABLE))
+    assert run(plugin.get_game_status("960"))["lost_backups"] == []  # its backup is there
+    (root / "libxess.dll.b").unlink()  # the game's own, set aside: gone
+
+    assert run(plugin.get_game_status("960"))["lost_backups"] == ["libxess.dll"]
+    assert run(plugin.patched_games())["games"][0]["lost_backups"] == ["libxess.dll"]
+    unpatched = run(plugin.unpatch_game("960", patched["launch_options"]))  # what Steam holds
+    assert unpatched["message"] == (
+        "Unpatched Backup Game. No backup of libxess.dll was left, so the game's own couldn't be put back: "
+        "restore it with Steam's Verify integrity of game files."
+    )
+
+
+def test_a_folder_unpatched_without_a_backup_says_the_games_own_couldnt_be_put_back(plugin, plugin_home, tmp_path):
+    game = make_game_dir(tmp_path / "games" / "Game", {"libxess.dll": game_file("libxess.dll")})
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    (game / "libxess.dll.b").unlink()
+
+    unpatched = run(plugin.manual_unpatch_directory(str(game)))
+
+    assert unpatched["lost_backups"] == ["libxess.dll"]
+    assert unpatched["message"] == (
+        f"OptiScaler files removed from {game}. No backup of libxess.dll was left, so the game's own couldn't be put "
+        "back: restore it with Steam's Verify integrity of game files."
+    )
+
+
+def test_a_proxy_leading_nowhere_without_its_backup_is_told_before_unpatching_as_unpatching_tells_it(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("961", "Dangling Game", {"dxgi.dll": game_file("dxgi.dll")})
+    patched = run(plugin.patch_game("961", "dxgi.dll", "", STABLE))
+    (root / "dxgi.dll").resolve().unlink()  # the library's file the proxy links to: gone
+    (root / "dxgi.dll.b").unlink()
+
+    assert run(plugin.get_game_status("961"))["lost_backups"] == ["dxgi.dll"]
+    assert run(plugin.patched_games())["games"][0]["lost_backups"] == ["dxgi.dll"]
+    unpatched = run(plugin.unpatch_game("961", patched["launch_options"]))
+    assert unpatched["message"] == (
+        "Unpatched Dangling Game. No backup of dxgi.dll was left, so the game's own couldn't be put back: "
+        "restore it with Steam's Verify integrity of game files."
+    )
+    assert not (root / "dxgi.dll").is_symlink() and not (root / "dxgi.dll").exists()
+
+
+def test_a_proxy_of_the_games_own_set_aside_and_put_back_by_a_verify_is_not_lost(plugin, plugin_home, steam_library):
+    root = steam_library.add_game("962", "Version Game", {"version.dll": game_file("version.dll")})
+    patched = run(plugin.patch_game("962", "dxgi.dll", "", STABLE))
+    assert not (root / "version.dll").exists() and (root / "version.dll.b").is_file()  # set aside, nothing in its place
+    (root / "version.dll.b").unlink()
+    write(root / "version.dll", game_file("version.dll"))  # Steam's Verify puts the game's own back
+
+    assert run(plugin.get_game_status("962"))["lost_backups"] == []
+    assert run(plugin.patched_games())["games"][0]["lost_backups"] == []
+    assert run(plugin.unpatch_game("962", patched["launch_options"]))["message"] == "Unpatched Version Game."
+    assert (root / "version.dll").read_bytes() == game_file("version.dll")
+
+
+def test_after_a_verify_the_games_own_proxy_is_told_and_the_patch_set_aside_as_its_backup_is_matched(plugin, plugin_home, tmp_path):
+    shipped = game_file("dxgi.dll")
+    game = make_game_dir(tmp_path / "games" / "Game", {"dxgi.dll": shipped})
+    run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    (game / "DECKYSCALER_PATCH").unlink()  # the record lost, and Steam's Verify put the game's own back:
+    (game / "dxgi.dll").unlink()
+    write(game / "dxgi.dll", shipped)  # dxgi.dll and the same dxgi.dll.b side by side
+
+    assert run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))["status"] == "success"
+    assert (game / "dxgi.dll.b").read_bytes() == shipped and (game / "dxgi.dll").is_symlink()
+
+    (game / "dxgi.dll").unlink()
+    write(game / "dxgi.dll", shipped)  # verified again, now with the record there
+    assert run(plugin.patched_games())["games"][0]["proxy_taken_back"] is True
+    (game / "DECKYSCALER_PATCH").unlink()
+    write(game / "dxgi.dll.b", b"another build")  # and a backup that isn't the same
+    refused = run(plugin.manual_patch_directory(str(game), "dxgi.dll", STABLE))
+    assert refused["status"] == "error" and "so is a different dxgi.dll.b" in refused["message"]
 
 
 def test_what_is_in_a_game_is_looked_for_only_where_asked_and_never_through_a_link(tmp_path):
