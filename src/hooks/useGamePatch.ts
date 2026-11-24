@@ -51,7 +51,8 @@ export const useGamePatch = (appid: string | null, patchWithFor: (status: GameSt
       const currentLaunchOptions = await getAppLaunchOptions(Number(appid)).catch(() => null);
       const result = await patchGame(appid, patchWith.dllName, currentLaunchOptions, patchWith.versionId);
       if (result.status !== "success") throw new Error(result.message || "Patch failed.");
-      setAppLaunchOptions(Number(appid), result.launch_options || "");
+      // None to set: Steam didn't say what they are, and the plugin's are what its last patch set.
+      if (typeof result.launch_options === "string") setAppLaunchOptions(Number(appid), result.launch_options);
       const message = result.message || `Patched ${name}.`;
       setResultMessage(message);
       notify(message);

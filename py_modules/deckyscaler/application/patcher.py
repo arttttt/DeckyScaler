@@ -76,6 +76,15 @@ def _patched_by_upstream(directory: Path) -> bool:
     return upstream.is_file() and _marker_of(directory) != upstream and not (directory / bundle.MARKER_FILENAME).is_file()
 
 
+def _options_left(current: str | None, after: str | None) -> str:
+    """What an unpatch that leaves a game's launch options as they are says of them."""
+    if after is not None:
+        return ""
+    if current is None:
+        return " Steam didn't say what its launch options are, so they were left as they are."
+    return " Its launch options were changed since it was patched, so they were left as they are."
+
+
 def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
@@ -677,7 +686,9 @@ class Patcher:
         existing_marker = self.find_marker(game.install_path)
         existing = files.read_json(existing_marker) if existing_marker else {}
         stored = str(existing.get("original_launch_options") or "") if existing_marker else None
-        original_options = marker.original_launch_options(current_launch_options, stored)
+        # Ours are told by the proxy the game is patched with, else the one it is about to be.
+        patched_with = str(existing.get("dll_name") or dll_name)
+        original_options = marker.original_launch_options(current_launch_options, stored, patched_with)
         if original_options is None:
             return _error(LAUNCH_OPTIONS_UNKNOWN)
 
@@ -689,44 +700,46 @@ class Patcher:
                 return moved
         log.info(f"[DeckyScaler] patch_game: appid={appid} dll={dll_name} target={target_dir} exe={target_exe}")
         fsr4_driver = self._fsr4(game)[1]
+        managed_options = launch_options.managed(dll_name, fsr4_driver is not None)
         result = self.patch_directory(
             target_dir,
             dll_name,
             version_id=version_id,
-            steam_game=marker.SteamGame(str(appid), game.name, original_options),
+            steam_game=marker.SteamGame(str(appid), game.name, original_options, managed_options),
             fsr4_driver=fsr4_driver,
         )
         if result["status"] != "success":
             return result
 
-        managed_options = launch_options.managed(dll_name, fsr4_driver is not None)
-        log.info(f"[DeckyScaler] patch_game success: appid={appid} launch_options={managed_options}")
+        options = marker.launch_options_after_patch(existing.get("launch_options"), managed_options, current_launch_options)
+        log.info(f"[DeckyScaler] patch_game success: appid={appid} launch_options={options}")
         return {
             "status": "success",
             "appid": str(appid),
             "name": game.name,
             "dll_name": dll_name,
             "target_dir": str(target_dir),
-            "launch_options": managed_options,
+            "launch_options": options,
             "original_launch_options": original_options,
             "optiscaler_version": result.get("optiscaler_version"),
             "message": f"Patched {game.name} with OptiScaler {result.get('optiscaler_version')} using {dll_name}.",
         }
 
-    def unpatch_game(self, appid: str, current_launch_options: str = "", confirmed_reset: bool = False) -> dict:
+    def unpatch_game(self, appid: str, current_launch_options: str | None = None, confirmed_reset: bool = False) -> dict:
         """Unpatch a Steam game: by its record, or — for a Decky Framegen patch, once the
-        user confirmed what the preview showed — by resetting it."""
+        user confirmed what the preview showed — by resetting it. `current_launch_options` is None when Steam didn't
+        say what they are; the answer's `launch_options` is what Steam is to set, None to leave them."""
         try:
             return self._unpatch_game(appid, current_launch_options, confirmed_reset)
         except Exception as exc:
             log.error(f"[DeckyScaler] unpatch_game failed for {appid}: {exc}")
             return _error(str(exc))
 
-    def _unpatch_game(self, appid: str, current_launch_options: str, confirmed_reset: bool) -> dict:
+    def _unpatch_game(self, appid: str, current_launch_options: str | None, confirmed_reset: bool) -> dict:
         game = steam_library.find_game(self.home, str(appid))
         if game is None:
             return _error("Game not found in Steam library.")
-        not_patched = {"status": "success", "appid": str(appid), "name": game.name, "launch_options": ""}
+        not_patched = {"status": "success", "appid": str(appid), "name": game.name, "launch_options": None}
         if not game.install_path.exists():
             return {**not_patched, "message": "Game install directory does not exist."}
         if self._is_running(game):
@@ -745,12 +758,15 @@ class Patcher:
         if result["status"] != "success":
             return result
         log.info(f"[DeckyScaler] unpatch_game success: appid={appid} target={target_dir}")
+        options = marker.launch_options_after_unpatch(
+            current_launch_options, str(metadata.get("original_launch_options") or ""), metadata.get("dll_name")
+        )
         return {
             "status": "success",
             "appid": str(appid),
             "name": game.name,
-            "launch_options": str(metadata.get("original_launch_options") or ""),
-            "message": f"Unpatched {game.name}.",
+            "launch_options": options,
+            "message": f"Unpatched {game.name}." + _options_left(current_launch_options, options),
         }
 
     # ── unpatching what Decky Framegen patched ──────────────────────
@@ -780,11 +796,10 @@ class Patcher:
         reset = stock_reset.plan(entries, plugin_entries, marked_elsewhere)
         if reset.evidence is None:
             return _error(f"No sign of DeckyScaler in {directory}; nothing to reset."), ()
-        stored = str(files.read_json(marker_path).get("original_launch_options") or "") if marker_path else ""
-        new_options = (
-            stock_reset.launch_options_after_reset(current_launch_options, stored)
-            if current_launch_options is not None
-            else None
+        found = files.read_json(marker_path) if marker_path else {}
+        # The original's marker names its proxy too: ours are told by it, else by any.
+        new_options = marker.launch_options_after_unpatch(
+            current_launch_options, str(found.get("original_launch_options") or ""), found.get("dll_name") or None
         )
         preview = {
             "status": "success",
@@ -797,7 +812,7 @@ class Patcher:
         }
         return preview, reset.operations
 
-    def preview_unpatch_game(self, appid: str, current_launch_options: str) -> dict:
+    def preview_unpatch_game(self, appid: str, current_launch_options: str | None) -> dict:
         """How unpatching a game goes: by its record (nothing to confirm), or a reset whose preview
         the user confirms first."""
         try:
@@ -813,7 +828,7 @@ class Patcher:
             log.error(f"[DeckyScaler] preview_unpatch_game failed for {appid}: {exc}")
             return _error(str(exc))
 
-    def _reset_game(self, appid: str, current_launch_options: str) -> dict:
+    def _reset_game(self, appid: str, current_launch_options: str | None) -> dict:
         try:
             game, target, marker_path = self._reset_target(appid)
             if self._is_running(game):

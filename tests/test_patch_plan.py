@@ -1,5 +1,7 @@
 """The rules every plan shares, the unpatch of Decky Framegen's patches, and the launch options to restore."""
 
+import pytest
+
 from deckyscaler.domain import marker
 from deckyscaler.domain import patch_plan as plan
 from deckyscaler.domain.patch_plan import Copy, DeleteFile, Move, RemoveFileOrTree, RemoveTree, preserving_existing
@@ -102,20 +104,45 @@ def test_unpatch_of_a_clean_directory_does_nothing():
 def test_original_launch_options_prefer_the_stored_user_options_and_never_keep_ours():
     ours = "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
 
-    assert marker.original_launch_options("mangohud %command%", "") == "mangohud %command%"
-    assert marker.original_launch_options(ours, "gamemoderun %command%") == "gamemoderun %command%"
-    assert marker.original_launch_options(ours, ours) == ""
+    assert marker.original_launch_options("mangohud %command%", "", "dxgi.dll") == "mangohud %command%"
+    assert marker.original_launch_options(ours, "gamemoderun %command%", "dxgi.dll") == "gamemoderun %command%"
+    assert marker.original_launch_options(ours, ours, "dxgi.dll") == ""
     # Stored options the plugin wrote are not the user's; the current ones are.
-    assert marker.original_launch_options("mangohud %command%", ours) == "mangohud %command%"
-    assert marker.original_launch_options("", "") == ""
-    assert marker.original_launch_options("mangohud %command%", None) == "mangohud %command%"  # a first patch
+    assert marker.original_launch_options("mangohud %command%", ours, "dxgi.dll") == "mangohud %command%"
+    assert marker.original_launch_options("", "", "dxgi.dll") == ""
+    assert marker.original_launch_options("mangohud %command%", None, "dxgi.dll") == "mangohud %command%"  # a first patch
+
+
+@pytest.mark.parametrize(
+    "users",
+    [
+        "SteamDeck=0 %command%",  # a common tweak of its own: the plugin writes it alone only for an .asi proxy
+        "PROTON_FSR4_UPGRADE=1 gamemoderun %command%",
+        "PROTON_FSR4_UPGRADE=1 %command%",
+        "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 gamemoderun %command%",  # ours, and something of the user's
+        "mangohud ~/deckyscaler/patch %command%",
+    ],
+)
+def test_a_first_patch_keeps_options_the_user_wrote_even_beside_the_plugins_own_words(users):
+    assert marker.original_launch_options(users, None, "dxgi.dll") == users
 
 
 def test_unknown_current_options_keep_the_stored_ones_and_are_never_taken_for_none():
     ours = "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
 
-    assert marker.original_launch_options(None, "gamemoderun %command%") == "gamemoderun %command%"
-    assert marker.original_launch_options(None, "") == ""  # an earlier patch stored that the user had none
-    assert marker.original_launch_options(None, ours) == ""
+    assert marker.original_launch_options(None, "gamemoderun %command%", "dxgi.dll") == "gamemoderun %command%"
+    assert marker.original_launch_options(None, "", "dxgi.dll") == ""  # an earlier patch stored that the user had none
+    assert marker.original_launch_options(None, ours, "dxgi.dll") == ""
     # A first patch can't know them: unknown, so the patch is refused rather than losing them.
-    assert marker.original_launch_options(None, None) is None
+    assert marker.original_launch_options(None, None, "dxgi.dll") is None
+
+
+def test_a_patch_leaves_unknown_options_while_the_plugins_are_what_its_last_patch_set():
+    ours = "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 %command%"
+    winmm = "WINEDLLOVERRIDES=winmm=n,b SteamDeck=0 %command%"
+
+    assert marker.launch_options_after_patch(ours, ours, None) is None  # ours, or the user's edit since: left
+    assert marker.launch_options_after_patch(ours, winmm, None) == winmm  # another proxy: they must change
+    assert marker.launch_options_after_patch(None, ours, None) == ours  # a marker from before it was kept
+    assert marker.launch_options_after_patch(ours, ours, "gamemoderun %command%") == ours  # read: the patch sets its own
+    assert marker.launch_options_after_patch(None, ours, "") == ours  # a first patch

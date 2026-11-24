@@ -11,8 +11,8 @@ WRAPPER_UNPATCH = "~/deckyscaler/unpatch %command%"
 """Launch options that unpatch the game through the wrapper on its next start."""
 
 _ASI_PROXY = "OptiScaler.asi"
-_WRAPPERS = ("deckyscaler/patch", "fgmod/fgmod")
-"""The launch wrapper, this plugin's and the original Decky Framegen's."""
+_WRAPPERS = ("/deckyscaler/patch", "/deckyscaler/unpatch", "/fgmod/fgmod")
+"""The launch wrapper's scripts, this plugin's and the original Decky Framegen's, by whatever path they are given."""
 
 
 def override_entry(dll_name: str) -> str | None:
@@ -53,17 +53,17 @@ def setup_json() -> dict:
     }
 
 
-def is_managed(options: str) -> bool:
-    """Whether launch options were written by the plugin or by the original Decky Framegen (or are either's
-    launch wrapper)."""
-    if not options or not options.strip():
-        return False
+def _normalized(options: str) -> str:
     # Decky Framegen also wrote the override quoted: WINEDLLOVERRIDES="dxgi=n,b".
-    normalized = " ".join(options.replace('"', "").replace("'", "").split())
-    tokens = (f"WINEDLLOVERRIDES={override_entry(dll)}" for dll in VALID_DLL_NAMES if override_entry(dll))
-    if any(token in normalized for token in tokens):
+    return " ".join(options.replace('"', "").replace("'", "").split())
+
+
+def is_managed(options: str, patched_with: str | None = None) -> bool:
+    """Whether launch options are exactly what the plugin or the original Decky Framegen writes for a game patched with
+    the proxy `patched_with` (with any proxy when None), FSR 4's upgrade variable or not, or either's launch wrapper
+    alone. Anything the user added to them makes them the user's: theirs to keep, never ours to clear."""
+    words = _normalized(options).split(" ")
+    if len(words) == 2 and words[0].endswith(_WRAPPERS) and words[1].lower() == "%command%":
         return True
-    # An .asi proxy's options carry no override: only what the plugin adds marks them.
-    if f"{UPGRADE_VARIABLE}=1" in normalized or normalized == "SteamDeck=0 %command%":
-        return True
-    return any(wrapper in normalized for wrapper in _WRAPPERS)
+    proxies = [patched_with] if patched_with else sorted(VALID_DLL_NAMES)
+    return _normalized(options) in {_normalized(managed(dll, upgrade)) for dll in proxies for upgrade in (False, True)}

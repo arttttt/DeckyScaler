@@ -23,7 +23,32 @@ def test_options_written_for_a_dll_proxy_are_recognised_as_managed(dll_name):
 def test_is_managed_tolerates_extra_whitespace_and_recognises_the_wrapper():
     assert launch_options.is_managed("  WINEDLLOVERRIDES=dxgi=n,b    SteamDeck=0 %command%  ")
     assert launch_options.is_managed("~/deckyscaler/patch %command%")
+    assert launch_options.is_managed("~/deckyscaler/unpatch %command%")
     assert launch_options.is_managed("~/fgmod/fgmod %command%")  # the original Decky Framegen's wrapper
+    assert launch_options.is_managed("/home/deck/fgmod/fgmod %COMMAND%")  # as its own script printed it
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        "~/deckyscaler/patch %command% -dx12",  # the wrapper, and the game's own arguments
+        "gamemoderun ~/deckyscaler/patch %command%",
+        "WINEDLLOVERRIDES=dxgi=n,b SteamDeck=0 gamemoderun %command%",
+        "PROTON_FSR4_UPGRADE=1 %command%",
+        "~/deckyscaler/patcher %command%",
+        "~/my-deckyscaler/patch %command%",  # someone else's script of that name
+    ],
+)
+def test_options_holding_the_plugins_words_and_the_users_are_the_users(options):
+    assert not launch_options.is_managed(options)
+
+
+def test_the_plugins_options_are_told_by_the_proxy_the_game_is_patched_with():
+    assert launch_options.is_managed("SteamDeck=0 %command%", "OptiScaler.asi")
+    assert not launch_options.is_managed("SteamDeck=0 %command%", "dxgi.dll")  # a tweak of the user's own, then
+    assert not launch_options.is_managed(launch_options.managed("winmm.dll"), "dxgi.dll")
+    assert launch_options.is_managed(launch_options.managed("dxgi.dll", True), "dxgi.dll")
+    assert launch_options.is_managed("SteamDeck=0 %command%")  # with no proxy to go by: any proxy's
 
 
 @pytest.mark.parametrize("quote", ['"', "'"])
